@@ -1,0 +1,26 @@
+<!doctype html>
+<meta charset="utf-8" />
+<title>Mic Test</title>
+<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css">
+<script src="https://unpkg.com/jspsych@7.3.3/dist/jspsych.js"></script>
+<script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+<body></body>
+<script>
+  const jsPsych = initJsPsych({ on_finish: () => jsPsych.data.displayData() });
+
+  const timeline = [
+    { type: jsPsychHtmlButtonResponse, stimulus: "<p>Click to begin & enable audio</p>", choices: ["Begin"] },
+    { type: jsPsychInitializeMicrophone },
+    {
+      type: jsPsychHtmlAudioResponse,
+      stimulus: "<p>Say something, then click Finish.</p>",
+      recording_duration: null,
+      show_done_button: true,
+      done_button_label: "Finish recording",
+      allow_playback: true
+    }
+  ];
+
+  jsPsych.run(timeline);
+</script>
