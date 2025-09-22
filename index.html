@@ -1,26 +1,83 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <title>VR Iconicity Pre-Test</title>
-  <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css">
+  <meta charset="UTF-8" />
+  <title>jsPsych 7.3.3 UMD Demo</title>
+  <!-- Load jsPsych core and CSS -->
+  <script src="https://unpkg.com/jspsych@7.3.3"></script>
+  <link href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" rel="stylesheet" />
+  <!-- Load jsPsych plugins (UMD builds) -->
+  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
+  <link href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" rel="stylesheet" />
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-audio-button-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@2.1.1"></script>
 </head>
-<body>
-  <div id="jspsych-target"></div>
+<body></body>
+<script>
+  // Initialize jsPsych
+  const jsPsych = initJsPsych({ on_finish: () => jsPsych.data.displayData() });
 
-  <!-- jsPsych core (UMD) -->
-  <script src="https://unpkg.com/jspsych@7.3.3/dist/jspsych.js"></script>
+  // Create a timeline array
+  const timeline = [];
 
-  <!-- Plugins (UMD builds) -->
-  <script src="https://unpkg.com/@jspsych/plugin-survey@1.0.0/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.0.0/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.1/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.1/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-audio-button-response@1.1.1/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.1.1/dist/index.umd.js"></script>
-  <script src="https://unpkg.com/@jspsych-contrib/plugin-html-audio-response@1.0.0/dist/index.umd.js"></script>
+  // 1. Survey-Text trial (text input question)
+  timeline.push({
+    type: jsPsychSurveyText,
+    questions: [{ prompt: "What is your name?", placeholder: "Type your name here..." }],
+    button_label: "Continue"
+  });
 
-  <!-- Your experiment -->
-  <script src="./jspsych_pretest_battery.js"></script>
-</body>
+  // 2. HTML-Button-Response trial (simple button click)
+  timeline.push({
+    type: jsPsychHtmlButtonResponse,
+    stimulus: "<p>Welcome to the experiment!</p><p>Click the button to continue.</p>",
+    choices: ["Begin"]
+  });
+
+  // 3. HTML-Keyboard-Response trial (press a key)
+  timeline.push({
+    type: jsPsychHtmlKeyboardResponse,
+    stimulus: "<p>Press any key to proceed to the audio trial.</p>",
+    prompt: "<p>(This trial ends when you press a key.)</p>"
+  });
+
+  // 4. Initialize-Microphone trial (request microphone access)
+  timeline.push({ type: jsPsychInitializeMicrophone });
+
+  // 5. HTML-Audio-Response trial (record a short audio response)
+  timeline.push({
+    type: jsPsychHtmlAudioResponse,
+    stimulus: "<p>Please say a short phrase out loud (audio will be recorded).</p>",
+    recording_duration: 2000,    // record for 2 seconds max
+    show_done_button: true,
+    done_button_label: "Finish Recording"
+  });
+
+  // 6. Audio-Button-Response trial (play an audio and get button response)
+  timeline.push({
+    type: jsPsychAudioButtonResponse,
+    stimulus: "https://www.jspsych.org/examples/audio/sample.mp3",  // sample audio file URL
+    choices: ["Heard 'Hello'", "Heard something else"],
+    prompt: "<p>What did you hear in the audio?</p>"
+  });
+
+  // 7. Survey plugin trial (using SurveyJS for a multi-question page)
+  const surveyPage = [
+    { type: "html", prompt: "<strong>Thank you!</strong> Please answer one more question:" },
+    { type: "text", prompt: "How did you feel about this demo?", placeholder: "your feedback..." }
+  ];
+  timeline.push({
+    type: jsPsychSurvey,
+    pages: [ surveyPage ],
+    title: "Feedback Survey",
+    button_label_finish: "Submit"
+  });
+
+  // Run the timeline
+  jsPsych.run(timeline);
+</script>
 </html>
