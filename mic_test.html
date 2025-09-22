@@ -1,66 +1,91 @@
 <!doctype html>
 <meta charset="utf-8" />
-<title>Mic Test v2</title>
-<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css">
+<title>Mic Test v3</title>
+
+<!-- CSS (jsDelivr primary, unpkg fallback) -->
+<link id="css1" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspsych@7.3.3/css/jspsych.css">
+<link id="css2" rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" disabled>
 
 <div id="jspsych-target"></div>
 <pre id="log" style="padding:8px;background:#111;color:#0f0;white-space:pre-wrap"></pre>
 <script>
-  function log(msg){ document.getElementById('log').textContent += msg + "\n"; }
+  function log(m){ document.getElementById('log').textContent += m + "\n"; }
+  function addScript(src, label, next){
+    const s = document.createElement('script');
+    s.src = src;
+    s.onload = () => { log(label + " loaded ✓"); next && next(); };
+    s.onerror = () => { log(label + " failed ✗"); next && next(true); };
+    document.head.appendChild(s);
+  }
+  function loadWithFallback(primary, fallback, label, done){
+    addScript(primary, label + " (primary)", (err) => {
+      if(!err){ done(); }
+      else {
+        addScript(fallback, label + " (fallback)", (err2) => { done(err2); });
+      }
+    });
+  }
+  // If jsDelivr CSS fails, enable unpkg CSS
+  document.getElementById('css1').addEventListener('error', () => {
+    document.getElementById('css2').disabled = false;
+    log('CSS fallback enabled');
+  });
 </script>
 
-<!-- Core jsPsych -->
-<script src="https://unpkg.com/jspsych@7.3.3/dist/jspsych.js"
-        onload="log('jsPsych loaded ✓')" onerror="log('jsPsych failed ✗')"></script>
-
-<!-- Plugins (UMD builds) -->
-<script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0/dist/index.umd.js"
-        onload="log('html-button-response loaded ✓')" onerror="log('html-button-response failed ✗')"></script>
-
-<!-- IMPORTANT: stick to 1.0.3 for mic + audio-response to match v7 behavior -->
-<script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.umd.js"
-        onload="log('initialize-microphone loaded ✓')" onerror="log('initialize-microphone failed ✗')"></script>
-<script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3/dist/index.umd.js"
-        onload="log('html-audio-response loaded ✓')" onerror="log('html-audio-response failed ✗')"></script>
-
+<!-- Load core + plugins (jsDelivr primary, unpkg fallback) -->
 <script>
-  window.addEventListener('load', () => {
-    try {
-      const jsPsych = initJsPsych({
-        on_finish: () => { log('Timeline finished ✓'); jsPsych.data.displayData(); },
-        show_progress_bar: true
-      });
-      log('initJsPsych ✓');
+  loadWithFallback(
+    "https://cdn.jsdelivr.net/npm/jspsych@7.3.3/dist/jspsych.js",
+    "https://unpkg.com/jspsych@7.3.3/dist/jspsych.js",
+    "jsPsych",
+    () => loadWithFallback(
+      "https://cdn.jsdelivr.net/npm/@jspsych/plugin-html-button-response@2.1.0/dist/index.umd.js",
+      "https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0/dist/index.umd.js",
+      "html-button-response",
+      () => loadWithFallback(
+        "https://cdn.jsdelivr.net/npm/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.umd.js",
+        "https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.umd.js",
+        "initialize-microphone",
+        () => loadWithFallback(
+          "https://cdn.jsdelivr.net/npm/@jspsych/plugin-html-audio-response@1.0.3/dist/index.umd.js",
+          "https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3/dist/index.umd.js",
+          "html-audio-response",
+          () => {
+            try {
+              const jsPsych = initJsPsych({
+                on_finish: () => { log('Timeline finished ✓'); jsPsych.data.displayData(); },
+                show_progress_bar: true
+              });
+              log('initJsPsych ✓');
 
-      const timeline = [];
+              const timeline = [
+                {
+                  type: jsPsychHtmlButtonResponse,
+                  stimulus: '<p>Click "Begin" to allow microphone.</p>',
+                  choices: ['Begin']
+                },
+                {
+                  type: jsPsychInitializeMicrophone,
+                  device_select: true
+                },
+                {
+                  type: jsPsychHtmlAudioResponse,
+                  stimulus: '<p>Say something, then click <strong>Finish recording</strong>.</p>',
+                  recording_duration: null,
+                  show_done_button: true,
+                  done_button_label: 'Finish recording',
+                  allow_playback: true
+                }
+              ];
 
-      // Give the browser a user gesture before audio
-      timeline.push({
-        type: jsPsychHtmlButtonResponse,
-        stimulus: '<p>Click "Begin" to start and allow microphone.</p>',
-        choices: ['Begin']
-      });
-
-      // Must run before any recording
-      timeline.push({
-        type: jsPsychInitializeMicrophone,
-        device_select: true   // shows a device picker (useful for debugging)
-      });
-
-      // Recording controlled by the user; "Finish recording" must stop the trial
-      timeline.push({
-        type: jsPsychHtmlAudioResponse,
-        stimulus: '<p>Say something, then click <strong>Finish recording</strong>.</p>',
-        recording_duration: null,          // user-controlled (critical)
-        show_done_button: true,
-        done_button_label: 'Finish recording',
-        allow_playback: true               // lets you review & re-record
-      });
-
-      jsPsych.run(timeline);
-      log('jsPsych.run() called ✓');
-    } catch (e) {
-      log('Exception: ' + (e && e.stack ? e.stack : e));
-    }
-  });
+              jsPsych.run(timeline);
+              log('jsPsych.run() called ✓');
+            } catch(e) {
+              log('Exception: ' + (e && e.stack ? e.stack : e));
+            }
+          }
+        )
+      )
+    )
+  );
 </script>
