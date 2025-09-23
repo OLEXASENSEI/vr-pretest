@@ -1,39 +1,26 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>jsPsych 7.3.4 Experiment</title>
-    
-    <!-- Core jsPsych library -->
-    <script src="https://unpkg.com/jspsych@7.3.4"></script>
-    
-    <!-- All requested plugins -->
-    <script src="https://unpkg.com/@jspsych/plugin-survey@1.0.1"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.2.0"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-audio-button-response@1.1.3"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
-    <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
-    
-    <!-- CSS files -->
-    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
-    <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@1.0.1/css/survey.css">
-</head>
+<!doctype html>
+<meta charset="utf-8" />
+<title>jsPsych timeline sanity check</title>
+
+<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+
 <body></body>
 <script>
-    // Initialize jsPsych
-    const jsPsych = initJsPsych({
-        on_finish: function() {
-            jsPsych.data.displayData();
-        }
+  window.addEventListener('load', () => {
+    const jsPsych = initJsPsych({ on_finish: () => jsPsych.data.displayData() });
+
+    const timeline = [];
+    // push at least one trivial trial
+    timeline.push({
+      type: jsPsychHtmlButtonResponse,
+      stimulus: "<h1>It works 🎉</h1><p>Click to continue.</p>",
+      choices: ["Continue"]
     });
 
-    // Example usage of all plugins - see syntax below
-    const timeline = [];
-    
-    // Add your trials here using the syntax shown below
-    
-    // Run experiment
+    console.log("timeline length before run:", timeline.length);
     jsPsych.run(timeline);
+  });
 </script>
-</html>
