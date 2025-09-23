@@ -1,91 +1,34 @@
 <!doctype html>
 <meta charset="utf-8" />
-<title>Mic Test v3</title>
+<title>Mic Test</title>
 
-<!-- CSS (jsDelivr primary, unpkg fallback) -->
-<link id="css1" rel="stylesheet" href="https://cdn.jsdelivr.net/npm/jspsych@7.3.3/css/jspsych.css">
-<link id="css2" rel="stylesheet" href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" disabled>
+<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
 
 <div id="jspsych-target"></div>
-<pre id="log" style="padding:8px;background:#111;color:#0f0;white-space:pre-wrap"></pre>
+
+<!-- Core (v7) -->
+<script src="https://unpkg.com/jspsych@7.3.4"></script>
+
+<!-- Plugins (load AFTER core) -->
+<script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+<script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+<script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+
 <script>
-  function log(m){ document.getElementById('log').textContent += m + "\n"; }
-  function addScript(src, label, next){
-    const s = document.createElement('script');
-    s.src = src;
-    s.onload = () => { log(label + " loaded ✓"); next && next(); };
-    s.onerror = () => { log(label + " failed ✗"); next && next(true); };
-    document.head.appendChild(s);
-  }
-  function loadWithFallback(primary, fallback, label, done){
-    addScript(primary, label + " (primary)", (err) => {
-      if(!err){ done(); }
-      else {
-        addScript(fallback, label + " (fallback)", (err2) => { done(err2); });
-      }
-    });
-  }
-  // If jsDelivr CSS fails, enable unpkg CSS
-  document.getElementById('css1').addEventListener('error', () => {
-    document.getElementById('css2').disabled = false;
-    log('CSS fallback enabled');
-  });
-</script>
+  const jsPsych = initJsPsych({ show_progress_bar: true, on_finish: () => jsPsych.data.displayData() });
 
-<!-- Load core + plugins (jsDelivr primary, unpkg fallback) -->
-<script>
-  loadWithFallback(
-    "https://cdn.jsdelivr.net/npm/jspsych@7.3.3/dist/jspsych.js",
-    "https://unpkg.com/jspsych@7.3.3/dist/jspsych.js",
-    "jsPsych",
-    () => loadWithFallback(
-      "https://cdn.jsdelivr.net/npm/@jspsych/plugin-html-button-response@2.1.0/dist/index.umd.js",
-      "https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0/dist/index.umd.js",
-      "html-button-response",
-      () => loadWithFallback(
-        "https://cdn.jsdelivr.net/npm/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.umd.js",
-        "https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.umd.js",
-        "initialize-microphone",
-        () => loadWithFallback(
-          "https://cdn.jsdelivr.net/npm/@jspsych/plugin-html-audio-response@1.0.3/dist/index.umd.js",
-          "https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3/dist/index.umd.js",
-          "html-audio-response",
-          () => {
-            try {
-              const jsPsych = initJsPsych({
-                on_finish: () => { log('Timeline finished ✓'); jsPsych.data.displayData(); },
-                show_progress_bar: true
-              });
-              log('initJsPsych ✓');
+  const timeline = [
+    { type: jsPsychHtmlButtonResponse, stimulus: '<p>Click "Begin" to allow microphone.</p>', choices: ['Begin'] },
+    { type: jsPsychInitializeMicrophone, device_select: true },
+    {
+      type: jsPsychHtmlAudioResponse,
+      stimulus: '<p>Say something, then click <strong>Finish recording</strong>.</p>',
+      recording_duration: null,         // user-controlled
+      show_done_button: true,
+      done_button_label: 'Finish recording',
+      allow_playback: true
+    }
+  ];
 
-              const timeline = [
-                {
-                  type: jsPsychHtmlButtonResponse,
-                  stimulus: '<p>Click "Begin" to allow microphone.</p>',
-                  choices: ['Begin']
-                },
-                {
-                  type: jsPsychInitializeMicrophone,
-                  device_select: true
-                },
-                {
-                  type: jsPsychHtmlAudioResponse,
-                  stimulus: '<p>Say something, then click <strong>Finish recording</strong>.</p>',
-                  recording_duration: null,
-                  show_done_button: true,
-                  done_button_label: 'Finish recording',
-                  allow_playback: true
-                }
-              ];
-
-              jsPsych.run(timeline);
-              log('jsPsych.run() called ✓');
-            } catch(e) {
-              log('Exception: ' + (e && e.stack ? e.stack : e));
-            }
-          }
-        )
-      )
-    )
-  );
+  jsPsych.run(timeline);
 </script>
