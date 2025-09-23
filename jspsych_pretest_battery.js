@@ -26,114 +26,128 @@ const jsPsych = initJsPsych({
 
 const participant_info = {
   type: jsPsychSurvey,
-  pages: [[
-    {
-      type: 'text',
-      prompt: 'Participant ID / 参加者ID',
-      name: 'participant_id',
-      required: true
-    },
-    {
-      type: 'drop-down',
-      prompt: 'Age / 年齢',
-      name: 'age',
-      options: ['18-25', '26-35', '36-45', '46-55', '56+'],
-      required: true
-    },
-    {
-      type: 'multi-choice',
-      prompt: 'Native Language / 母語',
-      name: 'native_language',
-      options: ['Japanese / 日本語', 'Other / その他'],
-      required: true
-    },
-    {
-      type: 'multi-choice',
-      prompt: 'English Learning Years / 英語学習年数',
-      name: 'english_years',
-      options: ['0-3', '4-6', '7-10', '10+'],
-      required: true
-    },
-    {
-      type: 'multi-choice',
-      prompt: 'VR Experience / VR経験',
-      name: 'vr_experience',
-      options: ['None / なし', 'Once or twice / 1-2回', 'Several times / 数回', 'Regular / 定期的'],
-      required: true
-    }
-  ]],
-  button_label_finish: 'Continue / 続ける',
-  data: {
-    task: 'participant_info'
-  }
+  survey_json: {
+    title: "Participant Info / 参加者情報",
+    showQuestionNumbers: "off",
+    pages: [
+      {
+        name: "p1",
+        elements: [
+          {
+            type: "text",
+            name: "participant_id",
+            title: "Participant ID / 参加者ID",
+            isRequired: true,
+            placeholder: "Enter ID here"
+          },
+          {
+            type: "dropdown", // (was 'drop-down')
+            name: "age",
+            title: "Age / 年齢",
+            isRequired: true,
+            choices: ["18-25", "26-35", "36-45", "46-55", "56+"]
+          },
+          {
+            type: "radiogroup", // (was 'multi-choice')
+            name: "native_language",
+            title: "Native Language / 母語",
+            isRequired: true,
+            choices: ["Japanese / 日本語", "Other / その他"]
+          },
+          {
+            type: "radiogroup",
+            name: "english_years",
+            title: "English Learning Years / 英語学習年数",
+            isRequired: true,
+            choices: ["0-3", "4-6", "7-10", "10+"]
+          },
+          {
+            type: "radiogroup",
+            name: "vr_experience",
+            title: "VR Experience / VR経験",
+            isRequired: true,
+            choices: ["None / なし", "Once or twice / 1-2回", "Several times / 数回", "Regular / 定期的"]
+          }
+        ]
+      }
+    ]
+  },
+  data: { task: "participant_info" }
 };
+
 
 // ========================================
 // SECTION 2: MOTION SICKNESS SUSCEPTIBILITY
 // ========================================
-
 const motion_sickness_questionnaire = {
   type: jsPsychSurvey,
-  pages: [[
-    {
-      type: 'likert',
-      prompt: 'How often do you feel sick when reading in a car? / 車で読書をするとき、どのくらい気分が悪くなりますか？',
-      name: 'mssq_car_reading',
-      required: true,
-      likert_scale_values: [
-        {value: 1, text: 'Never / 全くない'},
-        {value: 2, text: 'Rarely / めったにない'},
-        {value: 3, text: 'Sometimes / 時々'},
-        {value: 4, text: 'Often / よく'},
-        {value: 5, text: 'Always / いつも'}
-      ]
-    },
-    {
-      type: 'likert',
-      prompt: 'How often do you feel sick on boats? / 船に乗るとき、どのくらい気分が悪くなりますか？',
-      name: 'mssq_boat',
-      required: true,
-      likert_scale_values: [
-        {value: 1, text: 'Never / 全くない'},
-        {value: 2, text: 'Rarely / めったにない'},
-        {value: 3, text: 'Sometimes / 時々'},
-        {value: 4, text: 'Often / よく'},
-        {value: 5, text: 'Always / いつも'}
-      ]
-    },
-    {
-      type: 'likert',
-      prompt: 'How often do you feel dizzy playing video games? / ビデオゲームをするとき、どのくらいめまいを感じますか？',
-      name: 'mssq_games',
-      required: true,
-      likert_scale_values: [
-        {value: 1, text: 'Never / 全くない'},
-        {value: 2, text: 'Rarely / めったにない'},
-        {value: 3, text: 'Sometimes / 時々'},
-        {value: 4, text: 'Often / よく'},
-        {value: 5, text: 'Always / いつも'}
-      ]
-    },
-    {
-      type: 'likert',
-      prompt: 'How often do you feel sick in VR (if experienced)? / VRで気分が悪くなることがありますか（経験がある場合）？',
-      name: 'mssq_vr',
-      required: false,
-      likert_scale_values: [
-        {value: 0, text: 'No experience / 経験なし'},
-        {value: 1, text: 'Never / 全くない'},
-        {value: 2, text: 'Rarely / めったにない'},
-        {value: 3, text: 'Sometimes / 時々'},
-        {value: 4, text: 'Often / よく'},
-        {value: 5, text: 'Always / いつも'}
-      ]
-    }
-  ]],
-  button_label_finish: 'Continue / 続ける',
-  data: {
-    task: 'motion_sickness'
-  }
+  survey_json: {
+    title: "Motion Sickness Susceptibility / 乗り物酔い傾向",
+    showQuestionNumbers: "off",
+    pages: [
+      {
+        name: "mssq",
+        elements: [
+          {
+            type: "rating",
+            name: "mssq_car_reading",
+            title: "How often do you feel sick when reading in a car? / 車で読書をするとき、どのくらい気分が悪くなりますか？",
+            isRequired: true,
+            rateValues: [
+              { value: 1, text: "Never / 全くない" },
+              { value: 2, text: "Rarely / めったにない" },
+              { value: 3, text: "Sometimes / 時々" },
+              { value: 4, text: "Often / よく" },
+              { value: 5, text: "Always / いつも" }
+            ]
+          },
+          {
+            type: "rating",
+            name: "mssq_boat",
+            title: "How often do you feel sick on boats? / 船に乗るとき、どのくらい気分が悪くなりますか？",
+            isRequired: true,
+            rateValues: [
+              { value: 1, text: "Never / 全くない" },
+              { value: 2, text: "Rarely / めったにない" },
+              { value: 3, text: "Sometimes / 時々" },
+              { value: 4, text: "Often / よく" },
+              { value: 5, text: "Always / いつも" }
+            ]
+          },
+          {
+            type: "rating",
+            name: "mssq_games",
+            title: "How often do you feel dizzy playing video games? / ビデオゲームでめまいを感じますか？",
+            isRequired: true,
+            rateValues: [
+              { value: 1, text: "Never / 全くない" },
+              { value: 2, text: "Rarely / めったにない" },
+              { value: 3, text: "Sometimes / 時々" },
+              { value: 4, text: "Often / よく" },
+              { value: 5, text: "Always / いつも" }
+            ]
+          },
+          {
+            type: "rating",
+            name: "mssq_vr",
+            title: "How often do you feel sick in VR (if experienced)? / VRで気分が悪くなりますか（経験がある場合）？",
+            isRequired: false,
+            rateValues: [
+              { value: 0, text: "No experience / 経験なし" },
+              { value: 1, text: "Never / 全くない" },
+              { value: 2, text: "Rarely / めったにない" },
+              { value: 3, text: "Sometimes / 時々" },
+              { value: 4, text: "Often / よく" },
+              { value: 5, text: "Always / いつも" }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  data: { task: "motion_sickness" }
 };
+
 
 // ========================================
 // SECTION 3: WORKING MEMORY - DIGIT SPAN
@@ -512,17 +526,18 @@ const naming_instructions = {
 
 const naming_trial = {
   type: jsPsychHtmlAudioResponse,
-  stimulus: function() {
-    return `<img src="${jsPsych.timelineVariable('image')}" style="width:400px;">`;
-  },
-  recording_duration: 5000,
-  show_done_button: false,
+  stimulus: () => `<img src="${jsPsych.timelineVariable('image')}" style="width:400px;">`,
+  recording_duration: null,          // let participant control
+  show_done_button: true,
+  done_button_label: 'Finish recording',
+  allow_playback: true,
   data: {
     task: 'picture_naming',
     target: jsPsych.timelineVariable('target'),
     category: jsPsych.timelineVariable('category')
   }
 };
+
 
 const naming_procedure = {
   timeline: [naming_trial],
@@ -762,35 +777,41 @@ const crossmodal_procedure = {
 // ========================================
 // SECTION 12: JAPANESE IDEOPHONE MAPPING
 // ========================================
-
 const ideophone_test = {
   type: jsPsychSurvey,
-  pages: [[
-    {
-      type: 'multi-choice',
-      prompt: 'Which Japanese sound represents egg frying? / 卵を焼く音は？',
-      name: 'frying_sound',
-      options: ['ジュージュー', 'パラパラ', 'ドンドン', 'グルグル'],
-      required: true
-    },
-    {
-      type: 'multi-choice',
-      prompt: 'Which represents stirring? / かき混ぜる音は？',
-      name: 'stirring_sound',
-      options: ['ジュージュー', 'パラパラ', 'ドンドン', 'グルグル'],
-      required: true
-    },
-    {
-      type: 'multi-choice',
-      prompt: 'Which represents pouring powder? / 粉を注ぐ音は？',
-      name: 'powder_sound',
-      options: ['ジュージュー', 'パラパラ', 'ドンドン', 'グルグル'],
-      required: true
-    }
-  ]],
-  data: {
-    task: 'ideophone_mapping'
-  }
+  survey_json: {
+    title: "Japanese Ideophone Mapping / 和製擬音語マッピング",
+    showQuestionNumbers: "off",
+    pages: [
+      {
+        name: "ideo",
+        elements: [
+          {
+            type: "radiogroup",
+            name: "frying_sound",
+            title: "Which Japanese sound represents egg frying? / 卵を焼く音は？",
+            isRequired: true,
+            choices: ["ジュージュー", "パラパラ", "ドンドン", "グルグル"]
+          },
+          {
+            type: "radiogroup",
+            name: "stirring_sound",
+            title: "Which represents stirring? / かき混ぜる音は？",
+            isRequired: true,
+            choices: ["ジュージュー", "パラパラ", "ドンドン", "グルグル"]
+          },
+          {
+            type: "radiogroup",
+            name: "powder_sound",
+            title: "Which represents pouring powder? / 粉を注ぐ音は？",
+            isRequired: true,
+            choices: ["ジュージュー", "パラパラ", "ドンドン", "グルグル"]
+          }
+        ]
+      }
+    ]
+  },
+  data: { task: "ideophone_mapping" }
 };
 
 // ========================================
