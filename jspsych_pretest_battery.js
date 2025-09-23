@@ -400,9 +400,14 @@ const phoneme_trial = {
     const a1 = jsPsych.timelineVariable('audio1');
     const a2 = jsPsych.timelineVariable('audio2');
     return `
-      <div id="phoneme-player" data-audio2="${a2}">
-        <p>Listen carefully / よく聞いてください</p>
-        <audio id="audio1" src="${a1}"></audio>
+      <div class="ab-wrap" data-a1="${a1}" data-a2="${a2}">
+        <p>You'll hear two words: <strong>A</strong> then <strong>B</strong>.<br>
+        Are they the <strong>same word</strong> or <strong>different words</strong>?<br>
+        （同じ単語か、違う単語か）</p>
+        <div style="margin:10px 0;">
+          <button id="playA" class="jspsych-btn">Play A</button>
+          <button id="playB" class="jspsych-btn" disabled>Play B</button>
+        </div>
       </div>
     `;
   },
@@ -413,26 +418,45 @@ const phoneme_trial = {
     contrast_type: jsPsych.timelineVariable('contrast')
   },
   on_load: function () {
-    const buttons = Array.from(document.querySelectorAll('button'));
-    buttons.forEach(b => b.disabled = true);
+    const wrap = document.querySelector('.ab-wrap');
+    const a1src = wrap.dataset.a1;
+    const a2src = wrap.dataset.a2;
 
-    const container = document.getElementById('phoneme-player');
-    const audio1 = /** @type {HTMLAudioElement} */(document.getElementById('audio1'));
-    const audio2Src = container.dataset.audio2 || '';
-    const audio2 = new Audio(audio2Src);
+    const a1 = new Audio(a1src);
+    const a2 = new Audio(a2src);
 
-    const safePlay = (el) => el.play().catch(e => {
-      console.warn('Audio play() blocked or failed:', e);
-      // If autoplay blocks, at least enable buttons so the user can proceed.
-      buttons.forEach(b => b.disabled = false);
+    const btnA = document.getElementById('playA');
+    const btnB = document.getElementById('playB');
+
+    const responseBtns = Array.from(document.querySelectorAll('.jspsych-btn'))
+      .filter(b => b !== btnA && b !== btnB);
+
+    // Disable Same/Different until A and B have both played once
+    responseBtns.forEach(b => b.disabled = true);
+
+    let playedA = false, playedB = false;
+    const enableResponses = () => {
+      if (playedA && playedB) responseBtns.forEach(b => b.disabled = false);
+    };
+
+    btnA.addEventListener('click', () => {
+      a1.currentTime = 0;
+      a1.play().catch(e => console.warn('play A blocked:', e));
+    });
+    a1.addEventListener('ended', () => {
+      playedA = true;
+      btnB.disabled = false;
+      enableResponses();
     });
 
-    // sequence: play first, then second; enable buttons after second ends
-    audio1.addEventListener('ended', () => setTimeout(() => safePlay(audio2), 400));
-    audio2.addEventListener('ended', () => buttons.forEach(b => b.disabled = false));
-
-    // kick off after a tiny delay (post-user gesture)
-    setTimeout(() => safePlay(audio1), 60);
+    btnB.addEventListener('click', () => {
+      a2.currentTime = 0;
+      a2.play().catch(e => console.warn('play B blocked:', e));
+    });
+    a2.addEventListener('ended', () => {
+      playedB = true;
+      enableResponses();
+    });
   },
   on_finish: function (data) {
     const response = data.response === 0 ? 'same' : 'different';
