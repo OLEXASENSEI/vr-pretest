@@ -1,26 +1,56 @@
 <!doctype html>
-<meta charset="utf-8" />
-<title>jsPsych timeline sanity check</title>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>VR Pre-Test</title>
 
-<link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
-<script src="https://unpkg.com/jspsych@7.3.4"></script>
-<script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
-<script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <!-- jsPsych core (v7) -->
+  <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
 
-<body></body>
-<script>
-  window.addEventListener('load', () => {
-    const jsPsych = initJsPsych({ on_finish: () => jsPsych.data.displayData() });
+  <!-- Plugins (load AFTER core) -->
+  <!-- If your code is v7-era, these 2.x builds are correct -->
+  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
+  <link  rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css">
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-audio-button-response@2.1.0"></script>
 
-    const timeline = [];
-    // push at least one trivial trial
-    timeline.push({
-      type: jsPsychHtmlButtonResponse,
-      stimulus: "<h1>It works 🎉</h1><p>Click to continue.</p>",
-      choices: ["Continue"]
-    });
+  <!-- Microphone pair (these specific 1.0.3 builds match v7 docs behavior) -->
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
 
-    console.log("timeline length before run:", timeline.length);
-    jsPsych.run(timeline);
-  });
-</script>
+  <style>
+    body { font-family: system-ui, Arial, sans-serif; background:#f7f7f8; }
+    .jspsych-content { max-width: 900px; margin: 40px auto; }
+    .note {max-width: 900px; margin: 24px auto; padding: 12px 16px; background:#fff7d6; border:1px solid #ead488; border-radius:8px;}
+  </style>
+
+  <!-- Optional: helpful runtime flags/messages -->
+  <script>
+    // Force a user gesture before audio on some browsers
+    window.REQUIRE_USER_GESTURE = true;
+    // Allow skipping mic in non-secure contexts or if needed
+    window.SKIP_MIC = !window.isSecureContext; // Pages is HTTPS, so this will be false there
+  </script>
+</head>
+<body>
+  <div id="jspsych-target"></div>
+  <div id="note" class="note" style="display:none"></div>
+
+  <!-- Preflight: show a clear message if libs failed to load -->
+  <script>
+    (function () {
+      if (typeof initJsPsych !== 'function') {
+        document.getElementById('note').style.display = 'block';
+        document.getElementById('note').innerHTML =
+          "<strong>jsPsych failed to load.</strong> Hard-refresh (Ctrl/⌘-Shift-R) or check for network/extension blocking CDN.";
+      }
+    })();
+  </script>
+
+  <!-- Your experiment must be LAST -->
+  <script src="./jspsych_pretest_battery.js"></script>
+</body>
+</html>
