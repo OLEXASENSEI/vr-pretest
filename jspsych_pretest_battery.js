@@ -396,12 +396,13 @@ const phoneme_instructions = {
 
 const phoneme_trial = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: function() {
-    const audio1 = jsPsych.timelineVariable('audio1');
+  stimulus: function () {
+    const a1 = jsPsych.timelineVariable('audio1');
+    const a2 = jsPsych.timelineVariable('audio2');
     return `
-      <div id="phoneme-player">
+      <div id="phoneme-player" data-audio2="${a2}">
         <p>Listen carefully / よく聞いてください</p>
-        <audio id="audio1" src="${audio1}" autoplay></audio>
+        <audio id="audio1" src="${a1}"></audio>
       </div>
     `;
   },
@@ -411,31 +412,35 @@ const phoneme_trial = {
     correct_answer: jsPsych.timelineVariable('correct'),
     contrast_type: jsPsych.timelineVariable('contrast')
   },
-  on_load: function() {
+  on_load: function () {
     const buttons = Array.from(document.querySelectorAll('button'));
-    buttons.forEach(button => {
-      button.disabled = true;
+    buttons.forEach(b => b.disabled = true);
+
+    const container = document.getElementById('phoneme-player');
+    const audio1 = /** @type {HTMLAudioElement} */(document.getElementById('audio1'));
+    const audio2Src = container.dataset.audio2 || '';
+    const audio2 = new Audio(audio2Src);
+
+    const safePlay = (el) => el.play().catch(e => {
+      console.warn('Audio play() blocked or failed:', e);
+      // If autoplay blocks, at least enable buttons so the user can proceed.
+      buttons.forEach(b => b.disabled = false);
     });
 
-    const audio1Element = document.getElementById('audio1');
-    audio1Element.onended = function() {
-      jsPsych.pluginAPI.setTimeout(() => {
-        const audio2 = new Audio(jsPsych.timelineVariable('audio2'));
-        audio2.onended = () => {
-          buttons.forEach(button => {
-            button.disabled = false;
-          });
-        };
-        audio2.play();
-      }, 500);
-    };
+    // sequence: play first, then second; enable buttons after second ends
+    audio1.addEventListener('ended', () => setTimeout(() => safePlay(audio2), 400));
+    audio2.addEventListener('ended', () => buttons.forEach(b => b.disabled = false));
+
+    // kick off after a tiny delay (post-user gesture)
+    setTimeout(() => safePlay(audio1), 60);
   },
-  on_finish: function(data) {
+  on_finish: function (data) {
     const response = data.response === 0 ? 'same' : 'different';
     data.selected_option = response;
     data.correct = response === data.correct_answer;
   }
 };
+
 
 const phoneme_procedure = {
   timeline: [phoneme_trial],
@@ -526,18 +531,17 @@ const naming_instructions = {
 
 const naming_trial = {
   type: jsPsychHtmlAudioResponse,
-  stimulus: () => `<img src="${jsPsych.timelineVariable('image')}" style="width:400px;">`,
-  recording_duration: null,          // let participant control
-  show_done_button: true,
-  done_button_label: 'Finish recording',
-  allow_playback: true,
+  stimulus: function() {
+    return `<img src="${jsPsych.timelineVariable('image')}" style="width:400px;">`;
+  },
+  recording_duration: 5000,
+  show_done_button: false,
   data: {
     task: 'picture_naming',
     target: jsPsych.timelineVariable('target'),
     category: jsPsych.timelineVariable('category')
   }
 };
-
 
 const naming_procedure = {
   timeline: [naming_trial],
