@@ -481,8 +481,27 @@ const phoneme_trial = {
   on_load: function () {
     const audio1Path = jsPsych.timelineVariable('audio1');
     const audio2Path = jsPsych.timelineVariable('audio2');
-    const audio1 = new Audio(audio1Path);
-    const audio2 = new Audio(audio2Path);
+    // Preload audio using jsPsych's pluginAPI. This returns an HTML5
+    // Audio object or a WebAudio buffer depending on browser support.
+    let audio1 = null;
+    let audio2 = null;
+    jsPsych.pluginAPI
+      .getAudioBuffer(audio1Path)
+      .then((aud) => {
+        audio1 = aud;
+      })
+      .catch(() => {
+        // Fallback to HTML5 Audio if the buffer fails to load
+        audio1 = new Audio(audio1Path);
+      });
+    jsPsych.pluginAPI
+      .getAudioBuffer(audio2Path)
+      .then((aud) => {
+        audio2 = aud;
+      })
+      .catch(() => {
+        audio2 = new Audio(audio2Path);
+      });
     const statusText = document.getElementById('status-text');
     const soundIndicator = document.getElementById('sound-indicator');
     const playBtn = document.getElementById('play-btn');
@@ -520,61 +539,72 @@ const phoneme_trial = {
       playBtn.style.opacity = '0.5';
       replayBtn.disabled = true;
       replayBtn.style.opacity = '0.5';
-      // Reset playback positions
-      audio1.currentTime = 0;
-      audio2.currentTime = 0;
+      // Reset playback if using HTML5 Audio; otherwise skip (WebAudio buffers
+      // cannot reset currentTime directly)
+      if (audio1 && typeof audio1.currentTime === 'number') {
+        audio1.currentTime = 0;
+      }
+      if (audio2 && typeof audio2.currentTime === 'number') {
+        audio2.currentTime = 0;
+      }
       // Display first cue
       soundIndicator.textContent = '🔊 Word 1';
       statusText.textContent = 'Listen carefully...';
-      // Attempt to play the first audio; ignore rejection
-      audio1.play().catch(() => {
-        // Fallback handled below
-      });
-      // Handler when the first audio ends (or after fallback timeout)
-      const handleFirstEnd = () => {
-        soundIndicator.textContent = '';
-        // Brief pause between words
-        setTimeout(() => {
-          soundIndicator.textContent = '🔊 Word 2';
-          // Attempt to play second audio; ignore rejection
-          audio2.play().catch(() => {
-            // Fallback handled below
-          });
-          // Handler when the second audio ends (or after fallback timeout)
-          const handleSecondEnd = () => {
-            playCount++;
-            isPlaying = false;
-            soundIndicator.textContent = '';
-            statusText.textContent = 'Same or Different?';
-            // Enable response buttons
-            responseButtons.forEach((btn) => {
-              btn.disabled = false;
-              btn.style.opacity = '1';
-            });
-            // Show or hide play and replay buttons based on remaining replays
-            if (playCount < 1) {
-              // Hide Play button after first playback
-              playBtn.style.display = 'none';
-            }
-            if (playCount < maxReplays) {
-              replayBtn.style.display = 'inline-block';
-              replayBtn.disabled = false;
-              replayBtn.style.opacity = '1';
-              replayBtn.textContent = `🔄 Replay (${maxReplays - playCount} left)`;
+      // Helper to play an audio object via HTML5 or WebAudio
+      const playAudio = (audioObj) => {
+        try {
+          if (audioObj) {
+            if (typeof audioObj.play === 'function') {
+              // HTML5 audio element
+              audioObj.play().catch(() => {});
             } else {
-              replayBtn.style.display = 'none';
+              // AudioBuffer from WebAudio
+              const context = jsPsych.pluginAPI.audioContext();
+              const source = context.createBufferSource();
+              source.buffer = audioObj;
+              source.connect(context.destination);
+              source.start(0);
             }
-          };
-          // Listen for natural end of second audio
-          audio2.addEventListener('ended', handleSecondEnd, { once: true });
-          // Fallback: call handler if second audio hasn't ended after 1200 ms
-          setTimeout(handleSecondEnd, 1200);
-        }, 400);
+          }
+        } catch (e) {
+          // Ignore playback errors
+        }
       };
-      // Listen for natural end of first audio
-      audio1.addEventListener('ended', handleFirstEnd, { once: true });
-      // Fallback: call handler if first audio hasn't ended after 1200 ms
-      setTimeout(handleFirstEnd, 1200);
+      // Play first word
+      playAudio(audio1);
+      // Handler to proceed after second word completes
+      const finishPlayback = () => {
+        playCount++;
+        isPlaying = false;
+        soundIndicator.textContent = '';
+        statusText.textContent = 'Same or Different?';
+        // Enable response buttons
+        responseButtons.forEach((btn) => {
+          btn.disabled = false;
+          btn.style.opacity = '1';
+        });
+        // Hide play button after first playback
+        if (playCount >= 1) {
+          playBtn.style.display = 'none';
+        }
+        // Show replay button if replays remain
+        if (playCount < maxReplays) {
+          replayBtn.style.display = 'inline-block';
+          replayBtn.disabled = false;
+          replayBtn.style.opacity = '1';
+          replayBtn.textContent = `🔄 Replay (${maxReplays - playCount} left)`;
+        } else {
+          replayBtn.style.display = 'none';
+        }
+      };
+      // After the first word duration + pause, play second word
+      const WORD_DURATION = 1000; // approximate length per word (ms)
+      setTimeout(() => {
+        soundIndicator.textContent = '🔊 Word 2';
+        playAudio(audio2);
+        // After second word duration, finish playback and enable responses
+        setTimeout(finishPlayback, WORD_DURATION);
+      }, WORD_DURATION + 400);
     }
 
     // Add click listener for the Play button to start the sequence
