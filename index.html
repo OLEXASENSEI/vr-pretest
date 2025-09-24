@@ -2,52 +2,95 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>VR Iconicity Study - Pre-Test Battery</title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>VR Iconicity Study – Pre‑Test Battery</title>
 
-  <!-- Optional: make relative paths like ./img/... resolve on GitHub Pages -->
-  <!-- <base href="/vr-pretest/"> -->
+  <!--
+    This HTML file boots the VR Iconicity Study pre‑test battery.  It loads
+    the jsPsych core library (v7.3.4) and matching plugin versions, then
+    mounts the experiment into a dedicated container div.  The CSS rules
+    center the experiment on the page and constrain its width so that all
+    tasks appear neatly aligned.  Update the script source below if you
+    rename or relocate your compiled experiment file.
+  -->
 
-  <!-- Silence favicon 404 warning -->
-  <link rel="icon" href="data:,">
+  <!-- Prevent a 404 for the favicon on GitHub Pages -->
+  <link rel="icon" href="data:," />
 
-  <!-- jsPsych core (7.3.4) -->
+  <!-- jsPsych core (v7.3.4) -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" />
 
-  <!-- Plugins (all 2.x where available; load AFTER core) -->
+  <!-- jsPsych plugins (v2.x where available) -->
   <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
-
-  <!-- Survey + CSS -->
   <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
   <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" />
-
-  <!-- Text survey -->
   <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
-
-  <!-- HTML response plugins -->
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
 
-  <!-- Microphone + audio-record (v1.x is correct for these two) -->
+  <!-- Microphone + audio record plugins (v1.x is correct for these two) -->
   <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
 
   <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background:#f5f5f5; }
-    .jspsych-display-element { max-width: 800px; margin: 0 auto; }
-    .spatial-grid { display:grid; grid-template-columns:repeat(3,110px); gap:12px; justify-content:center; margin:20px auto; }
-    .spatial-square { width:110px; height:110px; background:#ddd; border:2px solid #333; border-radius:12px; transition:background-color .2s ease; }
-    .spatial-square.active { background:#ffd966; }
-    .spatial-square.selected { background:#8ecae6; }
-    .spatial-square.clickable { cursor:pointer; }
+    /*
+      Global styling – center the experiment container on the page and
+      provide a light, neutral background.  The wrapper div (jspsych-target)
+      constrains the width of the experiment and ensures that all tasks
+      remain centered regardless of screen size.
+    */
+    html, body {
+      height: 100%;
+      margin: 0;
+      padding: 0;
+    }
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f5f5f5;
+    }
+    #jspsych-target {
+      width: 100%;
+      max-width: 900px;
+      margin-top: 20px;
+    }
+    /* Optional: style the spatial-span squares if needed; jsPsych also injects inline styles */
+    .spatial-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      gap: 12px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .spatial-square {
+      width: 110px;
+      height: 110px;
+      background: #ddd;
+      border: 2px solid #333;
+      border-radius: 12px;
+      transition: background-color 0.2s ease;
+    }
+    .spatial-square.active { background: #ffd966; }
+    .spatial-square.selected { background: #8ecae6; }
+    .spatial-square.clickable { cursor: pointer; }
   </style>
 </head>
 <body>
-  <!-- If you want to target a specific node, add an element and pass display_element in initJsPsych -->
-  <!-- <div id="jspsych-target"></div> -->
+  <!--
+    jsPsych will render all trials inside this container.  The container is
+    centered by the body’s flexbox settings and constrained in width via
+    CSS.  If you choose to target a different element, update the
+    `display_element` property in your JavaScript initialization.
+  -->
+  <div id="jspsych-target"></div>
 
-  <!-- Your experiment code -->
+  <!-- Include the compiled experiment logic.  Ensure that pretest.js is
+       uploaded alongside this HTML file in the same directory.  The
+       JavaScript file should call initJsPsych with display_element:
+       'jspsych-target' to mount into this container. -->
   <script src="./pretest.js"></script>
 </body>
 </html>
