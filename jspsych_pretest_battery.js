@@ -444,8 +444,7 @@ const phoneme_trial = {
     `;
   },
   choices: ['Same / 同じ', 'Different / 違う'],
-  // Fixed for v7: button_html must be a string template
-  button_html: '<button class="jspsych-btn response-btn">%choice%</button>',
+  // Removed button_html parameter - will use default buttons
   data: {
     task: 'phoneme_discrimination',
     correct_answer: jsPsych.timelineVariable('correct'),
@@ -459,7 +458,10 @@ const phoneme_trial = {
     const statusText = document.getElementById('status-text');
     const soundIndicator = document.getElementById('sound-indicator');
     const replayBtn = document.getElementById('replay-btn');
-    const responseButtons = Array.from(document.querySelectorAll('.response-btn'));
+    
+    // Select the response buttons using the default jsPsych button class
+    // Since we removed button_html, buttons will have the default jspsych-btn class
+    const responseButtons = Array.from(document.querySelectorAll('#jspsych-html-button-response-btngroup button'));
     
     let playCount = 0;
     const maxReplays = 2;
@@ -784,8 +786,7 @@ const visual_trial = {
     `;
   },
   choices: jsPsych.timelineVariable('words'),
-  // Fixed for v7: button_html must be a string template
-  button_html: '<button class="jspsych-btn">%choice%</button>',
+  // Removed button_html parameter - will use default buttons
   data: {
     task: 'visual_iconicity',
     correct_answer: jsPsych.timelineVariable('expected'),
