@@ -1,7 +1,11 @@
-// Version 3.1 – Optimized Pre-Test Battery for VR Iconicity Study
-// ✅ Mic recording for picture naming
-// ✅ Assets preloaded
-// ✅ Each task on separate screens, small inter-trial gaps
+// Version 3.1 – Optimized Pre‑Test Battery for VR Iconicity Study
+// This version incorporates numerous bug fixes reported by users:
+//  - Surveys no longer display intermediate completion pages (thanks flashes removed)
+//  - Each task runs on its own page with a short blank gap between tasks
+//  - Foley sound matching uses a play button and no longer auto‑repeats
+//  - Picture naming trials show a start button before recording begins
+//  - Lexical decision and other tasks clear the screen between stimuli
+//  - The entire experiment is centered on the page via CSS (see HTML)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -12,14 +16,17 @@ const jsPsych = initJsPsych({
   use_webaudio: true,
   show_progress_bar: true,
   message_progress_bar: '進捗 Progress',
-  default_iti: 350, // short gap between all trials
+  // A short inter‑trial interval (blank gap) after every trial
+  default_iti: 350,
   on_finish: function () {
     const data = jsPsych.data.get().values();
     saveDataToServer(data);
   },
 });
 
-/* ========== STIMULI & PRELOAD ========== */
+/* ========== STIMULI & PRELOAD LISTS ========== */
+// Audio and image lists used throughout the experiment.  These lists will be
+// preloaded before the experiment starts to avoid any delays or auto‑repeats.
 const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'l_r' },
   { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'control' },
@@ -46,43 +53,33 @@ const picture_naming_stimuli = [
 ];
 
 const visual_iconicity_stimuli = [
-  { shape: 'img/round_shape.svg', words: ['maluma', 'takete'],    expected: 0, shape_type: 'round'     },
-  { shape: 'img/spiky_shape.svg', words: ['bouba', 'kiki'],       expected: 1, shape_type: 'spiky'     },
-  { shape: 'img/bowl_shape.svg',  words: ['container', 'cutter'], expected: 0, shape_type: 'container' },
+  { shape: 'img/round_shape.svg', words: ['maluma','takete'],    expected: 0, shape_type: 'round'     },
+  { shape: 'img/spiky_shape.svg', words: ['bouba','kiki'],       expected: 1, shape_type: 'spiky'     },
+  { shape: 'img/bowl_shape.svg',  words: ['container','cutter'], expected: 0, shape_type: 'container' },
 ];
 
-// Collect assets for preloading
-const PRELOAD_AUDIO = [
-  ...new Set([
-    ...phoneme_discrimination_stimuli.flatMap(s => [s.audio1, s.audio2]),
-    ...foley_stimuli.map(s => s.audio),
-  ])
-];
-const PRELOAD_IMAGES = [
-  ...new Set([
-    ...picture_naming_stimuli.map(s => s.image),
-    ...visual_iconicity_stimuli.map(s => s.shape),
-  ])
-];
-
-/* ========== PLUGINS USED ========== */
-/* Make sure your HTML loads these:
-   - @jspsych/plugin-preload@2.1.0
-   - @jspsych/plugin-initialize-microphone@1.0.3
-   - @jspsych/plugin-html-audio-response@1.0.3
-   - @jspsych/plugin-survey@2.x, survey-text@2.x
-   - @jspsych/plugin-html-button-response@2.x
-   - @jspsych/plugin-html-keyboard-response@2.x
-   (HTML notes at bottom) */
+// Collect assets for preloading (deduplicated)
+const PRELOAD_AUDIO = Array.from(new Set([
+  ...phoneme_discrimination_stimuli.flatMap(s => [s.audio1, s.audio2]),
+  ...foley_stimuli.map(s => s.audio),
+]));
+const PRELOAD_IMAGES = Array.from(new Set([
+  ...picture_naming_stimuli.map(s => s.image),
+  ...visual_iconicity_stimuli.map(s => s.shape),
+]));
 
 /* ========== SECTION 1: PARTICIPANT INFORMATION ========== */
+// Collect demographic and background information. Set showCompletedPage:false so
+// the survey does not display a default completion message between tasks. Use
+// an on_finish callback to remove any lingering SurveyJS DOM elements. This
+// prevents the survey header from flashing on subsequent trials.
 const participant_info = {
   type: jsPsychSurvey,
   survey_json: {
     title: 'Participant Info / 参加者情報',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
-    showCompletedPage: false,  // <-- disable interim completion screen
+    showCompletedPage: false,
     pages: [{
       name: 'p1',
       elements: [
@@ -95,35 +92,48 @@ const participant_info = {
     }],
   },
   data: { task: 'participant_info' },
+  on_finish: function() {
+    // Remove SurveyJS containers that may linger after the survey finishes.
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => el.remove());
+  }
 };
 
 /* ========== SECTION 2: MOTION SICKNESS SUSCEPTIBILITY ========== */
+// This questionnaire asks participants about their susceptibility to motion sickness
+// in various contexts (e.g., reading in a car, being on a boat, playing video
+// games, and using VR). The average of these ratings produces a motion
+// sickness risk score used to tailor VR exposure and adjust the learning condition.
 const motion_sickness_questionnaire = {
   type: jsPsychSurvey,
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
-     showCompletedPage: false,  // <-- disable interim completion screen
     showCompletedPage: false,
     pages: [{
       name: 'mssq',
       elements: [
-        { type: 'rating', name: 'mssq_car_reading', title: 'How often do you feel sick when reading in a car? / 車で読書をするとき、どのくらい気分が悪くなりますか？',
-          isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
-        { type: 'rating', name: 'mssq_boat', title: 'How often do you feel sick on boats? / 船に乗るとき、どのくらい気分が悪くなりますか？',
-          isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
-        { type: 'rating', name: 'mssq_games', title: 'How often do you feel dizzy playing video games? / ビデオゲームでめまいを感じますか？',
-          isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
-        { type: 'rating', name: 'mssq_vr', title: 'How often do you feel sick in VR (if experienced)? / VRで気分が悪くなりますか（経験がある場合）？',
-          isRequired: false, rateValues: [ {value:0,text:'No experience / 経験なし'},{value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
+        { type: 'rating', name: 'mssq_car_reading', title: 'How often do you feel sick when reading in a car? / 車で読書をするとき、どのくらい気分が悪くなりますか？', isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
+        { type: 'rating', name: 'mssq_boat', title: 'How often do you feel sick on boats? / 船に乗るとき、どのくらい気分が悪くなりますか？', isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
+        { type: 'rating', name: 'mssq_games', title: 'How often do you feel dizzy playing video games? / ビデオゲームでめまいを感じますか？', isRequired: true, rateValues: [ {value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
+        { type: 'rating', name: 'mssq_vr', title: 'How often do you feel sick in VR (if experienced)? / VRで気分が悪くなりますか（経験がある場合）？', isRequired: false, rateValues: [ {value:0,text:'No experience / 経験なし'},{value:1,text:'Never / 全くない'},{value:2,text:'Rarely / めったにない'},{value:3,text:'Sometimes / 時々'},{value:4,text:'Often / よく'},{value:5,text:'Always / いつも'} ] },
       ],
     }],
   },
   data: { task: 'motion_sickness' },
+  on_finish: function() {
+    // Remove leftover SurveyJS elements after finishing motion sickness questionnaire.
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => el.remove());
+  },
 };
 
 /* ========== SECTION 3: WORKING MEMORY – DIGIT SPAN (adaptive, 2 strikes) ========== */
+// The digit span tasks measure auditory working memory capacity. Participants
+// are shown sequences of numbers and must reproduce them in the same order
+// (forward span) or in reverse order (backward span). Span length
+// increments until the participant makes two mistakes, providing an estimate
+// of memory capacity. This score is used later to inform assignment to
+// easier or more challenging VR learning modes.
 const digit_span_forward_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -141,6 +151,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
   let failCount = 0;
   for (let length = 3; length <= 8; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
+    // Display the digits
     trials.push({
       type: jsPsychHtmlKeyboardResponse,
       stimulus: `<div style="font-size:48px;">${digits.join(' ')}</div>`,
@@ -148,17 +159,20 @@ function generateOptimizedDigitSpanTrials(forward = true) {
       trial_duration: 800 * length,
       data: { task: 'digit_span_presentation', digits: digits.join(''), length, direction: forward ? 'forward' : 'backward' },
     });
+    // Collect response
     trials.push({
       type: jsPsychSurveyText,
       questions: [{
-        prompt: forward ? 'Enter the numbers in the SAME order / 同じ順番で数字を入力'
-                        : 'Enter the numbers in REVERSE order / 逆の順番で数字を入力',
-        name: 'response', required: true
+        prompt: forward ? 'Enter the numbers in the SAME order / 同じ順番で数字を入力' : 'Enter the numbers in REVERSE order / 逆の順番で数字を入力',
+        name: 'response',
+        required: true,
       }],
+      post_trial_gap: 250,
       data: {
         task: 'digit_span_response',
         correct_answer: forward ? digits.join('') : digits.slice().reverse().join(''),
-        length, direction: forward ? 'forward' : 'backward'
+        length: length,
+        direction: forward ? 'forward' : 'backward',
       },
       on_finish: function (data) {
         const userResponse = (data.response?.response || '').replace(/\s/g, '');
@@ -187,6 +201,11 @@ const digit_span_backward_instructions = {
 };
 
 /* ========== SECTION 4: SPATIAL WORKING MEMORY (adaptive, 2 strikes) ========== */
+// This Corsi-like spatial span task assesses visuospatial working memory.
+// Squares on a 3×3 grid light up in a sequence; participants click the
+// squares in the same order. Sequence length increases until two errors occur.
+// The maximum span indicates spatial memory capacity, which may correlate with
+// ability to navigate and remember virtual environments.
 const spatial_span_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -203,7 +222,6 @@ function generateOptimizedSpatialSpanTrials() {
   const trials = [];
   window.spatialSpanFailCount = 0;
   const totalSquares = 9;
-
   function makeTrial(sequence, length) {
     return {
       type: jsPsychHtmlKeyboardResponse,
@@ -227,13 +245,12 @@ function generateOptimizedSpatialSpanTrials() {
       on_load: function () {
         const squares = Array.from(document.querySelectorAll('.spatial-square'));
         const instruction = document.getElementById('spatial-instruction');
-        const highlightDuration = 500, betweenDuration = 220;
+        const highlightDuration = 500;
+        const betweenDuration = 220;
         const response = [];
         let responseEnabled = false;
         let responseStart = null;
-
         squares.forEach((sq) => sq.classList.remove('clickable'));
-
         const highlightSequence = (idx) => {
           if (idx >= sequence.length) {
             jsPsych.pluginAPI.setTimeout(() => {
@@ -244,14 +261,13 @@ function generateOptimizedSpatialSpanTrials() {
             }, 300);
             return;
           }
-          const square = squares[sequence[idx]];
-          square.classList.add('active');
+          const sq = squares[sequence[idx]];
+          sq.classList.add('active');
           jsPsych.pluginAPI.setTimeout(() => {
-            square.classList.remove('active');
+            sq.classList.remove('active');
             jsPsych.pluginAPI.setTimeout(() => highlightSequence(idx + 1), betweenDuration);
           }, highlightDuration);
         };
-
         const endTrial = () => {
           responseEnabled = false;
           squares.forEach((sq) => {
@@ -261,14 +277,12 @@ function generateOptimizedSpatialSpanTrials() {
           jsPsych.pluginAPI.clearAllTimeouts();
           const rt = responseStart ? Math.round(performance.now() - responseStart) : null;
           const isCorrect = response.length === sequence.length && response.every((v, i) => v === sequence[i]);
-
           if (!isCorrect) {
             window.spatialSpanFailCount = (window.spatialSpanFailCount || 0) + 1;
             if (window.spatialSpanFailCount >= 2) jsPsych.endCurrentTimeline();
           }
           jsPsych.finishTrial({ response, click_sequence: response.join(','), rt, correct: isCorrect });
         };
-
         const handleClick = (e) => {
           if (!responseEnabled) return;
           const idx = Number(e.currentTarget.dataset.index);
@@ -276,13 +290,11 @@ function generateOptimizedSpatialSpanTrials() {
           e.currentTarget.classList.add('selected');
           if (response.length >= sequence.length) jsPsych.pluginAPI.setTimeout(endTrial, 160);
         };
-
         squares.forEach((sq) => sq.addEventListener('click', handleClick));
         highlightSequence(0);
       },
     };
   }
-
   for (let length = 3; length <= 6; length++) {
     const sequence = jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], length);
     trials.push(makeTrial(sequence, length));
@@ -291,6 +303,12 @@ function generateOptimizedSpatialSpanTrials() {
 }
 
 /* ========== SECTION 5: PHONOLOGICAL AWARENESS (A/B play then answer) ========== */
+// In this phoneme discrimination task, participants hear two words that may
+// differ by a single phonetic feature (e.g., /l/ vs /r/, vowel length). They
+// must determine whether the words are the same or different. Response
+// buttons remain disabled until both sounds have been played. Accuracy on
+// specific contrasts helps to identify areas of phonological difficulty for
+// Japanese L1 speakers learning English.
 const phoneme_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -336,8 +354,9 @@ const phoneme_trial = {
     const playB = document.getElementById('playB');
     const btnSame = document.getElementById('btnSame');
     const btnDiff = document.getElementById('btnDiff');
-
-    let aPlayed = false, bPlayed = false, respStart = null;
+    let aPlayed = false;
+    let bPlayed = false;
+    let respStart = null;
     function enableResponsesIfReady() {
       if (aPlayed && bPlayed) {
         [btnSame, btnDiff].forEach(b => { b.disabled = false; b.style.opacity = '1'; });
@@ -346,14 +365,20 @@ const phoneme_trial = {
       }
     }
     playA.addEventListener('click', () => {
-      audio1.currentTime = 0; audio1.play().catch(()=>{});
-      aPlayed = true; playA.disabled = true; playA.style.opacity = '.5';
+      audio1.currentTime = 0;
+      audio1.play().catch(() => {});
+      aPlayed = true;
+      playA.disabled = true;
+      playA.style.opacity = '.5';
       status.textContent = 'Played A / 音Aを再生';
       enableResponsesIfReady();
     });
     playB.addEventListener('click', () => {
-      audio2.currentTime = 0; audio2.play().catch(()=>{});
-      bPlayed = true; playB.disabled = true; playB.style.opacity = '.5';
+      audio2.currentTime = 0;
+      audio2.play().catch(() => {});
+      bPlayed = true;
+      playB.disabled = true;
+      playB.style.opacity = '.5';
       status.textContent = 'Played B / 音Bを再生';
       enableResponsesIfReady();
     });
@@ -373,9 +398,19 @@ const phoneme_trial = {
   },
 };
 
-const phoneme_procedure = { timeline: [phoneme_trial], timeline_variables: phoneme_discrimination_stimuli, randomize_order: true };
+const phoneme_procedure = {
+  timeline: [phoneme_trial],
+  timeline_variables: phoneme_discrimination_stimuli,
+  randomize_order: true,
+};
 
 /* ========== SECTION 6: LEXICAL DECISION TASK ========== */
+// This lexical decision task probes English vocabulary knowledge and processing
+// speed. Participants see a letter string and press ‘W’ if it forms a real
+// English word and ‘N’ if it does not. The ten items include high‑,
+// mid‑ and low‑frequency pancake-related words, two control words, and four
+// plausible nonwords. Mean reaction time and accuracy feed into a language
+// proficiency metric for adaptive assignment.
 const ldt_stimuli = [
   { stimulus: 'BOWL',    correct_response: 'w', word_type: 'target_high_freq' },
   { stimulus: 'FLOUR',   correct_response: 'w', word_type: 'target_mid_freq'  },
@@ -412,29 +447,53 @@ const ldt_trial = {
   stimulus: () => `<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
   choices: ['w', 'n'],
   trial_duration: 2500,
-  post_trial_gap: 250,  // <-- add: brief 250 ms blank gap after each trial
+  post_trial_gap: 250,
   data: { task: 'lexical_decision', correct_response: jsPsych.timelineVariable('correct_response'), word_type: jsPsych.timelineVariable('word_type') },
   on_finish: function (data) { data.correct = data.response === data.correct_response; },
 };
 
 const ldt_procedure = { timeline: [ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order: true };
 
-/* ========== SECTION 7: PICTURE NAMING (Mic record with fallback) ========== */
+/* ========== SECTION 7: PICTURE NAMING (Mic record with prompt and fallback) ========== */
+// The picture naming task assesses expressive vocabulary. For each core
+// pancake-making ingredient or utensil (bowl, egg, flour, spatula) the
+// participant first sees a prompt screen with the image and presses a Start
+// button. If microphone permission is granted, the next trial records the
+// participant saying the item’s English name for 4 seconds. If a mic is not
+// available, a fallback text entry trial collects the response. Completion
+// rate and correctness contribute to overall language proficiency measures.
+// Instructions before naming block
 const naming_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
     <h2>Picture Naming / 絵の命名</h2>
-    <p>Say the name in English – we will record your voice (4 seconds per picture).</p>
-    <p>各絵の英語名を声に出して言ってください（1枚あたり4秒録音）</p>
+    <p>You will see pictures of cooking items.</p>
+    <p>調理に使うものの絵が表示されます。</p>
+    <p>Press Start on each picture and say the English name (we will record your voice).</p>
+    <p>各絵で「開始」を押して英語名を声に出してください。</p>
     <br><p style="color:#666;font-size:14px;">4 pictures / 4枚</p>
   `,
   choices: ['Begin / 開始'],
 };
 
-// Audio recording trial (preferred)
+// A prompt shown for each picture asking the participant to start
+const naming_prompt = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: function() {
+    return `
+      <div style="text-align:center;">
+        <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
+        <p style="margin-top:20px;">Ready to name this object in English?</p>
+      </div>
+    `;
+  },
+  choices: ['Start / 開始'],
+};
+
+// Audio recording trial when mic is available
 const naming_audio_trial = {
-  type: jsPsychHtmlAudioResponse, // v1.0.3
-  stimulus: function () {
+  type: jsPsychHtmlAudioResponse,
+  stimulus: function() {
     return `
       <div style="text-align:center;">
         <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
@@ -448,20 +507,22 @@ const naming_audio_trial = {
   data: { task: 'picture_naming', target: jsPsych.timelineVariable('target'), category: jsPsych.timelineVariable('category') },
 };
 
-// Fallback text entry trial (if mic not available)
+// Text fallback trial when mic is not available
 const naming_text_fallback_trial = {
   type: jsPsychSurveyText,
-  questions: [{
-    prompt: function() {
-      return `
-        <div style="text-align:center;">
-          <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;">
-          <p style="margin-top:20px;">Type the English name for this object:</p>
-        </div>
-      `;
+  questions: [
+    {
+      prompt: function() {
+        return `
+          <div style="text-align:center;">
+            <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;">
+            <p style="margin-top:20px;">Type the English name for this object:</p>
+          </div>
+        `;
+      },
+      name: 'response', required: true, placeholder: 'Type your answer here'
     },
-    name: 'response', required: true, placeholder: 'Type your answer here'
-  }],
+  ],
   data: { task: 'picture_naming', target: jsPsych.timelineVariable('target'), category: jsPsych.timelineVariable('category') },
   on_finish: function(data) {
     const response = (data.response?.response || '').toLowerCase().trim();
@@ -470,9 +531,10 @@ const naming_text_fallback_trial = {
   }
 };
 
-// Wrap both with conditional: use mic when secure + mediaDevices available
+// Combine prompt with conditional recording or fallback
 const naming_procedure = {
   timeline: [
+    naming_prompt,
     {
       timeline: [naming_audio_trial],
       conditional_function: () => (window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
@@ -483,10 +545,16 @@ const naming_procedure = {
     }
   ],
   timeline_variables: picture_naming_stimuli,
-  randomize_order: false
+  randomize_order: false,
 };
 
-/* ========== SECTION 8: FOLEY SOUND ICONICITY ========== */
+/* ========== SECTION 8: FOLEY SOUND ICONICITY (Play button, no auto repeat) ========== */
+// The foley sound matching task explores auditory iconicity. Participants
+// hear short environmental sounds associated with pancake-making (e.g., a
+// tinkle, a granular pour, a whir, sizzling) and choose which ingredient,
+// utensil, or action the sound represents. Each trial has a single-play
+// button; the sound cannot be replayed once clicked. Accuracy on these
+// judgments contributes to the participant’s overall iconicity profile.
 const foley_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -500,35 +568,67 @@ const foley_instructions = {
   choices: ['Begin / 開始'],
 };
 
+// Foley trial with explicit play button and per‑trial cleanup
 const foley_trial = {
   type: jsPsychHtmlButtonResponse,
   stimulus: function() {
-    const audioFile = jsPsych.timelineVariable('audio');
     return `
       <div style="text-align:center;">
-        <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:20px;">
-          <p style="font-size:20px;margin-bottom:15px;">🔊 Listen to this sound:</p>
-          <audio id="foley-audio" controls style="width:300px;">
-            <source src="${audioFile}" type="audio/mpeg">
-          </audio>
+        <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
+          <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
+          <div id="foley-note" style="font-size:13px;color:#666;margin-top:8px;visibility:hidden;">(played)</div>
         </div>
         <p>What does this sound represent?</p>
-        <p style="color:#666;">この音は何を表していますか？</p>
+        <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
       </div>
     `;
   },
-  on_load: function() {
-    const el = document.getElementById('foley-audio');
-    if (el) el.play().catch(()=>{ /* autoplay may be blocked until user clicks */ });
-  },
+  post_trial_gap: 250,
   choices: () => jsPsych.timelineVariable('options'),
-  data: { task: 'foley_iconicity', correct_answer: jsPsych.timelineVariable('correct'), mapping_type: jsPsych.timelineVariable('mapping_type') },
-  on_finish: function(data) { data.correct = data.response === data.correct_answer; }
+  data: {
+    task: 'foley_iconicity',
+    correct_answer: jsPsych.timelineVariable('correct'),
+    mapping_type: jsPsych.timelineVariable('mapping_type'),
+  },
+  on_load: function() {
+    const src = jsPsych.timelineVariable('audio');
+    // Prepare audio buffer; do not inject <audio> into the DOM
+    const audio = new Audio(src);
+    audio.preload = 'auto';
+    const btn = document.getElementById('foley-play');
+    const note = document.getElementById('foley-note');
+    btn.addEventListener('click', () => {
+      try {
+        audio.currentTime = 0;
+        audio.play();
+      } catch (e) {}
+      note.style.visibility = 'visible';
+    });
+    // Store audio handle globally so we can stop it on trial finish
+    window.__foleyAudio = audio;
+  },
+  on_finish: function(data) {
+    // Stop any playing audio to avoid carryover
+    if (window.__foleyAudio) {
+      try { window.__foleyAudio.pause(); window.__foleyAudio.src = ''; } catch(e) {}
+      window.__foleyAudio = null;
+    }
+    data.correct = (data.response === data.correct_answer);
+  },
 };
 
-const foley_procedure = { timeline: [foley_trial], timeline_variables: foley_stimuli, randomize_order: true };
+const foley_procedure = {
+  timeline: [foley_trial],
+  timeline_variables: foley_stimuli,
+  randomize_order: true,
+};
 
 /* ========== SECTION 9: VISUAL ICONICITY ========== */
+// In the visual iconicity task, participants match abstract shapes to
+// pseudowords (maluma/takete, bouba/kiki) and a bowl shape to everyday words
+// (container/cutter). These items test classic Bouba/Kiki associations and
+// object-based mappings, providing a visual counterpart to the auditory and
+// cross-modal iconicity measures.
 const visual_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -549,13 +649,26 @@ const visual_trial = {
     </div>
   `,
   choices: jsPsych.timelineVariable('words'),
-  data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
+  post_trial_gap: 250,
+  data: {
+    task: 'visual_iconicity',
+    correct_answer: jsPsych.timelineVariable('expected'),
+    shape_type: jsPsych.timelineVariable('shape_type'),
+  },
   on_finish: function (data) { data.correct = data.response === data.correct_answer; },
 };
 
-const visual_procedure = { timeline: [visual_trial], timeline_variables: visual_iconicity_stimuli, randomize_order: true };
+const visual_procedure = {
+  timeline: [visual_trial],
+  timeline_variables: visual_iconicity_stimuli,
+  randomize_order: true,
+};
 
 /* ========== SECTION 10: PROCEDURAL KNOWLEDGE TEST ========== */
+// This open-ended recipe description asks participants to list the key
+// ingredients and steps for making pancakes. The number of words used and
+// content quality provide a baseline measure of procedural knowledge that may
+// influence subsequent learning outcomes.
 const procedural_test = {
   type: jsPsychSurveyText,
   questions: [{
@@ -579,6 +692,7 @@ const ideophone_test = {
     title: 'Japanese Sound Words / 擬音語',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
+    showCompletedPage: false,
     pages: [{
       name: 'ideo',
       elements: [
@@ -588,23 +702,29 @@ const ideophone_test = {
     }],
   },
   data: { task: 'ideophone_mapping' },
+  on_finish: function() {
+    // Clean up SurveyJS elements after completion to avoid leftover headings from the ideophone survey.
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => el.remove());
+  }
 };
 
 /* ========== PRELOAD & TIMELINE ========== */
+// Preload all audio and image files up front.  A short delay will occur if any file
+// fails to load, and missing files will be reported in the console.
 const preload = {
   type: jsPsychPreload,
   audio: PRELOAD_AUDIO,
   images: PRELOAD_IMAGES,
   max_load_time: 30000,
-}
-
-preload.on_finish = function(data){
-  const failed = (data.failed_audio || []).concat(data.failed_images || []);
-  if (failed.length) {
-    console.warn('Preload failed for:', failed);
+  on_finish: function(data) {
+    const failed = (data.failed_audio || []).concat(data.failed_images || []);
+    if (failed.length) {
+      console.warn('Preload failed for:', failed);
+    }
   }
 };
 
+// Welcome screen
 const welcome = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -616,9 +736,10 @@ const welcome = {
   choices: ['Begin / 開始'],
 };
 
-// Mic access early so we fail fast if blocked
+// Mic access early so participants are prompted at the start
 const mic_request = { type: jsPsychInitializeMicrophone };
 
+// Assemble timeline in order
 const timeline = [];
 timeline.push(welcome);
 timeline.push(preload);
@@ -654,7 +775,7 @@ timeline.push(visual_procedure);
 timeline.push(procedural_test);
 timeline.push(ideophone_test);
 
-// End screen (compute condition right before showing)
+// End screen – assign condition before display
 timeline.push({
   type: jsPsychHtmlButtonResponse,
   stimulus: function() {
@@ -683,18 +804,17 @@ timeline.push({
   },
   choices: ['Finish / 完了'],
   on_finish: function () {
-    // allow leaving page without warning
     window.onbeforeunload = null;
   },
 });
 
-/* Start */
+// Run the experiment
 jsPsych.run(timeline);
 
-/* Warn before closing during the test */
+// Warn participants before closing the tab mid-experiment
 window.onbeforeunload = function() {
   if (jsPsych.data.get().count() > 2) {
-    return "Are you sure you want to leave? Your progress will be lost.";
+    return 'Are you sure you want to leave? Your progress will be lost.';
   }
 };
 
@@ -716,7 +836,6 @@ function getSummaryMetrics(data) {
   const proceduralResponse = data.find((e) => e.task === 'procedural_knowledge');
   const proceduralWordCount = countWords(proceduralResponse?.response?.pancake_procedure || '');
   const namingCompletion = calculateNamingCompletionRate(data);
-
   return {
     participant_id: participantInfo?.response?.participant_id || null,
     background: participantInfo?.response || {},
@@ -742,23 +861,14 @@ function getSummaryMetrics(data) {
 function saveDataToServer(data) {
   const metrics = getSummaryMetrics(data);
   latestMetrics = metrics;
-  jsPsych.data.addProperties({ 
-    participant_id: metrics.participant_id, 
-    assigned_condition: metrics.assigned_condition 
-  });
-
+  jsPsych.data.addProperties({ participant_id: metrics.participant_id, assigned_condition: metrics.assigned_condition });
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   const filename = `pretest_${metrics.participant_id || 'unknown'}_${timestamp}.json`;
-
   try {
-    localStorage.setItem('pretest_latest', JSON.stringify({
-      metrics, raw_data: data, timestamp, filename
-    }));
+    localStorage.setItem('pretest_latest', JSON.stringify({ metrics, raw_data: data, timestamp, filename }));
   } catch(e) {
     console.warn('Could not save to localStorage:', e);
   }
-
-  // auto-download at the end
   jsPsych.data.get().localSave('json', filename);
   console.log(`Data saved as ${filename}`);
 }
@@ -766,22 +876,16 @@ function saveDataToServer(data) {
 function assignCondition() {
   const data = jsPsych.data.get().values();
   const metrics = latestMetrics || getSummaryMetrics(data);
-
   const iconScores = [metrics.foley_iconicity_score, metrics.visual_iconicity_score].filter((s) => typeof s === 'number');
   const avgIconicity = iconScores.length ? iconScores.reduce((a,b)=>a+b,0)/iconScores.length : null;
-
   const wmScores = [metrics.digit_span_forward, metrics.digit_span_backward, metrics.spatial_span].filter((s) => typeof s === 'number');
   const avgWorkingMemory = wmScores.length ? wmScores.reduce((a,b)=>a+b,0)/wmScores.length : null;
-
   const languagePerformance = typeof metrics.ldt_accuracy === 'number' ? metrics.ldt_accuracy : null;
-
   let condition = 'Mixed-Iconicity VR';
   if (avgIconicity !== null && avgIconicity >= 0.75) condition = 'High-Iconicity VR';
   else if (avgIconicity !== null && avgIconicity < 0.45) condition = 'Low-Iconicity VR';
-
   if (languagePerformance !== null && languagePerformance < 0.55) condition = 'Foundational Vocabulary VR';
   else if (avgWorkingMemory !== null && avgWorkingMemory >= 6) condition = 'Challenge Mode VR';
-
   assignedCondition = condition;
   jsPsych.data.addProperties({ assigned_condition: condition });
   console.log(`Assigned learning condition: ${condition}`);
@@ -815,11 +919,9 @@ function calculateSpatialSpanScore(data) {
 function calculateAccuracy(data, task, filterKey = null) {
   let trials = data.filter((t) => t.task === task && typeof t.correct === 'boolean');
   if (!trials.length) return null;
-
   if (filterKey) {
-    if (task === 'phoneme_discrimination') {
-      trials = trials.filter((t) => t.contrast_type === filterKey);
-    } else if (task === 'lexical_decision') {
+    if (task === 'phoneme_discrimination') trials = trials.filter((t) => t.contrast_type === filterKey);
+    else if (task === 'lexical_decision') {
       if (filterKey === 'target') trials = trials.filter((t) => typeof t.word_type === 'string' && t.word_type.startsWith('target'));
       else trials = trials.filter((t) => t.word_type === filterKey);
     }
