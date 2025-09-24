@@ -96,6 +96,10 @@ const motion_sickness_questionnaire = {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
     // Do not display the default completion page; proceed directly to the next task.
+    // SurveyJS uses the `showCompletedPage` property (with a 'd') to control
+    // whether the built‑in completion page appears. Setting this to false
+    // prevents the default “Thank you” message from showing so the experiment
+    // can flow seamlessly into the next task.
     showCompletedPage: false,
     pages: [
       {
@@ -476,65 +480,97 @@ const phoneme_trial = {
     const soundIndicator = document.getElementById('sound-indicator');
     const replayBtn = document.getElementById('replay-btn');
     const responseButtons = Array.from(document.querySelectorAll('.response-btn'));
+    // Track number of times the sequence has been played
     let playCount = 0;
     const maxReplays = 2;
+    // Flag to prevent overlapping play calls
     let isPlaying = false;
     // Disable response buttons initially
     responseButtons.forEach((btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
     });
+
+    /**
+     * Plays the two audio files in sequence. If either audio fails to load
+     * or play, fallback timeouts ensure the trial continues and the
+     * participant can respond. The durations used here (1000 ms) are
+     * approximations of the typical word lengths in the stimuli.
+     */
     function playSequence() {
       if (isPlaying) return;
       isPlaying = true;
+      // Disable buttons while playing
       responseButtons.forEach((btn) => {
         btn.disabled = true;
         btn.style.opacity = '0.5';
       });
       replayBtn.disabled = true;
       replayBtn.style.opacity = '0.5';
+      // Reset playback positions
       audio1.currentTime = 0;
       audio2.currentTime = 0;
+      // Display first cue
       soundIndicator.textContent = '🔊 Word 1';
       statusText.textContent = 'Listen carefully...';
-      audio1.play().then(() => {
-        const handleFirstEnd = () => {
-          soundIndicator.textContent = '';
-          setTimeout(() => {
-            soundIndicator.textContent = '🔊 Word 2';
-            audio2.play().then(() => {
-              const handleSecondEnd = () => {
-                playCount++;
-                isPlaying = false;
-                soundIndicator.textContent = '';
-                statusText.textContent = 'Same or Different?';
-                responseButtons.forEach((btn) => {
-                  btn.disabled = false;
-                  btn.style.opacity = '1';
-                });
-                if (playCount < maxReplays) {
-                  replayBtn.style.display = 'inline-block';
-                  replayBtn.disabled = false;
-                  replayBtn.style.opacity = '1';
-                  replayBtn.textContent = `🔄 Replay (${maxReplays - playCount} left)`;
-                } else {
-                  replayBtn.style.display = 'none';
-                }
-              };
-              audio2.addEventListener('ended', handleSecondEnd, { once: true });
-            });
-          }, 400);
-        };
-        audio1.addEventListener('ended', handleFirstEnd, { once: true });
+      // Attempt to play the first audio; ignore rejection
+      audio1.play().catch(() => {
+        /* If play() fails, the timeout fallback below will handle progression */
       });
+      // Define handler for when the first audio finishes (or after timeout)
+      const handleFirstEnd = () => {
+        soundIndicator.textContent = '';
+        // Brief pause between words
+        setTimeout(() => {
+          soundIndicator.textContent = '🔊 Word 2';
+          // Attempt to play the second audio; ignore rejection
+          audio2.play().catch(() => {
+            /* Fallback handled by timeout */
+          });
+          // Handler for when the second audio finishes (or after timeout)
+          const handleSecondEnd = () => {
+            playCount++;
+            isPlaying = false;
+            soundIndicator.textContent = '';
+            statusText.textContent = 'Same or Different?';
+            // Enable response buttons
+            responseButtons.forEach((btn) => {
+              btn.disabled = false;
+              btn.style.opacity = '1';
+            });
+            // Show replay option if allowed
+            if (playCount < maxReplays) {
+              replayBtn.style.display = 'inline-block';
+              replayBtn.disabled = false;
+              replayBtn.style.opacity = '1';
+              replayBtn.textContent = `🔄 Replay (${maxReplays - playCount} left)`;
+            } else {
+              replayBtn.style.display = 'none';
+            }
+          };
+          // Listen for natural end of second audio
+          audio2.addEventListener('ended', handleSecondEnd, { once: true });
+          // Fallback: if the second audio doesn't end within 1200 ms, call handler
+          setTimeout(handleSecondEnd, 1200);
+        }, 400);
+      };
+      // Listen for natural end of first audio
+      audio1.addEventListener('ended', handleFirstEnd, { once: true });
+      // Fallback: if the first audio doesn't end within 1200 ms, call handler
+      setTimeout(handleFirstEnd, 1200);
     }
+
+    // Add click listener for replay button
     replayBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
       if (!isPlaying) playSequence();
       return false;
     });
-    // Start automatically after a short delay
+
+    // Start automatically after a short delay. This delay occurs after a user
+    // gesture (clicking "Begin"), so audio should be allowed to play. If
+    // autoplay is still blocked, the fallback timeouts will progress the trial.
     setTimeout(playSequence, 300);
   },
   on_finish: function (data) {
