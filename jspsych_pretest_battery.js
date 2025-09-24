@@ -38,6 +38,9 @@ const participant_info = {
   survey_json: {
     title: 'Participant Info / 参加者情報',
     showQuestionNumbers: 'off',
+    // Do not automatically focus the first question when the survey loads. This avoids
+    // autofocus conflicts that can trigger browser warnings.
+    focusFirstQuestionAutomatic: false,
     pages: [
       {
         name: 'p1',
@@ -95,6 +98,8 @@ const motion_sickness_questionnaire = {
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
+    // Disable auto-focusing the first question to avoid autofocus conflicts.
+    focusFirstQuestionAutomatic: false,
     // Do not display the default completion page; proceed directly to the next task.
     // SurveyJS uses the `showCompletedPage` property (with a 'd') to control
     // whether the built‑in completion page appears. Setting this to false
@@ -466,7 +471,15 @@ const phoneme_trial = {
     `;
   },
   choices: ['Same / 同じ', 'Different / 違う'],
-  button_html: '<button class="jspsych-btn response-btn">%choice%</button>',
+  // Provide button_html as a function rather than a string. On jsPsych v8+ the
+  // html-button-response plugin expects this property to be a function that
+  // returns the HTML for each choice button. If provided as a string, jsPsych
+  // will attempt to call it and throw a TypeError. We attach a custom
+  // 'response-btn' class here so that we can easily enable/disable the
+  // response buttons after the audio has been played.
+  button_html: (choice) => {
+    return `<button class="jspsych-btn response-btn">${choice}</button>`;
+  },
   data: {
     task: 'phoneme_discrimination',
     correct_answer: jsPsych.timelineVariable('correct'),
@@ -826,7 +839,12 @@ const visual_trial = {
   choices: function () {
     return jsPsych.timelineVariable('words');
   },
-  button_html: '<button class="jspsych-btn">%choice%</button>',
+  // Use a function for button_html. jsPsych v8+ interprets button_html as a
+  // function rather than a static template string. Returning a simple button
+  // ensures compatibility and allows per-button customization if needed.
+  button_html: (choice) => {
+    return `<button class="jspsych-btn">${choice}</button>`;
+  },
   data: {
     task: 'visual_iconicity',
     correct_answer: jsPsych.timelineVariable('expected'),
@@ -885,6 +903,8 @@ const ideophone_test = {
   survey_json: {
     title: 'Japanese Sound Words / 擬音語',
     showQuestionNumbers: 'off',
+    // Avoid focusing the first question automatically; this prevents autofocus conflicts.
+    focusFirstQuestionAutomatic: false,
     pages: [
       {
         name: 'ideo',
