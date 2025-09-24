@@ -453,6 +453,8 @@ const naming_trial = {
   `,
   recording_duration: 4000,
   show_done_button: false,
+  post_trial_gap: 300,          // <-- add this
+  
   data: { task: 'picture_naming', target: jsPsych.timelineVariable('target'), category: jsPsych.timelineVariable('category') },
 };
 
