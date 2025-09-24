@@ -96,7 +96,7 @@ const motion_sickness_questionnaire = {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
     // Do not display the default completion page; proceed directly to the next task.
-    showCompletePage: false,
+    showCompletedPage: false,
     pages: [
       {
         name: 'mssq',
