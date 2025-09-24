@@ -450,23 +450,17 @@ const phoneme_instructions = {
 
 const phoneme_trial = {
   type: jsPsychHtmlButtonResponse,
-  // The HTML for this trial includes a play button that the participant must
-  // click to hear the two words. A separate replay button appears after
-  // playback for optional replays. The response buttons (Same/Different)
-  // remain hidden until the audio has played at least once.
+  // The HTML for this trial presents two separate play buttons (Sound A and Sound B).
+  // Participants must click each button to listen to the individual words. Once both
+  // sounds have been played, the response buttons (Same/Different) become enabled.
   stimulus: function () {
     return `
       <div class="phoneme-trial">
-        <p id="status-text">Click “Play” to hear the two words.</p>
-        <p>同じ単語か、違う単語か判断してください</p>
-        <div style="margin: 20px 0;">
-          <div id="sound-indicator" style="font-size: 24px; height: 40px;"></div>
-          <button id="play-btn" type="button" class="jspsych-btn" style="margin-right: 8px;">
-            ▶️ Play / 再生
-          </button>
-          <button id="replay-btn" type="button" class="jspsych-btn" style="display: none; margin-top: 10px;">
-            🔄 Replay / もう一度
-          </button>
+        <p id="status-text">Click each sound to listen, then decide if they are the same or different.</p>
+        <p>2つの音をクリックして聞き、その後「同じ」か「違う」かを選んでください。</p>
+        <div style="margin: 20px 0; display: flex; gap: 10px; justify-content: center;">
+          <button id="sound1-btn" type="button" class="jspsych-btn">🔊 Sound A / 音A</button>
+          <button id="sound2-btn" type="button" class="jspsych-btn">🔊 Sound B / 音B</button>
         </div>
       </div>
     `;
@@ -481,8 +475,7 @@ const phoneme_trial = {
   on_load: function () {
     const audio1Path = jsPsych.timelineVariable('audio1');
     const audio2Path = jsPsych.timelineVariable('audio2');
-    // Preload audio using jsPsych's pluginAPI. This returns an HTML5
-    // Audio object or a WebAudio buffer depending on browser support.
+    // Load audio buffers via jsPsych plugin API with fallback to HTML5 Audio
     let audio1 = null;
     let audio2 = null;
     jsPsych.pluginAPI
@@ -491,7 +484,6 @@ const phoneme_trial = {
         audio1 = aud;
       })
       .catch(() => {
-        // Fallback to HTML5 Audio if the buffer fails to load
         audio1 = new Audio(audio1Path);
       });
     jsPsych.pluginAPI
@@ -503,123 +495,66 @@ const phoneme_trial = {
         audio2 = new Audio(audio2Path);
       });
     const statusText = document.getElementById('status-text');
-    const soundIndicator = document.getElementById('sound-indicator');
-    const playBtn = document.getElementById('play-btn');
-    const replayBtn = document.getElementById('replay-btn');
+    const btnSound1 = document.getElementById('sound1-btn');
+    const btnSound2 = document.getElementById('sound2-btn');
     const responseButtons = Array.from(document.querySelectorAll('.response-btn'));
-    // Track number of times the sequence has been played
-    let playCount = 0;
-    const maxReplays = 2;
-    // Flag to prevent overlapping play calls
-    let isPlaying = false;
-    // Disable response buttons initially and hide them via opacity so they
-    // cannot be clicked until audio has played.
+    // Flags to track whether each sound has been played
+    let played1 = false;
+    let played2 = false;
+    // Disable response buttons initially
     responseButtons.forEach((btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
     });
-
-    /**
-     * Plays the two audio files in sequence. The sequence is initiated by the
-     * participant clicking the Play or Replay button. If either audio fails to
-     * play (due to loading errors or browser restrictions), fallback timeouts
-     * ensure the trial still progresses. Playback durations are approximated
-     * (1.2 s per word) to keep the timing consistent.
-     */
-    function playSequence() {
-      if (isPlaying) return;
-      isPlaying = true;
-      // Disable response buttons during playback
-      responseButtons.forEach((btn) => {
-        btn.disabled = true;
-        btn.style.opacity = '0.5';
-      });
-      // Disable play and replay buttons while audio is playing
-      playBtn.disabled = true;
-      playBtn.style.opacity = '0.5';
-      replayBtn.disabled = true;
-      replayBtn.style.opacity = '0.5';
-      // Reset playback if using HTML5 Audio; otherwise skip (WebAudio buffers
-      // cannot reset currentTime directly)
-      if (audio1 && typeof audio1.currentTime === 'number') {
-        audio1.currentTime = 0;
-      }
-      if (audio2 && typeof audio2.currentTime === 'number') {
-        audio2.currentTime = 0;
-      }
-      // Display first cue
-      soundIndicator.textContent = '🔊 Word 1';
-      statusText.textContent = 'Listen carefully...';
-      // Helper to play an audio object via HTML5 or WebAudio
-      const playAudio = (audioObj) => {
-        try {
-          if (audioObj) {
-            if (typeof audioObj.play === 'function') {
-              // HTML5 audio element
-              audioObj.play().catch(() => {});
-            } else {
-              // AudioBuffer from WebAudio
-              const context = jsPsych.pluginAPI.audioContext();
-              const source = context.createBufferSource();
-              source.buffer = audioObj;
-              source.connect(context.destination);
-              source.start(0);
-            }
+    // Helper to play audio via HTML5 or WebAudio
+    function playAudio(audioObj) {
+      try {
+        if (audioObj) {
+          if (typeof audioObj.play === 'function') {
+            audioObj.currentTime = 0;
+            audioObj.play().catch(() => {});
+          } else {
+            const context = jsPsych.pluginAPI.audioContext();
+            const source = context.createBufferSource();
+            source.buffer = audioObj;
+            source.connect(context.destination);
+            source.start(0);
           }
-        } catch (e) {
-          // Ignore playback errors
         }
-      };
-      // Play first word
-      playAudio(audio1);
-      // Handler to proceed after second word completes
-      const finishPlayback = () => {
-        playCount++;
-        isPlaying = false;
-        soundIndicator.textContent = '';
-        statusText.textContent = 'Same or Different?';
-        // Enable response buttons
+      } catch (e) {
+        // Ignore playback errors
+      }
+    }
+    // Enable responses once both sounds have been played
+    function checkEnableResponses() {
+      if (played1 && played2) {
         responseButtons.forEach((btn) => {
           btn.disabled = false;
           btn.style.opacity = '1';
         });
-        // Hide play button after first playback
-        if (playCount >= 1) {
-          playBtn.style.display = 'none';
-        }
-        // Show replay button if replays remain
-        if (playCount < maxReplays) {
-          replayBtn.style.display = 'inline-block';
-          replayBtn.disabled = false;
-          replayBtn.style.opacity = '1';
-          replayBtn.textContent = `🔄 Replay (${maxReplays - playCount} left)`;
-        } else {
-          replayBtn.style.display = 'none';
-        }
-      };
-      // After the first word duration + pause, play second word
-      const WORD_DURATION = 1000; // approximate length per word (ms)
-      setTimeout(() => {
-        soundIndicator.textContent = '🔊 Word 2';
-        playAudio(audio2);
-        // After second word duration, finish playback and enable responses
-        setTimeout(finishPlayback, WORD_DURATION);
-      }, WORD_DURATION + 400);
+        statusText.textContent = 'Same or Different?';
+      }
     }
-
-    // Add click listener for the Play button to start the sequence
-    playBtn.addEventListener('click', (e) => {
+    // Click handler for first sound
+    btnSound1.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      playSequence();
+      playAudio(audio1);
+      played1 = true;
+      btnSound1.disabled = true;
+      btnSound1.style.opacity = '0.5';
+      checkEnableResponses();
       return false;
     });
-
-    // Add click listener for the Replay button
-    replayBtn.addEventListener('click', (e) => {
+    // Click handler for second sound
+    btnSound2.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      playSequence();
+      playAudio(audio2);
+      played2 = true;
+      btnSound2.disabled = true;
+      btnSound2.style.opacity = '0.5';
+      checkEnableResponses();
       return false;
     });
   },
