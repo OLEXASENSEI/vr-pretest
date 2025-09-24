@@ -12,7 +12,7 @@ const jsPsych = initJsPsych({
   use_webaudio: true,
   show_progress_bar: true,
   message_progress_bar: '進捗 Progress',
-  default_iti: 250, // short gap between all trials
+  default_iti: 350, // short gap between all trials
   on_finish: function () {
     const data = jsPsych.data.get().values();
     saveDataToServer(data);
@@ -593,6 +593,13 @@ const preload = {
   audio: PRELOAD_AUDIO,
   images: PRELOAD_IMAGES,
   max_load_time: 30000,
+}
+
+preload.on_finish = function(data){
+  const failed = (data.failed_audio || []).concat(data.failed_images || []);
+  if (failed.length) {
+    console.warn('Preload failed for:', failed);
+  }
 };
 
 const welcome = {
