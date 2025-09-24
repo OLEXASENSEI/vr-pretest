@@ -95,9 +95,8 @@ const motion_sickness_questionnaire = {
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
-    // Customize the completed message so participants know the pre-test continues.
-    completedHtml:
-      '<p>Thank you for completing this section. The pre-test continues! / このセクションは終了ですが、テストは続きます。</p>',
+    // Do not display the default completion page; proceed directly to the next task.
+    showCompletePage: false,
     pages: [
       {
         name: 'mssq',
