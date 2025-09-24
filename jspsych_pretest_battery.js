@@ -450,13 +450,20 @@ const phoneme_instructions = {
 
 const phoneme_trial = {
   type: jsPsychHtmlButtonResponse,
+  // The HTML for this trial includes a play button that the participant must
+  // click to hear the two words. A separate replay button appears after
+  // playback for optional replays. The response buttons (Same/Different)
+  // remain hidden until the audio has played at least once.
   stimulus: function () {
     return `
       <div class="phoneme-trial">
-        <p id="status-text">Listen to the two words...</p>
+        <p id="status-text">Click “Play” to hear the two words.</p>
         <p>同じ単語か、違う単語か判断してください</p>
         <div style="margin: 20px 0;">
           <div id="sound-indicator" style="font-size: 24px; height: 40px;"></div>
+          <button id="play-btn" type="button" class="jspsych-btn" style="margin-right: 8px;">
+            ▶️ Play / 再生
+          </button>
           <button id="replay-btn" type="button" class="jspsych-btn" style="display: none; margin-top: 10px;">
             🔄 Replay / もう一度
           </button>
@@ -478,6 +485,7 @@ const phoneme_trial = {
     const audio2 = new Audio(audio2Path);
     const statusText = document.getElementById('status-text');
     const soundIndicator = document.getElementById('sound-indicator');
+    const playBtn = document.getElementById('play-btn');
     const replayBtn = document.getElementById('replay-btn');
     const responseButtons = Array.from(document.querySelectorAll('.response-btn'));
     // Track number of times the sequence has been played
@@ -485,26 +493,31 @@ const phoneme_trial = {
     const maxReplays = 2;
     // Flag to prevent overlapping play calls
     let isPlaying = false;
-    // Disable response buttons initially
+    // Disable response buttons initially and hide them via opacity so they
+    // cannot be clicked until audio has played.
     responseButtons.forEach((btn) => {
       btn.disabled = true;
       btn.style.opacity = '0.5';
     });
 
     /**
-     * Plays the two audio files in sequence. If either audio fails to load
-     * or play, fallback timeouts ensure the trial continues and the
-     * participant can respond. The durations used here (1000 ms) are
-     * approximations of the typical word lengths in the stimuli.
+     * Plays the two audio files in sequence. The sequence is initiated by the
+     * participant clicking the Play or Replay button. If either audio fails to
+     * play (due to loading errors or browser restrictions), fallback timeouts
+     * ensure the trial still progresses. Playback durations are approximated
+     * (1.2 s per word) to keep the timing consistent.
      */
     function playSequence() {
       if (isPlaying) return;
       isPlaying = true;
-      // Disable buttons while playing
+      // Disable response buttons during playback
       responseButtons.forEach((btn) => {
         btn.disabled = true;
         btn.style.opacity = '0.5';
       });
+      // Disable play and replay buttons while audio is playing
+      playBtn.disabled = true;
+      playBtn.style.opacity = '0.5';
       replayBtn.disabled = true;
       replayBtn.style.opacity = '0.5';
       // Reset playback positions
@@ -515,19 +528,19 @@ const phoneme_trial = {
       statusText.textContent = 'Listen carefully...';
       // Attempt to play the first audio; ignore rejection
       audio1.play().catch(() => {
-        /* If play() fails, the timeout fallback below will handle progression */
+        // Fallback handled below
       });
-      // Define handler for when the first audio finishes (or after timeout)
+      // Handler when the first audio ends (or after fallback timeout)
       const handleFirstEnd = () => {
         soundIndicator.textContent = '';
         // Brief pause between words
         setTimeout(() => {
           soundIndicator.textContent = '🔊 Word 2';
-          // Attempt to play the second audio; ignore rejection
+          // Attempt to play second audio; ignore rejection
           audio2.play().catch(() => {
-            /* Fallback handled by timeout */
+            // Fallback handled below
           });
-          // Handler for when the second audio finishes (or after timeout)
+          // Handler when the second audio ends (or after fallback timeout)
           const handleSecondEnd = () => {
             playCount++;
             isPlaying = false;
@@ -538,7 +551,11 @@ const phoneme_trial = {
               btn.disabled = false;
               btn.style.opacity = '1';
             });
-            // Show replay option if allowed
+            // Show or hide play and replay buttons based on remaining replays
+            if (playCount < 1) {
+              // Hide Play button after first playback
+              playBtn.style.display = 'none';
+            }
             if (playCount < maxReplays) {
               replayBtn.style.display = 'inline-block';
               replayBtn.disabled = false;
@@ -550,28 +567,31 @@ const phoneme_trial = {
           };
           // Listen for natural end of second audio
           audio2.addEventListener('ended', handleSecondEnd, { once: true });
-          // Fallback: if the second audio doesn't end within 1200 ms, call handler
+          // Fallback: call handler if second audio hasn't ended after 1200 ms
           setTimeout(handleSecondEnd, 1200);
         }, 400);
       };
       // Listen for natural end of first audio
       audio1.addEventListener('ended', handleFirstEnd, { once: true });
-      // Fallback: if the first audio doesn't end within 1200 ms, call handler
+      // Fallback: call handler if first audio hasn't ended after 1200 ms
       setTimeout(handleFirstEnd, 1200);
     }
 
-    // Add click listener for replay button
-    replayBtn.addEventListener('click', (e) => {
+    // Add click listener for the Play button to start the sequence
+    playBtn.addEventListener('click', (e) => {
       e.preventDefault();
       e.stopPropagation();
-      if (!isPlaying) playSequence();
+      playSequence();
       return false;
     });
 
-    // Start automatically after a short delay. This delay occurs after a user
-    // gesture (clicking "Begin"), so audio should be allowed to play. If
-    // autoplay is still blocked, the fallback timeouts will progress the trial.
-    setTimeout(playSequence, 300);
+    // Add click listener for the Replay button
+    replayBtn.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      playSequence();
+      return false;
+    });
   },
   on_finish: function (data) {
     const response = data.response === 0 ? 'same' : 'different';
