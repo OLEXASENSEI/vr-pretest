@@ -227,24 +227,8 @@ function generateOptimizedDigitSpanTrials(forward = true) {
         const userResponse = (data.response?.response || '').replace(/\s/g, '');
         data.entered_response = userResponse;
         data.correct = userResponse === data.correct_answer;
-        // Store result for adaptive stopping
-        if (!window.digitSpanResults) {
-          window.digitSpanResults = { forward: {}, backward: {} };
-        }
-        const dir = data.direction;
-        if (!window.digitSpanResults[dir][data.length]) {
-          window.digitSpanResults[dir][data.length] = [];
-        }
-        window.digitSpanResults[dir][data.length].push(data.correct);
-      },
-    });
-    // After each response, decide whether to continue to the next length.
-    trials.push({
-      type: jsPsychCallFunction,
-      func: function () {
-        const dir = forward ? 'forward' : 'backward';
-        const results = window.digitSpanResults?.[dir]?.[length] || [];
-        if (results.length > 0 && !results[results.length - 1]) {
+        // If the participant failed on this length, end the digit span block.
+        if (!data.correct) {
           jsPsych.endCurrentTimeline();
         }
       },
@@ -294,19 +278,6 @@ function generateOptimizedSpatialSpanTrials() {
       length,
     );
     trials.push(createOptimizedSpatialSpanTrial(sequence, length));
-    // After each trial, check if the participant failed at this length. If so, end.
-    trials.push({
-      type: jsPsychCallFunction,
-      func: function () {
-        if (!window.spatialSpanResults) {
-          window.spatialSpanResults = {};
-        }
-        const result = window.spatialSpanResults[length];
-        if (result === false) {
-          jsPsych.endCurrentTimeline();
-        }
-      },
-    });
   }
   return trials;
 }
@@ -400,11 +371,10 @@ function createOptimizedSpatialSpanTrial(sequence, length) {
         const isCorrect =
           response.length === sequence.length &&
           response.every((value, idx) => value === sequence[idx]);
-        // Record result for adaptive stopping
-        if (!window.spatialSpanResults) {
-          window.spatialSpanResults = {};
+        // If participant failed on this sequence, end the spatial span block.
+        if (!isCorrect) {
+          jsPsych.endCurrentTimeline();
         }
-        window.spatialSpanResults[length] = isCorrect;
         jsPsych.finishTrial({
           response: response,
           click_sequence: response.join(','),
