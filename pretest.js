@@ -569,21 +569,23 @@ const foley_instructions = {
 };
 
 // Foley trial with explicit play button and per‑trial cleanup
+
 const foley_trial = {
   type: jsPsychHtmlButtonResponse,
   stimulus: function() {
+    // No <audio controls>, we manage playback for a single play
     return `
       <div style="text-align:center;">
-        <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
-          <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
-          <div id="foley-note" style="font-size:13px;color:#666;margin-top:8px;visibility:hidden;">(played)</div>
+        <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:20px;">
+          <p style="font-size:18px;margin-bottom:12px;">🔊 Listen to the sound (one time only)</p>
+          <button id="foley-play" class="jspsych-btn">▶️ Play (once)</button>
+          <p id="foley-status" style="margin-top:10px;color:#666;">Press play, then answer.</p>
         </div>
         <p>What does this sound represent?</p>
-        <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
+        <p style="color:#666;">この音は何を表していますか？</p>
       </div>
     `;
   },
-  post_trial_gap: 250,
   choices: () => jsPsych.timelineVariable('options'),
   data: {
     task: 'foley_iconicity',
@@ -592,30 +594,53 @@ const foley_trial = {
   },
   on_load: function() {
     const src = jsPsych.timelineVariable('audio');
-    // Prepare audio buffer; do not inject <audio> into the DOM
+    const btn = document.getElementById('foley-play');
+    const status = document.getElementById('foley-status');
+
+    // create an Audio() object we can fully control
     const audio = new Audio(src);
     audio.preload = 'auto';
-    const btn = document.getElementById('foley-play');
-    const note = document.getElementById('foley-note');
-    btn.addEventListener('click', () => {
+
+    // allow exactly one play
+    let played = false;
+    btn.addEventListener('click', async () => {
+      if (played) return;        // block repeats
+      played = true;
+      btn.disabled = true;
+      btn.textContent = 'Playing…';
+      status.textContent = 'Playing…';
       try {
-        audio.currentTime = 0;
-        audio.play();
-      } catch (e) {}
-      note.style.visibility = 'visible';
+        await audio.play();
+      } catch (e) {
+        // If user gesture was lost somehow, re-enable once
+        played = false;
+        btn.disabled = false;
+        btn.textContent = '▶️ Play (once)';
+        status.textContent = 'Press play, then answer.';
+      }
     });
-    // Store audio handle globally so we can stop it on trial finish
-    window.__foleyAudio = audio;
+
+    // When it finishes, update button label
+    audio.addEventListener('ended', () => {
+      btn.textContent = 'Played';
+      status.textContent = 'Answer below.';
+    });
+
+    // store a handle for cleanup in on_finish
+    jsPsych.getCurrentTrial()._foley_audio = audio;
   },
   on_finish: function(data) {
-    // Stop any playing audio to avoid carryover
-    if (window.__foleyAudio) {
-      try { window.__foleyAudio.pause(); window.__foleyAudio.src = ''; } catch(e) {}
-      window.__foleyAudio = null;
+    // hard cleanup to prevent any carry-over
+    const trial = jsPsych.getCurrentTrial();
+    const audio = trial && trial._foley_audio;
+    if (audio) {
+      try { audio.pause(); } catch(_) {}
+      audio.src = '';            // release
     }
-    data.correct = (data.response === data.correct_answer);
+    data.correct = data.response === data.correct_answer;
   },
 };
+
 
 const foley_procedure = {
   timeline: [foley_trial],
@@ -1428,44 +1453,48 @@ const naming_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
     <h2>Picture Naming / 絵の命名</h2>
-    <p>You will see pictures of cooking items.</p>
-    <p>調理に使うものの絵が表示されます。</p>
-    <p>Press Start on each picture and say the English name (we will record your voice).</p>
-    <p>各絵で「開始」を押して英語名を声に出してください。</p>
+    <p>For each picture, click <b>Start recording</b> and say the English name. Recording stops automatically after 4 seconds.</p>
+    <p>各絵で「録音開始」をクリックし、英語名を声に出して言ってください。録音は4秒で自動停止します。</p>
     <br><p style="color:#666;font-size:14px;">4 pictures / 4枚</p>
   `,
   choices: ['Begin / 開始'],
 };
 
-// A prompt shown for each picture asking the participant to start
-const naming_prompt = {
+// Step 1: per-image ready screen
+const naming_prepare = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: function() {
-    return `
-      <div style="text-align:center;">
-        <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
-        <p style="margin-top:20px;">Ready to name this object in English?</p>
-      </div>
-    `;
-  },
-  choices: ['Start / 開始'],
+  stimulus: () => `
+    <div style="text-align:center;">
+      <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
+      <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
+    </div>
+  `,
+  choices: ['Start recording / 録音開始'],
 };
 
-// Audio recording trial when mic is available
-const naming_audio_trial = {
+// Step 2: per-image recording (auto-stops after 4s)
+const naming_record = {
   type: jsPsychHtmlAudioResponse,
-  stimulus: function() {
-    return `
-      <div style="text-align:center;">
-        <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
-        <p style="margin-top:20px;">Say the English name now...</p>
-      </div>
-    `;
-  },
+  stimulus: () => `
+    <div style="text-align:center;">
+      <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
+      <p style="margin-top:16px;">Recording... speak now.</p>
+    </div>
+  `,
   recording_duration: 4000,
   show_done_button: false,
   allow_playback: false,
-  data: { task: 'picture_naming', target: jsPsych.timelineVariable('target'), category: jsPsych.timelineVariable('category') },
+  data: {
+    task: 'picture_naming',
+    target: jsPsych.timelineVariable('target'),
+    category: jsPsych.timelineVariable('category'),
+  },
+};
+
+const naming_procedure = {
+  timeline: [naming_prepare, naming_record],
+  timeline_variables: picture_naming_stimuli,
+  randomize_order: false,
 };
 
 // Text fallback trial when mic is not available
