@@ -484,17 +484,42 @@ const foley_instructions = {
 };
 
 const foley_trial = {
-  type: jsPsychAudioButtonResponse,
-  stimulus: jsPsych.timelineVariable('audio'),
-  choices: jsPsych.timelineVariable('options'),
-  prompt: '<p>What does this sound represent? / この音は何を表していますか？</p>',
+  type: jsPsychHtmlButtonResponse,
+  stimulus: function() {
+    // Preload and autoplay the audio
+    const audioFile = jsPsych.timelineVariable('audio');
+    return `
+      <div style="text-align:center;">
+        <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:20px;">
+          <p style="font-size:20px;margin-bottom:15px;">🔊 Listen to this sound:</p>
+          <audio id="foley-audio" controls style="width:300px;">
+            <source src="${audioFile}" type="audio/mpeg">
+          </audio>
+        </div>
+        <p>What does this sound represent?</p>
+        <p style="color:#666;">この音は何を表していますか？</p>
+      </div>
+      <script>
+        // Auto-play when loaded
+        document.getElementById('foley-audio').addEventListener('loadeddata', function() {
+          this.play().catch(e => console.log('Autoplay prevented'));
+        });
+      </script>
+    `;
+  },
+  choices: function() {
+    return jsPsych.timelineVariable('options');
+  },
   data: {
     task: 'foley_iconicity',
     correct_answer: jsPsych.timelineVariable('correct'),
     mapping_type: jsPsych.timelineVariable('mapping_type'),
   },
-  on_finish: function (data) { data.correct = data.response === data.correct_answer; },
+  on_finish: function(data) { 
+    data.correct = data.response === data.correct_answer; 
+  }
 };
+
 
 const foley_procedure = { timeline: [foley_trial], timeline_variables: foley_stimuli, randomize_order: true };
 
