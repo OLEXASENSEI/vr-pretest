@@ -692,16 +692,30 @@ function getSummaryMetrics(data) {
 function saveDataToServer(data) {
   const metrics = getSummaryMetrics(data);
   latestMetrics = metrics;
-  jsPsych.data.addProperties({ participant_id: metrics.participant_id, assigned_condition: metrics.assigned_condition });
-  const payload = { metrics, raw_data: data };
-  fetch('/save-pretest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-    .then((res) => { if (!res.ok) throw new Error('Server returned an error status'); console.log('Pre-test data successfully saved.'); })
-    .catch((err) => {
-      console.warn('Failed to save data to server.', err);
-      // Optional local save:
-      // const filename = metrics.participant_id ? `pretest_${metrics.participant_id}.json` : 'pretest_data.json';
-      // jsPsych.data.get().localSave('json', filename);
-    });
+  
+  // Save locally as backup
+  const filename = `pretest_${metrics.participant_id || 'unknown'}_${Date.now()}.json`;
+  jsPsych.data.get().localSave('json', filename);
+  
+  console.log('Data saved locally as:', filename);
+  console.log('Attempting server save...');
+  
+  // Then try server save
+  fetch('/save-pretest', { 
+    method: 'POST', 
+    headers: { 'Content-Type': 'application/json' }, 
+    body: JSON.stringify({ metrics, raw_data: data }) 
+  })
+  .then(res => {
+    if (res.ok) {
+      console.log('Data successfully saved to server');
+    } else {
+      console.warn('Server save failed, but local save succeeded');
+    }
+  })
+  .catch(err => {
+    console.warn('Server save failed, but local save succeeded:', err);
+  });
 }
 
 function assignCondition() {
