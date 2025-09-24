@@ -82,6 +82,7 @@ const participant_info = {
     title: 'Participant Info / 参加者情報',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
+    showCompletedPage: false,  // <-- disable interim completion screen
     pages: [{
       name: 'p1',
       elements: [
@@ -103,6 +104,7 @@ const motion_sickness_questionnaire = {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
+     showCompletedPage: false,  // <-- disable interim completion screen
     showCompletedPage: false,
     pages: [{
       name: 'mssq',
@@ -410,6 +412,7 @@ const ldt_trial = {
   stimulus: () => `<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
   choices: ['w', 'n'],
   trial_duration: 2500,
+  post_trial_gap: 250,  // <-- add: brief 250 ms blank gap after each trial
   data: { task: 'lexical_decision', correct_response: jsPsych.timelineVariable('correct_response'), word_type: jsPsych.timelineVariable('word_type') },
   on_finish: function (data) { data.correct = data.response === data.correct_response; },
 };
