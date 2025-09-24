@@ -95,6 +95,9 @@ const motion_sickness_questionnaire = {
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
+    // Customize the completed message so participants know the pre-test continues.
+    completedHtml:
+      '<p>Thank you for completing this section. The pre-test continues! / このセクションは終了ですが、テストは続きます。</p>',
     pages: [
       {
         name: 'mssq',
@@ -187,6 +190,8 @@ const digit_span_forward_instructions = {
 // participant fails a span length. Each digit is shown for 800 ms.
 function generateOptimizedDigitSpanTrials(forward = true) {
   const trials = [];
+  // Track the number of incorrect responses (strikes) across lengths. End the block after 3 failures.
+  let failCount = 0;
   for (let length = 3; length <= 8; length++) {
     const digits = [];
     for (let i = 0; i < length; i++) {
@@ -227,9 +232,12 @@ function generateOptimizedDigitSpanTrials(forward = true) {
         const userResponse = (data.response?.response || '').replace(/\s/g, '');
         data.entered_response = userResponse;
         data.correct = userResponse === data.correct_answer;
-        // If the participant failed on this length, end the digit span block.
+        // If the response is incorrect, increment the fail count. End the block after 3 strikes.
         if (!data.correct) {
-          jsPsych.endCurrentTimeline();
+          failCount++;
+          if (failCount >= 3) {
+            jsPsych.endCurrentTimeline();
+          }
         }
       },
     });
@@ -271,6 +279,8 @@ const spatial_span_instructions = {
 
 function generateOptimizedSpatialSpanTrials() {
   const trials = [];
+  // Reset the fail counter for spatial span. We'll track errors via a global variable.
+  window.spatialSpanFailCount = 0;
   const totalSquares = 9;
   for (let length = 3; length <= 6; length++) {
     const sequence = jsPsych.randomization.sampleWithoutReplacement(
@@ -371,9 +381,16 @@ function createOptimizedSpatialSpanTrial(sequence, length) {
         const isCorrect =
           response.length === sequence.length &&
           response.every((value, idx) => value === sequence[idx]);
-        // If participant failed on this sequence, end the spatial span block.
+        // If the participant failed on this sequence, increment a global fail count.
         if (!isCorrect) {
-          jsPsych.endCurrentTimeline();
+          if (typeof window.spatialSpanFailCount !== 'number') {
+            window.spatialSpanFailCount = 0;
+          }
+          window.spatialSpanFailCount += 1;
+          // End the spatial span block after 3 strikes
+          if (window.spatialSpanFailCount >= 3) {
+            jsPsych.endCurrentTimeline();
+          }
         }
         jsPsych.finishTrial({
           response: response,
@@ -901,13 +918,15 @@ timeline.push({
 timeline.push(participant_info);
 timeline.push(motion_sickness_questionnaire);
 // Digit span forward and backward
+// Digit span forward: show instructions, then run a nested timeline of trials
 timeline.push(digit_span_forward_instructions);
-timeline.push(...generateOptimizedDigitSpanTrials(true));
+timeline.push({ timeline: generateOptimizedDigitSpanTrials(true) });
+// Digit span backward
 timeline.push(digit_span_backward_instructions);
-timeline.push(...generateOptimizedDigitSpanTrials(false));
-// Spatial span
+timeline.push({ timeline: generateOptimizedDigitSpanTrials(false) });
+// Spatial span: instructions and nested trials
 timeline.push(spatial_span_instructions);
-timeline.push(...generateOptimizedSpatialSpanTrials());
+timeline.push({ timeline: generateOptimizedSpatialSpanTrials() });
 // Phoneme discrimination
 timeline.push(phoneme_instructions);
 timeline.push(phoneme_procedure);
@@ -1019,11 +1038,13 @@ function saveDataToServer(data) {
       console.log('Pre-test data successfully saved.');
     })
     .catch((error) => {
-      console.warn('Failed to save data to server, saving locally instead.', error);
-      const filename = metrics.participant_id
-        ? `pretest_${metrics.participant_id}.json`
-        : 'pretest_data.json';
-      jsPsych.data.get().localSave('json', filename);
+      console.warn('Failed to save data to server.', error);
+      // If a backend is unavailable, omit localSave to prevent prompting a file download.
+      // Uncomment the following lines if you wish to save a local copy:
+      // const filename = metrics.participant_id
+      //   ? `pretest_${metrics.participant_id}.json`
+      //   : 'pretest_data.json';
+      // jsPsych.data.get().localSave('json', filename);
     });
 }
 
