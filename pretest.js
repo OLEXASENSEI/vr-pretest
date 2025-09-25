@@ -12,6 +12,12 @@ const jsPsych = initJsPsych({
   show_progress_bar: true,
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
+  + on_trial_start: function () {
+// ensure no leftover scroll/overlap; jump the container to top
+const el = document.getElementById('jspsych-target');
+try { el && el.scrollTo(0, 0); } catch (_) {}
+try { window.scrollTo(0, 0); } catch (_) {}
+},
   on_finish: function () {
     const data = jsPsych.data.get().values();
     saveDataToServer(data);
@@ -310,50 +316,56 @@ const phoneme_trial = {
     contrast_type: jsPsych.timelineVariable('contrast'),
   },
   on_load: function () {
-    const audio1 = new Audio(jsPsych.timelineVariable('audio1'));
-    const audio2 = new Audio(jsPsych.timelineVariable('audio2'));
-    const status = document.getElementById('status');
-    const playA = document.getElementById('playA');
-    const playB = document.getElementById('playB');
-    const btnSame = document.getElementById('btnSame');
-    const btnDiff = document.getElementById('btnDiff');
-    let aPlayed = false;
-    let bPlayed = false;
-    let respStart = null;
-    function enableResponsesIfReady() {
-      if (aPlayed && bPlayed) {
-        [btnSame, btnDiff].forEach(b => { b.disabled = false; b.style.opacity = '1'; });
-        status.textContent = 'Same or Different? / 同じか違うか選んでください';
-        respStart = performance.now();
-      }
+  const src1 = jsPsych.timelineVariable('audio1');
+  const src2 = jsPsych.timelineVariable('audio2');
+  const audio1 = src1 ? new Audio(src1) : null;
+  const audio2 = src2 ? new Audio(src2) : null;
+
+  const status = document.getElementById('status');
+  const playA = document.getElementById('playA');
+  const playB = document.getElementById('playB');
+  const btnSame = document.getElementById('btnSame');
+  const btnDiff = document.getElementById('btnDiff');
+
+  let aPlayed = false, bPlayed = false, respStart = null;
+
+  function enableResponsesIfReady() {
+    if ((aPlayed || !audio1) && (bPlayed || !audio2)) {
+      [btnSame, btnDiff].forEach(b => { b.disabled = false; b.style.opacity = '1'; });
+      status.textContent = 'Same or Different? / 同じか違うか選んでください';
+      respStart = performance.now();
     }
-    playA.addEventListener('click', () => {
-      audio1.currentTime = 0;
-      audio1.play().catch(() => {});
-      aPlayed = true;
-      playA.disabled = true;
-      playA.style.opacity = '.5';
-      status.textContent = 'Played A / 音Aを再生';
-      enableResponsesIfReady();
-    });
-    playB.addEventListener('click', () => {
-      audio2.currentTime = 0;
-      audio2.play().catch(() => {});
-      bPlayed = true;
-      playB.disabled = true;
-      playB.style.opacity = '.5';
-      status.textContent = 'Played B / 音Bを再生';
-      enableResponsesIfReady();
-    });
-    btnSame.addEventListener('click', () => {
-      const rt = respStart ? Math.round(performance.now() - respStart) : null;
-      jsPsych.finishTrial({ response_label: 'same', rt });
-    });
-    btnDiff.addEventListener('click', () => {
-      const rt = respStart ? Math.round(performance.now() - respStart) : null;
-      jsPsych.finishTrial({ response_label: 'different', rt });
-    });
-  },
+  }
+
+  if (!audio1) { playA.disabled = true; playA.style.opacity = '.5'; }
+  if (!audio2) { playB.disabled = true; playB.style.opacity = '.5'; }
+
+  playA.addEventListener('click', () => {
+    if (aPlayed || !audio1) return;
+    aPlayed = true; playA.disabled = true; playA.style.opacity = '.5';
+    try { audio1.currentTime = 0; audio1.play(); } catch (_) {}
+    status.textContent = 'Played A / 音Aを再生';
+    enableResponsesIfReady();
+  });
+
+  playB.addEventListener('click', () => {
+    if (bPlayed || !audio2) return;
+    bPlayed = true; playB.disabled = true; playB.style.opacity = '.5';
+    try { audio2.currentTime = 0; audio2.play(); } catch (_) {}
+    status.textContent = 'Played B / 音Bを再生';
+    enableResponsesIfReady();
+  });
+
+  btnSame.addEventListener('click', () => {
+    const rt = respStart ? Math.round(performance.now() - respStart) : null;
+    jsPsych.finishTrial({ response_label: 'same', rt });
+  });
+  btnDiff.addEventListener('click', () => {
+    const rt = respStart ? Math.round(performance.now() - respStart) : null;
+    jsPsych.finishTrial({ response_label: 'different', rt });
+  });
+},
+
   on_finish: function (data) {
     const resp = data.response_label || null;
     data.selected_option = resp;
@@ -658,6 +670,9 @@ const welcome = {
 
 const mic_request = { type: jsPsychInitializeMicrophone };
 
+const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus: '', choices: 'NO_KEYS', trial_duration: 300 };
+
+
 /* ========== TIMELINE ASSEMBLY ========== */
 const timeline = [];
 timeline.push(welcome);
@@ -678,21 +693,27 @@ timeline.push({ timeline: generateOptimizedSpatialSpanTrials() });
 
 timeline.push(phoneme_instructions);
 timeline.push(phoneme_procedure);
+timeline.push(CLEAR);
 
 timeline.push(ldt_instructions);
 timeline.push(ldt_procedure);
+timeline.push(CLEAR);
 
 timeline.push(naming_instructions);
 timeline.push(naming_procedure);
+timeline.push(CLEAR);
 
 timeline.push(foley_instructions);
 timeline.push(foley_procedure);
+timeline.push(CLEAR);
 
 timeline.push(visual_instructions);
 timeline.push(visual_procedure);
+timeline.push(CLEAR);
 
 timeline.push(procedural_test);
 timeline.push(ideophone_test);
+timeline.push(CLEAR);
 
 timeline.push({
   type: jsPsychHtmlButtonResponse,
