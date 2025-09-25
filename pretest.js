@@ -13,12 +13,14 @@ const jsPsych = initJsPsych({
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
 
-  // scroll to the top at the start of every trial so nothing is hidden
-  on_trial_start: function () {
-    const el = document.getElementById('jspsych-target');
-    try { el && el.scrollTo(0, 0); } catch (_) {}
-    try { window.scrollTo(0, 0); } catch (_) {}
-  },
+function scrollTopNow() {
+  try {
+    const el = jsPsych.getDisplayElement?.() || document.getElementById('jspsych-target');
+    if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'auto' });
+    if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'auto' });
+  } catch (_) {}
+}
+
 
   on_finish: function () {
     const data = jsPsych.data.get().values();
@@ -689,7 +691,7 @@ const welcome = {
 
 const mic_request = { type: jsPsychInitializeMicrophone };
 
-const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus: '', choices: 'NO_KEYS', trial_duration: 300 };
+const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus: '', choices: 'NO_KEYS', trial_duration: 300, on_start: scrollTopNow  };
 
 
 /* ========== TIMELINE ASSEMBLY ========== */
