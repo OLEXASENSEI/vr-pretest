@@ -5,11 +5,17 @@
 let latestMetrics = null;
 let assignedCondition = null;
 
-/* ========== ASSET HELPER (cache-busted) ========== */
+/* ========== ASSET HELPER (GitHub Pages compatible) ========== */
 const ASSET_BUST = Math.floor(Date.now() / 3600000); // hourly
 const asset = (p) => {
-  const href = new URL(p, document.baseURI).href;
-  return href + (href.includes('?') ? '&' : '?') + 'v=' + ASSET_BUST;
+  // For GitHub Pages, use relative paths directly
+  // Don't construct complex URLs that might break
+  let cleanPath = p.startsWith('./') ? p.slice(2) : p;
+  cleanPath = cleanPath.startsWith('/') ? cleanPath.slice(1) : cleanPath;
+  
+  // Add cache busting
+  const separator = cleanPath.includes('?') ? '&' : '?';
+  return cleanPath + separator + 'v=' + ASSET_BUST;
 };
 
 /* ========== GLOBAL CSS (before jsPsych) ========== */
@@ -83,83 +89,186 @@ const visual_iconicity_stimuli = [
   { shape: 'img/bowl_shape.svg',  words: ['container','cutter'], expected: 0, shape_type: 'container' },
 ];
 
-/* ========== ROBUST EXISTENCE CHECKS ========== */
+/* ========== ROBUST EXISTENCE CHECKS (GitHub Pages compatible) ========== */
 async function headOK(url) {
   try {
-    const r = await fetch(url, { method: 'HEAD', mode: 'cors', cache: 'no-store' });
+    // For GitHub Pages, sometimes HEAD requests fail, so try GET with range
+    const r = await fetch(url, { 
+      method: 'HEAD', 
+      mode: 'cors', 
+      cache: 'no-store',
+      headers: {
+        'Range': 'bytes=0-0'  // Try to get just the first byte
+      }
+    });
     return r.ok;
-  } catch { return false; }
+  } catch { 
+    // Fallback: try a regular GET request but abort quickly
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      const r = await fetch(url, { 
+        method: 'GET', 
+        mode: 'cors', 
+        cache: 'no-store',
+        signal: controller.signal
+      });
+      clearTimeout(timeoutId);
+      return r.ok;
+    } catch {
+      return false;
+    }
+  }
 }
 
 async function checkAudioExists(url) {
-  if (await headOK(url)) return true;
+  console.log('Checking audio:', url);
+  
+  // First try the HEAD request
+  if (await headOK(url)) {
+    console.log('Audio HEAD OK:', url);
+    return true;
+  }
+  
+  // Fallback to audio element test
   return new Promise((resolve) => {
     const a = new Audio();
     const timeout = setTimeout(() => {
       a.src = '';
+      console.log('Audio timeout:', url);
       resolve(false);
-    }, 3000);
-    a.oncanplaythrough = () => {
+    }, 5000);
+    
+    a.addEventListener('canplaythrough', () => {
       clearTimeout(timeout);
+      console.log('Audio canplaythrough OK:', url);
       resolve(true);
-    };
-    a.onerror = () => {
+    });
+    
+    a.addEventListener('error', (e) => {
       clearTimeout(timeout);
+      console.log('Audio error:', url, e);
       resolve(false);
-    };
-    a.src = url;
+    });
+    
+    a.addEventListener('loadstart', () => {
+      console.log('Audio loadstart:', url);
+    });
+    
+    try {
+      a.src = url;
+    } catch (e) {
+      clearTimeout(timeout);
+      console.log('Audio src error:', url, e);
+      resolve(false);
+    }
   });
 }
 
 async function checkImageExists(url) {
-  if (await headOK(url)) return true;
+  console.log('Checking image:', url);
+  
+  // First try the HEAD request  
+  if (await headOK(url)) {
+    console.log('Image HEAD OK:', url);
+    return true;
+  }
+  
+  // Fallback to image element test
   return new Promise((resolve) => {
     const img = new Image();
-    const timeout = setTimeout(() => resolve(false), 3000);
+    const timeout = setTimeout(() => {
+      console.log('Image timeout:', url);
+      resolve(false);
+    }, 5000);
+    
     img.onload = () => {
       clearTimeout(timeout);
+      console.log('Image load OK:', url);
       resolve(true);
     };
-    img.onerror = () => {
+    
+    img.onerror = (e) => {
       clearTimeout(timeout);
+      console.log('Image error:', url, e);
       resolve(false);
     };
-    img.src = url;
+    
+    try {
+      img.src = url;
+    } catch (e) {
+      clearTimeout(timeout);
+      console.log('Image src error:', url, e);
+      resolve(false);
+    }
   });
 }
 
 async function filterExistingStimuli() {
-  console.log('Validating assets (HEAD + fallback)…');
+  console.log('Validating assets for GitHub Pages…');
+  
+  // Test a few different path formats to see what works
+  const testPaths = [
+    'sounds/bowl.mp3',
+    './sounds/bowl.mp3', 
+    'img/bowl.jpg',
+    './img/bowl.jpg'
+  ];
+  
+  console.log('Testing asset paths:');
+  for (const path of testPaths) {
+    const assetPath = asset(path);
+    console.log(`${path} -> ${assetPath}`);
+    const exists = path.endsWith('.mp3') ? await checkAudioExists(assetPath) : await checkImageExists(assetPath);
+    console.log(`${assetPath} exists: ${exists}`);
+  }
 
   const phoneme = [];
   for (const s of phoneme_discrimination_stimuli) {
     const ok1 = await checkAudioExists(asset(s.audio1));
     const ok2 = await checkAudioExists(asset(s.audio2));
-    if (ok1 && ok2) phoneme.push(s);
-    else console.warn('Skipping phoneme:', s.audio1, ok1, '/', s.audio2, ok2);
+    if (ok1 && ok2) {
+      phoneme.push(s);
+      console.log('✓ Phoneme included:', s.audio1, '&', s.audio2);
+    } else {
+      console.warn('✗ Skipping phoneme:', s.audio1, ok1, '/', s.audio2, ok2);
+    }
   }
 
   const foley = [];
   for (const s of foley_stimuli) {
     const ok = await checkAudioExists(asset(s.audio));
-    if (ok) foley.push(s); 
-    else console.warn('Skipping foley:', s.audio);
+    if (ok) {
+      foley.push(s);
+      console.log('✓ Foley included:', s.audio);
+    } else {
+      console.warn('✗ Skipping foley:', s.audio);
+    }
   }
 
   const picture = [];
   for (const s of picture_naming_stimuli) {
     const ok = await checkImageExists(asset(s.image));
-    if (ok) picture.push(s); 
-    else console.warn('Skipping picture:', s.image);
+    if (ok) {
+      picture.push(s);
+      console.log('✓ Picture included:', s.image);
+    } else {
+      console.warn('✗ Skipping picture:', s.image);
+    }
   }
 
   const visual = [];
   for (const s of visual_iconicity_stimuli) {
     const ok = await checkImageExists(asset(s.shape));
-    if (ok) visual.push(s); 
-    else console.warn('Skipping visual:', s.shape);
+    if (ok) {
+      visual.push(s);
+      console.log('✓ Visual included:', s.shape);
+    } else {
+      console.warn('✗ Skipping visual:', s.shape);
+    }
   }
 
+  console.log(`Final counts - Phoneme: ${phoneme.length}, Foley: ${foley.length}, Picture: ${picture.length}, Visual: ${visual.length}`);
   return { phoneme, foley, picture, visual };
 }
 
@@ -205,14 +314,50 @@ const motion_sickness_questionnaire = {
     pages: [{ 
       name: 'mssq', 
       elements: [
-        { type:'rating', name:'mssq_car_reading', title:'How often do you feel sick when reading in a car? / 車で読書…', isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-        { type:'rating', name:'mssq_boat', title:'How often do you feel sick on boats? / 船…', isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-        { type:'rating', name:'mssq_games', title:'How often do you feel dizzy playing video games? / ゲーム…', isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-        { type:'rating', name:'mssq_vr', title:'How often do you feel sick in VR (if experienced)? / VR…', isRequired:false,
-          rateValues:[{value:0,text:'No experience'},{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
+        { 
+          type: 'rating', 
+          name: 'mssq_car_reading', 
+          title: 'How often do you feel sick when reading in a car? / 車で読書をしている時に気分が悪くなりますか？', 
+          isRequired: true,
+          rateMin: 1,
+          rateMax: 5,
+          rateStep: 1,
+          minRateDescription: 'Never / 全くない',
+          maxRateDescription: 'Always / いつも'
+        },
+        { 
+          type: 'rating', 
+          name: 'mssq_boat', 
+          title: 'How often do you feel sick on boats? / 船に乗って気分が悪くなりますか？', 
+          isRequired: true,
+          rateMin: 1,
+          rateMax: 5,
+          rateStep: 1,
+          minRateDescription: 'Never / 全くない',
+          maxRateDescription: 'Always / いつも'
+        },
+        { 
+          type: 'rating', 
+          name: 'mssq_games', 
+          title: 'How often do you feel dizzy playing video games? / ビデオゲームをして目眩がしますか？', 
+          isRequired: true,
+          rateMin: 1,
+          rateMax: 5,
+          rateStep: 1,
+          minRateDescription: 'Never / 全くない',
+          maxRateDescription: 'Always / いつも'
+        },
+        { 
+          type: 'rating', 
+          name: 'mssq_vr', 
+          title: 'How often do you feel sick in VR (if experienced)? / VR体験で気分が悪くなりますか？', 
+          isRequired: false,
+          rateMin: 0,
+          rateMax: 5,
+          rateStep: 1,
+          minRateDescription: 'No experience / 経験なし',
+          maxRateDescription: 'Always / いつも'
+        },
       ]
     }],
   },
