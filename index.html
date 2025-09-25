@@ -13,70 +13,26 @@
   <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/survey.core.min.css">
   <link rel="stylesheet" href="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.css">
 
+  <!-- Silences the console 404 -->
+  <link rel="icon" href="data:image/x-icon;base64,AAABAAEAEBAAAAAAIABoAwAAFgAAACgAAAAQAAAAIAAAAAEAGAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A////AP///wD///8A" />
+
   <style>
-    /* Allow the page to grow and scroll */
-    html, body {
-      min-height: 100%;
-      height: auto;
-      margin: 0;
-      padding: 0;
-    }
-
-    /* Center horizontally, allow vertical scrolling */
+    html, body { min-height: 100%; height: auto; margin: 0; padding: 0; }
     body {
-      display: flex;
-      justify-content: center;
-      align-items: flex-start;
-      background: #f5f5f5;
-      overflow-y: auto;
-      -webkit-overflow-scrolling: touch; /* iOS smooth scroll */
+      display: flex; justify-content: center; align-items: flex-start;
+      background: #f5f5f5; overflow-y: auto; -webkit-overflow-scrolling: touch;
     }
-
-    /* Main experiment container */
-    #jspsych-target {
-      width: 100%;
-      max-width: 900px;
-      margin: 20px 0 40px;
-      box-sizing: border-box;
-    }
-
-    /* IMPORTANT: jsPsych adds .jspsych-display-element which can hide overflow.
-       Force our container to be scrollable and not fixed-height. */
-    #jspsych-target.jspsych-display-element {
-      overflow: visible !important;
-      height: auto !important;
-      min-height: 100vh;
-    }
-
-    /* Optional: tidy up spatial-span visuals (your JS also injects inline styles) */
-    .spatial-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 110px);
-      gap: 12px;
-      justify-content: center;
-      margin: 20px auto;
-    }
-    .spatial-square {
-      width: 110px;
-      height: 110px;
-      background: #ddd;
-      border: 2px solid #333;
-      border-radius: 12px;
-      transition: background-color .2s ease;
-    }
-    .spatial-square.active   { background: #ffd966; }
+    #jspsych-target { width: 100%; max-width: 900px; margin: 20px 0 40px; box-sizing: border-box; }
+    #jspsych-target.jspsych-display-element { overflow: visible !important; height: auto !important; min-height: 100vh; }
+    .spatial-grid { display: grid; grid-template-columns: repeat(3, 110px); gap: 12px; justify-content: center; margin: 20px auto; }
+    .spatial-square { width: 110px; height: 110px; background: #ddd; border: 2px solid #333; border-radius: 12px; transition: background-color .2s ease; }
+    .spatial-square.active { background: #ffd966; }
     .spatial-square.selected { background: #8ecae6; }
-    .spatial-square.clickable{ cursor: pointer; }
-
-    /* Do NOT vertically center .jspsych-content; that can create “no scroll” traps on long surveys */
-    #jspsych-target .jspsych-content {
-      display: block;
-      min-height: 0;
-    }
+    .spatial-square.clickable { cursor: pointer; }
+    #jspsych-target .jspsych-content { display: block; min-height: 0; }
   </style>
 </head>
 <body>
-  <!-- jsPsych renders into this container (pretest.js sets display_element:'jspsych-target') -->
   <div id="jspsych-target"></div>
 
   <noscript>
@@ -85,26 +41,26 @@
     </p>
   </noscript>
 
-  <!-- Scripts (load order matters) -->
+  <!-- Scripts (load order matters). 'defer' keeps order but avoids blocking render. -->
   <!-- jsPsych core -->
-  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/jspsych@7.3.4" defer></script>
 
   <!-- SurveyJS (required by @jspsych/plugin-survey) -->
-  <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
-  <script src="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.js"></script>
+  <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js" defer></script>
+  <script src="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.js" defer></script>
 
   <!-- jsPsych plugins -->
-  <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0" defer></script>
 
-  <!-- Microphone + audio record plugins (v1.x for these two) -->
-  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+  <!-- Microphone + audio record plugins (these are 1.x; that’s correct for mic/recording) -->
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3" defer></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3" defer></script>
 
   <!-- Your experiment (must call initJsPsych with display_element:'jspsych-target') -->
-  <script src="./pretest.js"></script>
+  <script src="./pretest.js" defer></script>
 </body>
 </html>
