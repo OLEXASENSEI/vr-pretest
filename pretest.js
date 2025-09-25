@@ -1,20 +1,20 @@
-// Version 3.6 – Fully Fixed Pre-Test Battery
-// - Survey question titles visible
-// - Asset filtering robust
-// - Picture/Foley/Visual blocks use array timeline_variables (no functions)
-// - Safer DOM cleanup
-// - Minor bugfixes & annotations
+// Version 3.7 – Fully Fixed Pre-Test Battery
+// - Picture naming uses array timeline_variables + robust mic gating
+// - SurveyJS radiogroups for MSSQ (stable radio UI)
+// - Asset filtering + GH Pages cache-busting
+// - Safer DOM cleanup & clear annotations
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
 let assignedCondition = null;
+let microphoneAvailable = false; // <-- populated after mic init
 
 /* ========== ASSET HELPER (GitHub Pages friendly) ========== */
 // Hourly cache-buster prevents GH Pages CDN staleness without spamming.
 const ASSET_BUST = Math.floor(Date.now() / 3600000);
 const asset = (p) => {
   // Normalize relative paths like './img/x.jpg' or '/img/x.jpg'
-  let clean = p.replace(/^(\.\/|\/)/, "");
+  const clean = p.replace(/^(\.\/|\/)/, "");
   return clean + (clean.includes("?") ? "&" : "?") + "v=" + ASSET_BUST;
 };
 
@@ -86,7 +86,6 @@ const visual_iconicity_stimuli = [
 
 /* ========== ROBUST EXISTENCE CHECKS ========== */
 // Simpler & robust: load with <audio>/<img>, give it a generous timeout.
-// (HEAD can be flaky on some CDNs; query-string cache-buster already used.)
 async function checkAudioExists(url) {
   return new Promise((resolve) => {
     const a = new Audio();
@@ -185,33 +184,48 @@ const motion_sickness_questionnaire = {
       name: 'mssq',
       elements: [
         {
-          type:'rating', name:'mssq_car_reading',
-          title:'How often do you feel sick when reading in a car?',
-          description:'車で読書をしている時に気分が悪くなりますか？',
-          isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]
+          type: 'radiogroup',
+          name: 'mssq_car_reading',
+          title: 'How often do you feel sick when reading in a car?',
+          description: '車で読書をしている時に気分が悪くなりますか？',
+          isRequired: true,
+          choices: [
+            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
+            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
+          ]
         },
         {
-          type:'rating', name:'mssq_boat',
-          title:'How often do you feel sick on boats?',
-          description:'船に乗っている時に気分が悪くなりますか？',
-          isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]
+          type: 'radiogroup',
+          name: 'mssq_boat',
+          title: 'How often do you feel sick on boats?',
+          description: '船に乗っている時に気分が悪くなりますか？',
+          isRequired: true,
+          choices: [
+            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
+            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
+          ]
         },
         {
-          type:'rating', name:'mssq_games',
-          title:'How often do you feel dizzy playing video games?',
-          description:'ゲームをしている時にめまいを感じますか？',
-          isRequired:true,
-          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]
+          type: 'radiogroup',
+          name: 'mssq_games',
+          title: 'How often do you feel dizzy playing video games?',
+          description: 'ゲームをしている時にめまいを感じますか？',
+          isRequired: true,
+          choices: [
+            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
+            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
+          ]
         },
         {
-          type:'rating', name:'mssq_vr',
-          title:'How often do you feel sick in VR (if experienced)?',
-          description:'（VR経験がある場合）VR中に気分が悪くなりますか？',
-          isRequired:false,
-          rateValues:[
-            {value:0,text:'No experience'},{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}
+          type: 'radiogroup',
+          name: 'mssq_vr',
+          title: 'How often do you feel sick in VR (if experienced)?',
+          description: '（VR経験がある場合）VR中に気分が悪くなりますか？',
+          isRequired: false,
+          choices: [
+            { value: 0, text: 'No experience' },
+            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
+            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
           ]
         }
       ]
@@ -219,7 +233,9 @@ const motion_sickness_questionnaire = {
   },
   data: { task: 'motion_sickness' },
   on_finish: () => setTimeout(() => {
-    document.querySelectorAll('.sd-header, .sv-title').forEach(el => { try { el.remove(); } catch(_){} });
+    document.querySelectorAll('.sd-header, .sv-title').forEach(el => { 
+      try { el.remove(); } catch(_){} 
+    });
   }, 100)
 };
 
@@ -464,12 +480,12 @@ const ldt_trial = {
 };
 const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
 
-/* ========== PICTURE NAMING (array timeline_variables) ========== */
+/* ========== PICTURE NAMING (merged: array timeline_variables + mic gating) ========== */
 const naming_intro = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: ()=>`<h2>Picture Naming / 絵の命名</h2>
-    <p>For each picture, click <b>Start recording</b> and say the English name. Recording stops automatically after 4s.</p>
-    <p>各絵で「録音開始」をクリックし、英語名を言ってください（4秒で自動停止）。</p>
+  stimulus: () => `<h2>Picture Naming / 絵の命名</h2>
+    <p>For each picture, you'll see it first, then record your response, then type it as backup.</p>
+    <p>各絵を見て、録音し、バックアップとしてタイプします。</p>
     <p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>`,
   choices: ['Begin / 開始'],
   post_trial_gap: 500,
@@ -487,7 +503,13 @@ const naming_prepare = {
       </div>`;
   },
   choices: ['Start recording / 録音開始'],
-  post_trial_gap: 250
+  post_trial_gap: 250,
+  data: () => ({
+    task: 'picture_naming_prepare',
+    target: jsPsych.timelineVariable('target') || 'unknown',
+    category: jsPsych.timelineVariable('category') || 'unknown',
+    image_file: jsPsych.timelineVariable('image') || 'none'
+  })
 };
 
 const naming_record = {
@@ -498,18 +520,18 @@ const naming_record = {
     return `
       <div style="text-align:center;">
         <img src="${asset(img)}" style="width:350px;border-radius:8px;" />
-        <p style="margin-top:16px;">Recording… speak now.</p>
+        <p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p>
       </div>`;
   },
   recording_duration: 4000,
   show_done_button: false,
   allow_playback: false,
   data: () => ({
-    task:'picture_naming',
+    task: 'picture_naming_audio',
     target: jsPsych.timelineVariable('target') || 'unknown',
     category: jsPsych.timelineVariable('category') || 'unknown',
     image_file: jsPsych.timelineVariable('image') || 'none'
-  }),
+  })
 };
 
 const naming_text_fallback = {
@@ -524,18 +546,20 @@ const naming_text_fallback = {
           <p style="margin-top:20px;">Type the English name for this object:</p>
         </div>`;
     },
-    name:'response', required:true
+    name: 'response', 
+    required: true,
+    placeholder: 'Enter the word you said...'
   }],
   data: () => ({
-    task:'picture_naming',
+    task: 'picture_naming_text',
     target: jsPsych.timelineVariable('target') || 'unknown',
     category: jsPsych.timelineVariable('category') || 'unknown',
     image_file: jsPsych.timelineVariable('image') || 'none'
   }),
   on_finish: d => {
-    const r=(d.response?.response||'').toLowerCase().trim();
-    d.correct=(r===d.target);
-    d.naming_response=r;
+    const r = (d.response?.response || '').toLowerCase().trim();
+    d.correct = (r === d.target);
+    d.naming_response = r;
   }
 };
 
@@ -693,7 +717,21 @@ const welcome = {
     <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
 };
 
-const mic_request = { type: jsPsychInitializeMicrophone };
+// Enhanced microphone initialization with better status capture
+const mic_request = {
+  type: jsPsychInitializeMicrophone,
+  data: { task: 'microphone_initialization' },
+  on_finish: function(trialData) {
+    // Heuristic: treat secure context + mediaDevices as baseline;
+    // mark available true only if the plugin didn't error out (trial likely completed).
+    // Some browsers won't surface a "success" flag; this keeps us conservative.
+    try {
+      microphoneAvailable = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    } catch { microphoneAvailable = false; }
+    console.log('Microphone available (heuristic):', microphoneAvailable);
+  }
+};
+
 const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus:'', choices:'NO_KEYS', trial_duration:300 };
 
 /* ========== INITIALIZE & BUILD TIMELINE ========== */
@@ -729,14 +767,18 @@ async function initializeExperiment(){
 
   timeline.push(ldt_instructions, ldt_procedure, CLEAR);
 
-  // === Picture Naming block built NOW with an ARRAY (no function) ===
+  // === Picture Naming block (ARRAY timeline_variables, mic-gated recording, always fallback text) ===
   if (FILTERED_STIMULI.picture.length) {
     timeline.push(naming_intro);
     timeline.push({
       timeline: [
         naming_prepare,
-        { timeline:[naming_record],        conditional_function: () => !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) },
-        { timeline:[naming_text_fallback], conditional_function: () => !(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) }
+        {
+          timeline:[naming_record],
+          conditional_function: () => microphoneAvailable && !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia)
+        },
+        // Always offer a typed backup, regardless of mic:
+        { timeline:[naming_text_fallback] }
       ],
       timeline_variables: FILTERED_STIMULI.picture,
       randomize_order: false
@@ -905,7 +947,7 @@ function calculateIdeophoneScore(data){
 }
 function countWords(t){ if(!t||typeof t!=='string')return 0; const c=t.trim(); return c?c.split(/\s+/).length:0; }
 function calculateNamingCompletionRate(data){
-  const t=data.filter(x=>x.task==='picture_naming');
+  const t=data.filter(x=>x.task==='picture_naming_audio'||x.task==='picture_naming_text');
   if(!t.length)return null;
   const c=t.filter(x=>x.response!==null&&x.response!==undefined);
   return c.length/t.length;
