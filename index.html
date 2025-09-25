@@ -3,43 +3,29 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>VR Iconicity Study – Pre‑Test Battery</title>
-
-  <!--
-    This HTML file boots the VR Iconicity Study pre‑test battery.  It loads
-    the jsPsych core library (v7.3.4) and matching plugin versions, then
-    mounts the experiment into a dedicated container div.  The CSS rules
-    center the experiment on the page and constrain its width so that all
-    tasks appear neatly aligned.  Update the script source below if you
-    rename or relocate your compiled experiment file.
-  -->
+  <title>VR Iconicity Study – Pre-Test Battery</title>
 
   <!-- Prevent a 404 for the favicon on GitHub Pages -->
   <link rel="icon" href="data:," />
 
   <!-- jsPsych core (v7.3.4) -->
-  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script defer src="https://unpkg.com/jspsych@7.3.4"></script>
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" />
 
   <!-- jsPsych plugins (v2.x where available) -->
-  <script src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-preload@2.1.0"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
   <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" />
-  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
 
   <!-- Microphone + audio record plugins (v1.x is correct for these two) -->
-  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+  <script defer src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
 
   <style>
-    /*
-      Global styling – center the experiment container on the page and
-      provide a light, neutral background.  The wrapper div (jspsych-target)
-      constrains the width of the experiment and ensures that all tasks
-      remain centered regardless of screen size.
-    */
+    /* Center the experiment and constrain width */
     html, body {
       height: 100%;
       margin: 0;
@@ -57,7 +43,7 @@
       max-width: 900px;
       margin-top: 20px;
     }
-    /* Optional: style the spatial-span squares if needed; jsPsych also injects inline styles */
+    /* Optional: spatial-span visual helpers (plugins also inject inline styles) */
     .spatial-grid {
       display: grid;
       grid-template-columns: repeat(3, 110px);
@@ -79,18 +65,16 @@
   </style>
 </head>
 <body>
-  <!--
-    jsPsych will render all trials inside this container.  The container is
-    centered by the body’s flexbox settings and constrained in width via
-    CSS.  If you choose to target a different element, update the
-    `display_element` property in your JavaScript initialization.
-  -->
+  <!-- All trials render inside this container (see display_element in pretest.js) -->
   <div id="jspsych-target"></div>
 
-  <!-- Include the compiled experiment logic.  Ensure that pretest.js is
-       uploaded alongside this HTML file in the same directory.  The
-       JavaScript file should call initJsPsych with display_element:
-       'jspsych-target' to mount into this container. -->
-  <script src="./pretest.js"></script>
+  <noscript>
+    <p style="max-width:900px;margin:20px auto;padding:12px;background:#fff3cd;border:1px solid #ffeeba;border-radius:8px;font-family:sans-serif;">
+      JavaScript is required to run this study. Please enable JavaScript and reload the page.
+    </p>
+  </noscript>
+
+  <!-- Your compiled experiment; must call initJsPsych({ display_element: 'jspsych-target', ... }) -->
+  <script defer src="./pretest.js"></script>
 </body>
 </html>
