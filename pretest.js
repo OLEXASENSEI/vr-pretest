@@ -874,3 +874,4 @@ function calculateNamingCompletionRate(data) {
   if (!trials.length) return null;
   const completed = trials.filter((t) => t.response !== null && t.response !== undefined);
   return completed.length / trials.length;
+}
