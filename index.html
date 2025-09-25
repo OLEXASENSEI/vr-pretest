@@ -5,40 +5,74 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>VR Iconicity Study – Pre-Test Battery</title>
 
-  <!-- Styles (safe to keep in <head>; if your platform strips <head>,
-       you can move these two <link> tags just above the scripts in <body>). -->
+  <!-- jsPsych + plugin CSS -->
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" />
   <link rel="stylesheet" href="https://unpkg.com/@jspsych/plugin-survey@2.0.0/css/survey.css" />
 
+  <!-- SurveyJS CSS (needed by @jspsych/plugin-survey) -->
+  <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/survey.core.min.css">
+  <link rel="stylesheet" href="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.css">
+
   <style>
-    html, body { height: 100%; margin: 0; padding: 0; }
-    body {
-      display: flex; justify-content: center; align-items: flex-start;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-      background: #f5f5f5;
+    /* Allow the page to grow and scroll */
+    html, body {
+      min-height: 100%;
+      height: auto;
+      margin: 0;
+      padding: 0;
     }
-    /* lock the page, let the experiment container scroll if needed */
-    body { overflow-y: hidden; }
 
-    #jspsych-target { min-height: 100vh; overflow-y: auto; }
-    #jspsych-target { width: 100%; max-width: 900px; margin-top: 20px; }
-    .spatial-grid { display: grid; grid-template-columns: repeat(3,110px); gap: 12px; justify-content: center; margin: 20px auto; }
-    .spatial-square { width:110px; height:110px; background:#ddd; border:2px solid #333; border-radius:12px; transition:background-color .2s ease; }
-    .spatial-square.active { background:#ffd966; }
-    .spatial-square.selected { background:#8ecae6; }
-    .spatial-square.clickable { cursor: pointer; }
+    /* Center horizontally, allow vertical scrolling */
+    body {
+      display: flex;
+      justify-content: center;
+      align-items: flex-start;
+      background: #f5f5f5;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch; /* iOS smooth scroll */
+    }
 
-    /* Keep the content vertically roomy and centered */
+    /* Main experiment container */
+    #jspsych-target {
+      width: 100%;
+      max-width: 900px;
+      margin: 20px 0 40px;
+      box-sizing: border-box;
+    }
+
+    /* IMPORTANT: jsPsych adds .jspsych-display-element which can hide overflow.
+       Force our container to be scrollable and not fixed-height. */
+    #jspsych-target.jspsych-display-element {
+      overflow: visible !important;
+      height: auto !important;
+      min-height: 100vh;
+    }
+
+    /* Optional: tidy up spatial-span visuals (your JS also injects inline styles) */
+    .spatial-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 110px);
+      gap: 12px;
+      justify-content: center;
+      margin: 20px auto;
+    }
+    .spatial-square {
+      width: 110px;
+      height: 110px;
+      background: #ddd;
+      border: 2px solid #333;
+      border-radius: 12px;
+      transition: background-color .2s ease;
+    }
+    .spatial-square.active   { background: #ffd966; }
+    .spatial-square.selected { background: #8ecae6; }
+    .spatial-square.clickable{ cursor: pointer; }
+
+    /* Do NOT vertically center .jspsych-content; that can create “no scroll” traps on long surveys */
     #jspsych-target .jspsych-content {
-  min-height: 65vh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* If you absolutely want no page scroll during trials: */
-/* body { overflow-y: hidden; }  <-- comment back in only if needed */
-
+      display: block;
+      min-height: 0;
+    }
   </style>
 </head>
 <body>
@@ -51,13 +85,11 @@
     </p>
   </noscript>
 
-  <!-- Load ALL JS libs at the end of <body> in the required order -->
+  <!-- Scripts (load order matters) -->
   <!-- jsPsych core -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
 
   <!-- SurveyJS (required by @jspsych/plugin-survey) -->
-  <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/survey.core.min.css">
-  <link rel="stylesheet" href="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.css">
   <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
   <script src="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.js"></script>
 
@@ -67,10 +99,12 @@
   <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.1.0"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.1.0"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.1.0"></script>
+
+  <!-- Microphone + audio record plugins (v1.x for these two) -->
   <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
 
-  <!-- Your experiment script (must include display_element:'jspsych-target') -->
+  <!-- Your experiment (must call initJsPsych with display_element:'jspsych-target') -->
   <script src="./pretest.js"></script>
 </body>
 </html>
