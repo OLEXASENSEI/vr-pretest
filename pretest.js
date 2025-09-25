@@ -690,7 +690,7 @@ const welcome = {
 
 const mic_request = { type: jsPsychInitializeMicrophone };
 
-const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus: '', choices: 'NO_KEYS', trial_duration: 300, on_start: scrollTopNow  };
+const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus: '', choices: 'NO_KEYS', trial_duration: 300 };
 
 
 /* ========== TIMELINE ASSEMBLY ========== */
