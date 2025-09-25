@@ -13,20 +13,19 @@ const jsPsych = initJsPsych({
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
 
-function scrollTopNow() {
-  try {
-    const el = jsPsych.getDisplayElement?.() || document.getElementById('jspsych-target');
-    if (el && el.scrollTo) el.scrollTo({ top: 0, behavior: 'auto' });
-    if (window.scrollTo) window.scrollTo({ top: 0, behavior: 'auto' });
-  } catch (_) {}
-}
-
+  // scroll to the top at the start of every trial so nothing is hidden
+  on_trial_start: function () {
+    const el = document.getElementById('jspsych-target');
+    if (el) el.scrollTop = 0;
+    try { window.scrollTo(0, 0); } catch (_) {}
+  },
 
   on_finish: function () {
     const data = jsPsych.data.get().values();
     saveDataToServer(data);
   },
 });
+
 
 /* ========== STIMULI & PRELOAD LISTS ========== */
 const phoneme_discrimination_stimuli = [
