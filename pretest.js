@@ -27,11 +27,15 @@ style.textContent = `
 `;
 document.head.appendChild(style);
 
-/* --- Hard-stop any SurveyJS header from sticking/overlapping --- */
+/* --- Modified CSS to allow question text but hide main survey title --- */
 const hardStyle = document.createElement('style');
 hardStyle.textContent = `
-  /* Hide SurveyJS titles/headers entirely */
-  .sd-header, .sd-title, .sv-title { display: none !important; }
+  /* Hide only the main SurveyJS survey title, not question titles */
+  .sv-header__title, .sd-title.sd-container-modern__title { display: none !important; }
+  
+  /* Make sure question titles ARE visible */
+  .sv-question__title, .sd-question__title, .sv-string-viewer { display: block !important; }
+  
   /* Make sure SurveyJS containers are not positioned sticky */
   .sv-root, .sv_main, .sv-container { position: static !important; top: auto !important; z-index: auto !important; }
 `;
@@ -307,56 +311,56 @@ const participant_info = {
 const motion_sickness_questionnaire = {
   type: jsPsychSurvey,
   survey_json: {
-    title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off', 
     focusFirstQuestionAutomatic: false, 
     showCompletedPage: false,
     pages: [{ 
       name: 'mssq', 
+      title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
       elements: [
         { 
           type: 'rating', 
           name: 'mssq_car_reading', 
-          title: 'How often do you feel sick when reading in a car? / 車で読書をしている時に気分が悪くなりますか？', 
+          title: 'How often do you feel sick when reading in a car?<br><small style="color:#666;">車で読書をしている時に気分が悪くなりますか？</small>',
           isRequired: true,
           rateMin: 1,
           rateMax: 5,
           rateStep: 1,
-          minRateDescription: 'Never / 全くない',
-          maxRateDescription: 'Always / いつも'
+          minRateDescription: 'Never',
+          maxRateDescription: 'Always'
         },
         { 
           type: 'rating', 
           name: 'mssq_boat', 
-          title: 'How often do you feel sick on boats? / 船に乗って気分が悪くなりますか？', 
+          title: 'How often do you feel sick on boats?<br><small style="color:#666;">船に乗って気分が悪くなりますか？</small>',
           isRequired: true,
           rateMin: 1,
           rateMax: 5,
           rateStep: 1,
-          minRateDescription: 'Never / 全くない',
-          maxRateDescription: 'Always / いつも'
+          minRateDescription: 'Never',
+          maxRateDescription: 'Always'
         },
         { 
           type: 'rating', 
           name: 'mssq_games', 
-          title: 'How often do you feel dizzy playing video games? / ビデオゲームをして目眩がしますか？', 
+          title: 'How often do you feel dizzy playing video games?<br><small style="color:#666;">ビデオゲームをして目眩がしますか？</small>',
           isRequired: true,
           rateMin: 1,
           rateMax: 5,
           rateStep: 1,
-          minRateDescription: 'Never / 全くない',
-          maxRateDescription: 'Always / いつも'
+          minRateDescription: 'Never',
+          maxRateDescription: 'Always'
         },
         { 
           type: 'rating', 
           name: 'mssq_vr', 
-          title: 'How often do you feel sick in VR (if experienced)? / VR体験で気分が悪くなりますか？', 
+          title: 'How often do you feel sick in VR (if experienced)?<br><small style="color:#666;">VR体験で気分が悪くなりますか？</small>',
           isRequired: false,
           rateMin: 0,
           rateMax: 5,
           rateStep: 1,
-          minRateDescription: 'No experience / 経験なし',
-          maxRateDescription: 'Always / いつも'
+          minRateDescription: 'No experience',
+          maxRateDescription: 'Always'
         },
       ]
     }],
@@ -640,53 +644,83 @@ const ldt_procedure = {
   randomize_order:true 
 };
 
-/* ========== PICTURE NAMING (FIXED - persistent intro) ========== */
+/* ========== PICTURE NAMING (FIXED - with proper error handling) ========== */
 const naming_intro = {
   type: jsPsychHtmlButtonResponse,
   stimulus: ()=>`<h2>Picture Naming / 絵の命名</h2>
     <p>For each picture, click <b>Start recording</b> and say the English name. Recording stops automatically after 4s.</p>
     <p>各絵で「録音開始」をクリックし、英語名を言ってください（4秒で自動停止）。</p>
-    <p style="color:#666">Pictures: ${FILTERED_STIMULI.picture?.length||0}</p>`,
-  choices:['Begin / 開始'],
-  post_trial_gap: 500, // Add gap to prevent flashing
+    <p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>
+    ${FILTERED_STIMULI.picture?.length === 0 ? '<p style="color:#red;"><strong>No pictures found - skipping this task</strong></p>' : ''}`,
+  choices: FILTERED_STIMULI.picture?.length > 0 ? ['Begin / 開始'] : ['Skip (No Pictures) / スキップ'],
+  post_trial_gap: 500,
 };
 
 const naming_prepare = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;" />
-      <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
-    </div>`,
+  stimulus: () => {
+    const imageUrl = jsPsych.timelineVariable('image');
+    if (!imageUrl) {
+      return '<p>Error: No image specified</p>';
+    }
+    return `
+      <div style="text-align:center;">
+        <img src="${asset(imageUrl)}" style="width:350px;border-radius:8px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4='; this.style.border='2px solid #ccc';" />
+        <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
+        <p style="color:#666; font-size:12px;">Target: ${jsPsych.timelineVariable('target') || 'unknown'}</p>
+      </div>`;
+  },
   choices: ['Start recording / 録音開始'],
   post_trial_gap: 250
 };
 
 const naming_record = {
   type: jsPsychHtmlAudioResponse,
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;" />
-      <p style="margin-top:16px;">Recording… speak now.</p>
-    </div>`,
+  stimulus: () => {
+    const imageUrl = jsPsych.timelineVariable('image');
+    if (!imageUrl) {
+      return '<p>Error: No image specified for recording</p>';
+    }
+    return `
+      <div style="text-align:center;">
+        <img src="${asset(imageUrl)}" style="width:350px;border-radius:8px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4='; this.style.border='2px solid #ccc';" />
+        <p style="margin-top:16px;">Recording… speak now.</p>
+      </div>`;
+  },
   recording_duration: 4000,
   show_done_button: false,
   allow_playback: false,
-  data: { task:'picture_naming', target:jsPsych.timelineVariable('target'), category:jsPsych.timelineVariable('category') },
+  data: () => ({ 
+    task:'picture_naming', 
+    target: jsPsych.timelineVariable('target') || 'unknown', 
+    category: jsPsych.timelineVariable('category') || 'unknown',
+    image_file: jsPsych.timelineVariable('image') || 'none'
+  }),
 };
 
 const naming_text_fallback = {
   type: jsPsychSurveyText,
   questions: [{ 
-    prompt: () => `
-      <div style="text-align:center;">
-        <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;">
-        <p style="margin-top:20px;">Type the English name for this object:</p>
-      </div>`, 
+    prompt: () => {
+      const imageUrl = jsPsych.timelineVariable('image');
+      if (!imageUrl) {
+        return '<p>Error: No image specified for text input</p>';
+      }
+      return `
+        <div style="text-align:center;">
+          <img src="${asset(imageUrl)}" style="width:350px;border-radius:8px;" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzUwIiBoZWlnaHQ9IjI1MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWxsPSIjZjBmMGYwIi8+PHRleHQgeD0iNTAlIiB5PSI1MCUiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxOCIgZmlsbD0iIzk5OSIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZHk9Ii4zZW0iPkltYWdlIG5vdCBmb3VuZDwvdGV4dD48L3N2Zz4='; this.style.border='2px solid #ccc';" />
+          <p style="margin-top:20px;">Type the English name for this object:</p>
+        </div>`;
+    }, 
     name:'response', 
     required:true 
   }],
-  data: { task:'picture_naming', target:jsPsych.timelineVariable('target'), category:jsPsych.timelineVariable('category') },
+  data: () => ({ 
+    task:'picture_naming', 
+    target: jsPsych.timelineVariable('target') || 'unknown', 
+    category: jsPsych.timelineVariable('category') || 'unknown',
+    image_file: jsPsych.timelineVariable('image') || 'none'
+  }),
   on_finish: d => { 
     const r=(d.response?.response||'').toLowerCase().trim(); 
     d.correct=(r===d.target); 
@@ -694,6 +728,7 @@ const naming_text_fallback = {
   }
 };
 
+// Only create trials if we have pictures
 const naming_trials = {
   timeline: [
     naming_prepare,
@@ -706,8 +741,16 @@ const naming_trials = {
       conditional_function: () => !(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) 
     }
   ],
-  timeline_variables: () => FILTERED_STIMULI.picture,
+  timeline_variables: () => {
+    console.log('Picture naming timeline variables:', FILTERED_STIMULI.picture);
+    return FILTERED_STIMULI.picture && FILTERED_STIMULI.picture.length > 0 ? FILTERED_STIMULI.picture : [];
+  },
   randomize_order: false,
+  conditional_function: () => {
+    const hasImages = FILTERED_STIMULI.picture && FILTERED_STIMULI.picture.length > 0;
+    console.log('Picture naming conditional check:', hasImages, FILTERED_STIMULI.picture);
+    return hasImages;
+  }
 };
 
 /* ========== FOLEY ICONICITY (COMPLETELY REWORKED) ========== */
