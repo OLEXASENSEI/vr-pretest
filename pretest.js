@@ -7,17 +7,19 @@ let assignedCondition = null;
 
 /* ========== INIT ========== */
 const jsPsych = initJsPsych({
-  display_element: 'jspsych-target', // FIXED: Added display_element
+  display_element: 'jspsych-target',
   use_webaudio: true,
   show_progress_bar: true,
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
-  + on_trial_start: function () {
-// ensure no leftover scroll/overlap; jump the container to top
-const el = document.getElementById('jspsych-target');
-try { el && el.scrollTo(0, 0); } catch (_) {}
-try { window.scrollTo(0, 0); } catch (_) {}
-},
+
+  // scroll to the top at the start of every trial so nothing is hidden
+  on_trial_start: function () {
+    const el = document.getElementById('jspsych-target');
+    try { el && el.scrollTo(0, 0); } catch (_) {}
+    try { window.scrollTo(0, 0); } catch (_) {}
+  },
+
   on_finish: function () {
     const data = jsPsych.data.get().values();
     saveDataToServer(data);
@@ -135,7 +137,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
     trials.push({
       type: jsPsychHtmlKeyboardResponse,
-      stimulus: `<div style="font-size:48px;">${digits.join(' ')}</div>`,
+      stimulus: `<div style="font-size:48px; white-space:nowrap; padding:20px 24px; text-align:center;">${digits.join(' ')}</div>`,
       choices: 'NO_KEYS',
       trial_duration: 800 * length,
       data: { task: 'digit_span_presentation', digits: digits.join(''), length, direction: forward ? 'forward' : 'backward' },
@@ -280,6 +282,7 @@ function generateOptimizedSpatialSpanTrials() {
 /* ========== SECTION 5: PHONOLOGICAL AWARENESS ========== */
 const phoneme_instructions = {
   type: jsPsychHtmlButtonResponse,
+  render_on_canvas: false,
   stimulus: `
     <h2>Sound Discrimination / 音の識別</h2>
     <p>You will hear two words.</p>
@@ -315,15 +318,19 @@ const phoneme_trial = {
     correct_answer: jsPsych.timelineVariable('correct'),
     contrast_type: jsPsych.timelineVariable('contrast'),
   },
-  on_load: function () {
+on_load: function () {
   const src1 = jsPsych.timelineVariable('audio1');
   const src2 = jsPsych.timelineVariable('audio2');
   const audio1 = src1 ? new Audio(src1) : null;
   const audio2 = src2 ? new Audio(src2) : null;
 
-  const status = document.getElementById('status');
-  const playA = document.getElementById('playA');
-  const playB = document.getElementById('playB');
+  // 🔎 Log missing files right in the console
+  if (audio1) audio1.addEventListener('error', () => console.warn('[404] Missing audio1:', src1));
+  if (audio2) audio2.addEventListener('error', () => console.warn('[404] Missing audio2:', src2));
+
+  const status  = document.getElementById('status');
+  const playA   = document.getElementById('playA');
+  const playB   = document.getElementById('playB');
   const btnSame = document.getElementById('btnSame');
   const btnDiff = document.getElementById('btnDiff');
 
@@ -365,6 +372,7 @@ const phoneme_trial = {
     jsPsych.finishTrial({ response_label: 'different', rt });
   });
 },
+
 
   on_finish: function (data) {
     const resp = data.response_label || null;
@@ -409,11 +417,21 @@ const ldt_instructions = {
   choices: [' '],
 };
 
-const ldt_fixation = { type: jsPsychHtmlKeyboardResponse, stimulus: '<div style="font-size:60px;">+</div>', choices: 'NO_KEYS', trial_duration: 500 };
+// Fixation before each LDT stimulus
+const ldt_fixation = {
+  type: jsPsychHtmlKeyboardResponse,
+  stimulus: '<div style="font-size:60px;">+</div>',
+  render_on_canvas: false,     // 👈 use DOM, not canvas
+  choices: 'NO_KEYS',
+  trial_duration: 500,
+};
 
+// LDT item
 const ldt_trial = {
   type: jsPsychHtmlKeyboardResponse,
   stimulus: () => `<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
+  render_on_canvas: false,     // 👈 use DOM, not canvas
+  stimulus_duration: 1000,     // 👈 hide word after 1s (trial still waits)
   choices: ['w', 'n'],
   trial_duration: 2500,
   post_trial_gap: 250,
@@ -445,6 +463,7 @@ const naming_prepare = {
     </div>
   `,
   choices: ['Start recording / 録音開始'],
+  post_trial_gap: 250   // <— small pause before the recording screen
 };
 
 const naming_record = {
@@ -684,12 +703,15 @@ timeline.push(motion_sickness_questionnaire);
 
 timeline.push(digit_span_forward_instructions);
 timeline.push({ timeline: generateOptimizedDigitSpanTrials(true) });
+timeline.push(CLEAR);
 
 timeline.push(digit_span_backward_instructions);
 timeline.push({ timeline: generateOptimizedDigitSpanTrials(false) });
+timeline.push(CLEAR);
 
 timeline.push(spatial_span_instructions);
 timeline.push({ timeline: generateOptimizedSpatialSpanTrials() });
+timeline.push(CLEAR);
 
 timeline.push(phoneme_instructions);
 timeline.push(phoneme_procedure);

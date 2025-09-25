@@ -19,7 +19,7 @@
     }
     /* lock the page, let the experiment container scroll if needed */
     body { overflow-y: hidden; }
-    
+
     #jspsych-target { min-height: 100vh; overflow-y: auto; }
     #jspsych-target { width: 100%; max-width: 900px; margin-top: 20px; }
     .spatial-grid { display: grid; grid-template-columns: repeat(3,110px); gap: 12px; justify-content: center; margin: 20px auto; }
@@ -27,6 +27,18 @@
     .spatial-square.active { background:#ffd966; }
     .spatial-square.selected { background:#8ecae6; }
     .spatial-square.clickable { cursor: pointer; }
+
+    /* Keep the content vertically roomy and centered */
+    #jspsych-target .jspsych-content {
+  min-height: 65vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* If you absolutely want no page scroll during trials: */
+/* body { overflow-y: hidden; }  <-- comment back in only if needed */
+
   </style>
 </head>
 <body>
