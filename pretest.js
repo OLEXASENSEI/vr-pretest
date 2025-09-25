@@ -20,6 +20,23 @@ style.textContent = `
   .jspsych-content { position: relative !important; }
 `;
 document.head.appendChild(style);
+/* --- Hard-stop any SurveyJS header from sticking/overlapping --- */
+const hardStyle = document.createElement('style');
+hardStyle.textContent = `
+  /* Hide SurveyJS titles/headers entirely */
+  .sd-header, .sd-title, .sv-title { display: none !important; }
+
+  /* Make sure SurveyJS containers are not positioned sticky */
+  .sv-root, .sv_main, .sv-container { position: static !important; top: auto !important; z-index: auto !important; }
+`;
+document.head.appendChild(hardStyle);
+
+/* Remove any stray SurveyJS nodes that might remain in the DOM */
+function nukeSurveyArtifacts() {
+  document.querySelectorAll('.sd-root, .sv-root, .sd-header, .sd-title, .sv-title')
+    .forEach(el => { try { el.remove(); } catch (_) {} });
+}
+
 
 /* ========== INIT ========== */
 const jsPsych = initJsPsych({
@@ -29,6 +46,7 @@ const jsPsych = initJsPsych({
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
   on_trial_start: () => { try { window.scrollTo(0, 0); } catch(_){} },
+   nukeSurveyArtifacts(); 
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
 
