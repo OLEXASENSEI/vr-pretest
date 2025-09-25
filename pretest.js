@@ -5,6 +5,9 @@
 let latestMetrics = null;
 let assignedCondition = null;
 
+  // Resolve any relative asset path (e.g., "sounds/foo.mp3") to an absolute URL
+const asset = (p) => new URL(p, document.baseURI).href;
+
 /* ========== INIT ========== */
 const jsPsych = initJsPsych({
   display_element: 'jspsych-target',
@@ -59,15 +62,20 @@ const visual_iconicity_stimuli = [
   { shape: 'img/bowl_shape.svg',  words: ['container','cutter'], expected: 0, shape_type: 'container' },
 ];
 
-// Collect assets for preloading (deduplicated)
+// Collect assets for preloading (deduplicated, with absolute URLs)
 const PRELOAD_AUDIO = Array.from(new Set([
-  ...phoneme_discrimination_stimuli.flatMap(s => [s.audio1, s.audio2]),
-  ...foley_stimuli.map(s => s.audio),
+  ...phoneme_discrimination_stimuli.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
+  ...foley_stimuli.map(s => asset(s.audio)),
 ]));
+
 const PRELOAD_IMAGES = Array.from(new Set([
-  ...picture_naming_stimuli.map(s => s.image),
-  ...visual_iconicity_stimuli.map(s => s.shape),
+  ...picture_naming_stimuli.map(s => asset(s.image)),
+  ...visual_iconicity_stimuli.map(s => asset(s.shape)),
 ]));
+
+console.log('PRELOAD_AUDIO:', PRELOAD_AUDIO);
+console.log('PRELOAD_IMAGES:', PRELOAD_IMAGES);
+
 
 /* ========== SECTION 1: PARTICIPANT INFORMATION ========== */
 const participant_info = {
@@ -320,21 +328,30 @@ const phoneme_trial = {
     contrast_type: jsPsych.timelineVariable('contrast'),
   },
 on_load: function () {
+  // 🔁 build absolute URLs, then <Audio> objects
   const src1 = jsPsych.timelineVariable('audio1');
   const src2 = jsPsych.timelineVariable('audio2');
-  const audio1 = src1 ? new Audio(src1) : null;
-  const audio2 = src2 ? new Audio(src2) : null;
+  const a1 = src1 ? asset(src1) : null;
+  const a2 = src2 ? asset(src2) : null;
 
-  // 🔎 Log missing files right in the console
-  if (audio1) audio1.addEventListener('error', () => console.warn('[404] Missing audio1:', src1));
-  if (audio2) audio2.addEventListener('error', () => console.warn('[404] Missing audio2:', src2));
+  const audio1 = a1 ? new Audio(a1) : null;
+  const audio2 = a2 ? new Audio(a2) : null;
+
+  // helpful logs if something’s wrong
+  if (audio1) {
+    console.log('Loading audio1:', a1);
+    audio1.addEventListener('error', () => console.warn('[404] Missing audio1 URL:', a1));
+  }
+  if (audio2) {
+    console.log('Loading audio2:', a2);
+    audio2.addEventListener('error', () => console.warn('[404] Missing audio2 URL:', a2));
+  }
 
   const status  = document.getElementById('status');
   const playA   = document.getElementById('playA');
   const playB   = document.getElementById('playB');
   const btnSame = document.getElementById('btnSame');
   const btnDiff = document.getElementById('btnDiff');
-
   let aPlayed = false, bPlayed = false, respStart = null;
 
   function enableResponsesIfReady() {
@@ -373,6 +390,7 @@ on_load: function () {
     jsPsych.finishTrial({ response_label: 'different', rt });
   });
 },
+
 
 
   on_finish: function (data) {
@@ -458,23 +476,23 @@ const naming_instructions = {
 const naming_prepare = {
   type: jsPsychHtmlButtonResponse,
   stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
-      <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
-    </div>
-  `,
+  <div style="text-align:center;">
+    <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;" />
+    <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
+  </div>
+`,
   choices: ['Start recording / 録音開始'],
   post_trial_gap: 250   // <— small pause before the recording screen
 };
 
 const naming_record = {
   type: jsPsychHtmlAudioResponse,
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;" />
-      <p style="margin-top:16px;">Recording... speak now.</p>
-    </div>
-  `,
+ stimulus: () => `
+  <div style="text-align:center;">
+    <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;" />
+    <p style="margin-top:16px;">Recording... speak now.</p>
+  </div>
+`,
   recording_duration: 4000,
   show_done_button: false,
   allow_playback: false,
@@ -492,14 +510,20 @@ const naming_text_fallback = {
     prompt: function() {
       return `
         <div style="text-align:center;">
-          <img src="${jsPsych.timelineVariable('image')}" style="width:350px;border-radius:8px;">
+          <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;">
           <p style="margin-top:20px;">Type the English name for this object:</p>
         </div>
       `;
     },
-    name: 'response', required: true, placeholder: 'Type your answer here'
+    name: 'response',
+    required: true,
+    placeholder: 'Type your answer here'
   }],
-  data: { task: 'picture_naming', target: jsPsych.timelineVariable('target'), category: jsPsych.timelineVariable('category') },
+  data: {
+    task: 'picture_naming',
+    target: jsPsych.timelineVariable('target'),
+    category: jsPsych.timelineVariable('category')
+  },
   on_finish: function(data) {
     const response = (data.response?.response || '').toLowerCase().trim();
     data.correct = response === data.target;
@@ -558,21 +582,28 @@ const foley_trial = {
     correct_answer: jsPsych.timelineVariable('correct'),
     mapping_type: jsPsych.timelineVariable('mapping_type'),
   },
-  on_load: function() {
-    const src = jsPsych.timelineVariable('audio');
-    const audio = new Audio(src);
-    audio.preload = 'auto';
-    const btn = document.getElementById('foley-play');
-    const note = document.getElementById('foley-note');
-    btn.addEventListener('click', () => {
-      try {
-        audio.currentTime = 0;
-        audio.play();
-      } catch (e) {}
-      note.style.visibility = 'visible';
-    });
-    window.__foleyAudio = audio;
-  },
+ on_load: function() {
+  const src = jsPsych.timelineVariable('audio');
+  const url = asset(src);
+  const audio = new Audio(url);
+  audio.preload = 'auto';
+
+  // helpful log
+  console.log('Loading foley audio:', url);
+  audio.addEventListener('error', () => console.warn('[404] Foley missing:', url));
+
+  const btn = document.getElementById('foley-play');
+  const note = document.getElementById('foley-note');
+  btn.addEventListener('click', () => {
+    try {
+      audio.currentTime = 0;
+      audio.play();
+    } catch (e) {}
+    note.style.visibility = 'visible';
+  });
+  window.__foleyAudio = audio;
+},
+
   on_finish: function(data) {
     if (window.__foleyAudio) {
       try { window.__foleyAudio.pause(); window.__foleyAudio.src = ''; } catch(e) {}
@@ -602,12 +633,12 @@ const visual_instructions = {
 
 const visual_trial = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${jsPsych.timelineVariable('shape')}" style="width:200px;height:200px;" />
-      <p style="margin-top:20px;">Which word matches this shape?</p>
-    </div>
-  `,
+ stimulus: () => `
+  <div style="text-align:center;">
+    <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
+    <p style="margin-top:20px;">Which word matches this shape?</p>
+  </div>
+`,
   choices: jsPsych.timelineVariable('words'),
   post_trial_gap: 250,
   data: {
