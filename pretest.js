@@ -1,7 +1,9 @@
-// Version 3.8 – Pre-Test Battery (syntax fixed, Foley single-trial pages, mic-gated naming)
+// Version 3.8.1
+// 
+ – Pre-Test Battery (syntax fixed, Foley single-trial pages, mic-gated naming)
 // - Fix: stray '}' and older-browser-incompatible `catch {}` -> `catch (e) {}`
 // - Fix: removed duplicate Foley block
-// - Foley: one sound per page + progress interstitial + robust audio cleanup
+// - Foley: one sound per page + progress interstitial + robust audio cleanup 
 // - Picture naming: mic-gated only (no text fallback)
 // - SurveyJS radiogroups for MSSQ kept
 // - GH Pages cache-busting & asset existence checks retained
@@ -570,6 +572,7 @@ const foley_trial = {
     audio.src = url;
 
     let audioLoaded = false;
+
     const onCanPlay = () => {
       audioLoaded = true;
       if (status) status.textContent = 'Audio ready - click to play';
@@ -579,23 +582,24 @@ const foley_trial = {
       if (btn) { btn.textContent = '❌ Audio unavailable'; btn.disabled = true; }
       if (status) status.textContent = 'Audio failed to load - you can still answer';
     };
-
-    audio.addEventListener('canplaythrough', onCanPlay);
-    audio.addEventListener('error', onError);
-
     const playHandler = () => {
       if (!audioLoaded) return;
       try {
         audio.currentTime = 0;
         audio.play().then(() => {
           if (status) status.textContent = 'Playing audio...';
-        }).catch((e)=>{ if (status) status.textContent = 'Playback failed'; });
-      } catch (e) {}
+        }).catch(() => {
+          if (status) status.textContent = 'Playback failed';
+        });
+      } catch {}
     };
+
+    audio.addEventListener('canplaythrough', onCanPlay);
+    audio.addEventListener('error', onError);
     if (btn) btn.addEventListener('click', playHandler);
 
-    // Keep a cleaner to remove listeners/audio when trial ends
-    this._foley_cleanup = () => {
+    // Window-scoped cleanup so on_finish can always reach it
+    window.__foleyCleanup = () => {
       try {
         if (btn) btn.removeEventListener('click', playHandler);
         if (audio) {
@@ -605,7 +609,7 @@ const foley_trial = {
           audio.src = '';
           audio.load();
         }
-      } catch (e) {}
+      } catch {}
       audio = null;
     };
   },
@@ -618,10 +622,11 @@ const foley_trial = {
       d.skipped = true;
       d.correct = null;
     }
-    // cleanup
-    try { if (this._foley_cleanup) this._foley_cleanup(); } catch (e) {}
+    try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch {}
+    window.__foleyCleanup = null;
   }
 };
+
 
 /* ========== VISUAL ICONICITY ========== */
 const visual_intro = {
@@ -698,18 +703,32 @@ const welcome = {
 };
 
 // Mic init with older-browser-safe catch
+// Mic init with older-browser-safe catch + permissions probe
 const mic_request = {
   type: jsPsychInitializeMicrophone,
   data: { task: 'microphone_initialization' },
-  on_finish: function(trialData) {
+  on_finish: async function () {
+    let ok = false;
     try {
-      microphoneAvailable = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      // Prefer Permissions API if available (no extra prompt)
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const p = await navigator.permissions.query({ name: 'microphone' });
+          ok = (p.state === 'granted' || p.state === 'prompt'); // 'prompt' still OK to try recording
+        } catch (e) {}
+      }
+      // Heuristic fallback
+      if (!ok) {
+        ok = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+      }
     } catch (e) {
-      microphoneAvailable = false;
+      ok = false;
     }
-    console.log('Microphone available (heuristic):', microphoneAvailable);
+    microphoneAvailable = ok;
+    console.log('Microphone available (post-init check):', microphoneAvailable);
   }
 };
+
 
 const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus:'', choices:'NO_KEYS', trial_duration:300 };
 
@@ -769,25 +788,36 @@ async function initializeExperiment(){
     timeline.push(CLEAR);
   }
 
-  // Picture Naming (mic-gated; no text fallback)
-  if (FILTERED_STIMULI.picture.length) {
-    if (microphoneAvailable) {
-      timeline.push(naming_intro);
-      timeline.push({
+
+ // Picture Naming (runtime-gated; no text fallback)
+if (FILTERED_STIMULI.picture.length) {
+  // If mic is available at runtime
+  timeline.push({
+    conditional_function: () => microphoneAvailable === true,
+    timeline: [
+      naming_intro,
+      {
         timeline: [naming_prepare, naming_record],
         timeline_variables: FILTERED_STIMULI.picture,
         randomize_order: false
-      });
-      timeline.push(CLEAR);
-    } else {
-      timeline.push({
+      },
+      CLEAR
+    ]
+  });
+
+  // If mic is NOT available at runtime
+  timeline.push({
+    conditional_function: () => microphoneAvailable !== true,
+    timeline: [
+      {
         type: jsPsychHtmlButtonResponse,
         stimulus: `<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>`,
         choices: ['Continue']
-      });
-      timeline.push(CLEAR);
-    }
-  }
+      },
+      CLEAR
+    ]
+  });
+}
 
   // Visual
   if (FILTERED_STIMULI.visual.length) {
