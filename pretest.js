@@ -1,5 +1,5 @@
-// Version 3.4 – Resilient Pre-Test Battery
-// Fixes: naming intro always shown, Foley never blocks, cache-busting, robust asset checks
+// Version 3.5 – Fully Fixed Pre-Test Battery
+// Fixes: picture naming intro persistence, foley audio handling, visual iconicity, all task completion
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -20,12 +20,12 @@ style.textContent = `
   .jspsych-content { position: relative !important; }
 `;
 document.head.appendChild(style);
+
 /* --- Hard-stop any SurveyJS header from sticking/overlapping --- */
 const hardStyle = document.createElement('style');
 hardStyle.textContent = `
   /* Hide SurveyJS titles/headers entirely */
   .sd-header, .sd-title, .sv-title { display: none !important; }
-
   /* Make sure SurveyJS containers are not positioned sticky */
   .sv-root, .sv_main, .sv-container { position: static !important; top: auto !important; z-index: auto !important; }
 `;
@@ -37,7 +37,6 @@ function nukeSurveyArtifacts() {
     .forEach(el => { try { el.remove(); } catch (_) {} });
 }
 
-
 /* ========== INIT ========== */
 const jsPsych = initJsPsych({
   display_element: 'jspsych-target',
@@ -45,8 +44,10 @@ const jsPsych = initJsPsych({
   show_progress_bar: true,
   message_progress_bar: '進捗 Progress',
   default_iti: 350,
-  on_trial_start: () => { try { window.scrollTo(0, 0); } catch(_){} },
-   nukeSurveyArtifacts(); 
+  on_trial_start: () => { 
+    try { window.scrollTo(0, 0); } catch(_){} 
+    nukeSurveyArtifacts(); 
+  },
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
 
@@ -89,23 +90,40 @@ async function headOK(url) {
     return r.ok;
   } catch { return false; }
 }
+
 async function checkAudioExists(url) {
-  // Prefer HEAD; fall back to HTMLMediaElement error events
   if (await headOK(url)) return true;
-  await new Promise((resolve) => {
+  return new Promise((resolve) => {
     const a = new Audio();
-    a.oncanplaythrough = () => resolve(true);
-    a.onerror = () => resolve(false);
+    const timeout = setTimeout(() => {
+      a.src = '';
+      resolve(false);
+    }, 3000);
+    a.oncanplaythrough = () => {
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    a.onerror = () => {
+      clearTimeout(timeout);
+      resolve(false);
+    };
     a.src = url;
   });
-  return await headOK(url); // final attempt
 }
+
 async function checkImageExists(url) {
   if (await headOK(url)) return true;
-  return await new Promise((resolve) => {
+  return new Promise((resolve) => {
     const img = new Image();
-    img.onload = () => resolve(true);
-    img.onerror = () => resolve(false);
+    const timeout = setTimeout(() => resolve(false), 3000);
+    img.onload = () => {
+      clearTimeout(timeout);
+      resolve(true);
+    };
+    img.onerror = () => {
+      clearTimeout(timeout);
+      resolve(false);
+    };
     img.src = url;
   });
 }
@@ -124,19 +142,22 @@ async function filterExistingStimuli() {
   const foley = [];
   for (const s of foley_stimuli) {
     const ok = await checkAudioExists(asset(s.audio));
-    if (ok) foley.push(s); else console.warn('Skipping foley:', s.audio);
+    if (ok) foley.push(s); 
+    else console.warn('Skipping foley:', s.audio);
   }
 
   const picture = [];
   for (const s of picture_naming_stimuli) {
     const ok = await checkImageExists(asset(s.image));
-    if (ok) picture.push(s); else console.warn('Skipping picture:', s.image);
+    if (ok) picture.push(s); 
+    else console.warn('Skipping picture:', s.image);
   }
 
   const visual = [];
   for (const s of visual_iconicity_stimuli) {
     const ok = await checkImageExists(asset(s.shape));
-    if (ok) visual.push(s); else console.warn('Skipping visual:', s.shape);
+    if (ok) visual.push(s); 
+    else console.warn('Skipping visual:', s.shape);
   }
 
   return { phoneme, foley, picture, visual };
@@ -152,18 +173,25 @@ const participant_info = {
   type: jsPsychSurvey,
   survey_json: {
     title: 'Participant Info / 参加者情報',
-    showQuestionNumbers: 'off', focusFirstQuestionAutomatic: false, showCompletedPage: false,
-    pages: [{ name: 'p1', elements: [
-      { type: 'text',      name: 'participant_id', title: 'Participant ID / 参加者ID', isRequired: true, placeholder: 'Enter ID here' },
-      { type: 'dropdown',  name: 'age',            title: 'Age / 年齢',                 isRequired: true, choices: ['18-25','26-35','36-45','46-55','56+'] },
-      { type: 'radiogroup',name: 'native_language',title: 'Native Language / 母語',      isRequired: true, choices: ['Japanese / 日本語','Other / その他'] },
-      { type: 'radiogroup',name: 'english_years',  title: 'English Learning Years / 英語学習年数', isRequired: true, choices: ['0-3','4-6','7-10','10+'] },
-      { type: 'radiogroup',name: 'vr_experience',  title: 'VR Experience / VR経験',      isRequired: true, choices: ['None / なし','1–2 times / 1-2回','Several / 数回','Regular / 定期的'] },
-    ]}],
+    showQuestionNumbers: 'off', 
+    focusFirstQuestionAutomatic: false, 
+    showCompletedPage: false,
+    pages: [{ 
+      name: 'p1', 
+      elements: [
+        { type: 'text', name: 'participant_id', title: 'Participant ID / 参加者ID', isRequired: true, placeholder: 'Enter ID here' },
+        { type: 'dropdown', name: 'age', title: 'Age / 年齢', isRequired: true, choices: ['18-25','26-35','36-45','46-55','56+'] },
+        { type: 'radiogroup', name: 'native_language', title: 'Native Language / 母語', isRequired: true, choices: ['Japanese / 日本語','Other / その他'] },
+        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years / 英語学習年数', isRequired: true, choices: ['0-3','4-6','7-10','10+'] },
+        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience / VR経験', isRequired: true, choices: ['None / なし','1–2 times / 1-2回','Several / 数回','Regular / 定期的'] },
+      ]
+    }],
   },
   data: { task: 'participant_info' },
   on_finish: () => setTimeout(() => {
-    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => { el.remove(); });
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => { 
+      try { el.remove(); } catch(_) {} 
+    });
   }, 100)
 };
 
@@ -171,21 +199,28 @@ const motion_sickness_questionnaire = {
   type: jsPsychSurvey,
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
-    showQuestionNumbers: 'off', focusFirstQuestionAutomatic: false, showCompletedPage: false,
-    pages: [{ name: 'mssq', elements: [
-      { type:'rating', name:'mssq_car_reading', title:'How often do you feel sick when reading in a car? / 車で読書…', isRequired:true,
-        rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-      { type:'rating', name:'mssq_boat', title:'How often do you feel sick on boats? / 船…', isRequired:true,
-        rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-      { type:'rating', name:'mssq_games', title:'How often do you feel dizzy playing video games? / ゲーム…', isRequired:true,
-        rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-      { type:'rating', name:'mssq_vr', title:'How often do you feel sick in VR (if experienced)? / VR…', isRequired:false,
-        rateValues:[{value:0,text:'No experience'},{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
-    ]}],
+    showQuestionNumbers: 'off', 
+    focusFirstQuestionAutomatic: false, 
+    showCompletedPage: false,
+    pages: [{ 
+      name: 'mssq', 
+      elements: [
+        { type:'rating', name:'mssq_car_reading', title:'How often do you feel sick when reading in a car? / 車で読書…', isRequired:true,
+          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
+        { type:'rating', name:'mssq_boat', title:'How often do you feel sick on boats? / 船…', isRequired:true,
+          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
+        { type:'rating', name:'mssq_games', title:'How often do you feel dizzy playing video games? / ゲーム…', isRequired:true,
+          rateValues:[{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
+        { type:'rating', name:'mssq_vr', title:'How often do you feel sick in VR (if experienced)? / VR…', isRequired:false,
+          rateValues:[{value:0,text:'No experience'},{value:1,text:'Never'},{value:2,text:'Rarely'},{value:3,text:'Sometimes'},{value:4,text:'Often'},{value:5,text:'Always'}]},
+      ]
+    }],
   },
   data: { task: 'motion_sickness' },
   on_finish: () => setTimeout(() => {
-    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => { el.remove(); });
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el => { 
+      try { el.remove(); } catch(_) {} 
+    });
   }, 100)
 };
 
@@ -199,26 +234,35 @@ const digit_span_forward_instructions = {
   `,
   choices: ['Begin / 開始'],
 };
+
 function generateOptimizedDigitSpanTrials(forward = true) {
-  const trials = []; let failCount = 0;
+  const trials = []; 
+  let failCount = 0;
   for (let length = 3; length <= 8; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random()*10));
-    trials.push({ type: jsPsychHtmlKeyboardResponse,
+    trials.push({ 
+      type: jsPsychHtmlKeyboardResponse,
       stimulus: `<div style="font-size:48px;padding:20px 24px;">${digits.join(' ')}</div>`,
-      choices: 'NO_KEYS', trial_duration: 800*length,
+      choices: 'NO_KEYS', 
+      trial_duration: 800*length,
       data: { task:'digit_span_presentation', digits:digits.join(''), length, direction:forward?'forward':'backward' }
     });
-    trials.push({ type: jsPsychSurveyText,
+    trials.push({ 
+      type: jsPsychSurveyText,
       questions:[{ prompt: forward?'Enter SAME order / 同じ順番':'Enter REVERSE order / 逆順', name:'response', required:true }],
       post_trial_gap: 250,
       data:{ task:'digit_span_response', correct_answer: forward?digits.join(''):digits.slice().reverse().join(''), length, direction:forward?'forward':'backward' },
       on_finish: d => {
-        const r = (d.response?.response||'').replace(/\s/g,''); d.entered_response=r; d.correct = r===d.correct_answer;
+        const r = (d.response?.response||'').replace(/\s/g,''); 
+        d.entered_response=r; 
+        d.correct = r===d.correct_answer;
         if (!d.correct && ++failCount>=2) jsPsych.endCurrentTimeline();
       }
     });
-  } return trials;
+  } 
+  return trials;
 }
+
 const digit_span_backward_instructions = {
   type: jsPsychHtmlButtonResponse,
   stimulus: `
@@ -236,49 +280,101 @@ const spatial_span_instructions = {
   `,
   choices: ['Begin / 開始'],
 };
+
 function generateOptimizedSpatialSpanTrials(){
-  const trials=[]; window.spatialSpanFailCount=0; const totalSquares=9;
-  function makeTrial(seq,len){ return {
-    type: jsPsychHtmlKeyboardResponse, choices:'NO_KEYS',
-    stimulus:()=>{ let h=`<style>
-      .spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}
-      .spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}
-      .spatial-square.active{background:#ffd966;} .spatial-square.selected{background:#8ecae6;} .spatial-square.clickable{cursor:pointer;}
-    </style><div class="spatial-grid">`;
-      for(let i=0;i<9;i++) h+=`<div class="spatial-square" data-index="${i}"></div>`; 
-      return h+`</div><p id="spatial-instruction">Watch the sequence. / 覚えてください。</p>`;
-    },
-    data:{ task:'spatial_span', correct_answer: seq.join(','), length: len },
-    on_load: function(){
-      const squares=[...document.querySelectorAll('.spatial-square')];
-      const ins=document.getElementById('spatial-instruction'); const hi=500, gap=220; const resp=[]; let enabled=false, start=null;
-      squares.forEach(s=>s.classList.remove('clickable'));
-      const show=(i)=>{ if(i>=seq.length){ jsPsych.pluginAPI.setTimeout(()=>{ ins.textContent='Click the squares in order. / 同じ順番でクリック'; squares.forEach(s=>s.classList.add('clickable')); enabled=true; start=performance.now(); },300); return; }
-        const s=squares[seq[i]]; s.classList.add('active'); jsPsych.pluginAPI.setTimeout(()=>{ s.classList.remove('active'); jsPsych.pluginAPI.setTimeout(()=>show(i+1),gap); },hi);
-      };
-      const end=()=>{ enabled=false; squares.forEach(s=>{ s.classList.remove('clickable'); s.removeEventListener('click',click); }); jsPsych.pluginAPI.clearAllTimeouts();
-        const rt=start?Math.round(performance.now()-start):null; const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]);
-        if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.endCurrentTimeline(); jsPsych.finishTrial({response:resp, click_sequence:resp.join(','), rt, correct:ok});
-      };
-      const click=e=>{ if(!enabled) return; const idx=+e.currentTarget.dataset.index; resp.push(idx); e.currentTarget.classList.add('selected'); if(resp.length>=seq.length) jsPsych.pluginAPI.setTimeout(end,160); };
-      squares.forEach(s=>s.addEventListener('click',click)); show(0);
-    }
-  }; }
-  for(let len=3; len<=6; len++){ const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len); trials.push(makeTrial(seq,len)); }
+  const trials=[]; 
+  window.spatialSpanFailCount=0; 
+  const totalSquares=9;
+  
+  function makeTrial(seq,len){ 
+    return {
+      type: jsPsychHtmlKeyboardResponse, 
+      choices:'NO_KEYS',
+      stimulus:()=>{ 
+        let h=`<style>
+          .spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}
+          .spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}
+          .spatial-square.active{background:#ffd966;} 
+          .spatial-square.selected{background:#8ecae6;} 
+          .spatial-square.clickable{cursor:pointer;}
+        </style><div class="spatial-grid">`;
+        for(let i=0;i<9;i++) h+=`<div class="spatial-square" data-index="${i}"></div>`; 
+        return h+`</div><p id="spatial-instruction">Watch the sequence. / 覚えてください。</p>`;
+      },
+      data:{ task:'spatial_span', correct_answer: seq.join(','), length: len },
+      on_load: function(){
+        const squares=[...document.querySelectorAll('.spatial-square')];
+        const ins=document.getElementById('spatial-instruction'); 
+        const hi=500, gap=220; 
+        const resp=[]; 
+        let enabled=false, start=null;
+        
+        squares.forEach(s=>s.classList.remove('clickable'));
+        
+        const show=(i)=>{ 
+          if(i>=seq.length){ 
+            jsPsych.pluginAPI.setTimeout(()=>{ 
+              ins.textContent='Click the squares in order. / 同じ順番でクリック'; 
+              squares.forEach(s=>s.classList.add('clickable')); 
+              enabled=true; 
+              start=performance.now(); 
+            },300); 
+            return; 
+          }
+          const s=squares[seq[i]]; 
+          s.classList.add('active'); 
+          jsPsych.pluginAPI.setTimeout(()=>{ 
+            s.classList.remove('active'); 
+            jsPsych.pluginAPI.setTimeout(()=>show(i+1),gap); 
+          },hi);
+        };
+        
+        const end=()=>{ 
+          enabled=false; 
+          squares.forEach(s=>{ 
+            s.classList.remove('clickable'); 
+            s.removeEventListener('click',click); 
+          }); 
+          jsPsych.pluginAPI.clearAllTimeouts();
+          const rt=start?Math.round(performance.now()-start):null; 
+          const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]);
+          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.endCurrentTimeline(); 
+          jsPsych.finishTrial({response:resp, click_sequence:resp.join(','), rt, correct:ok});
+        };
+        
+        const click=e=>{ 
+          if(!enabled) return; 
+          const idx=+e.currentTarget.dataset.index; 
+          resp.push(idx); 
+          e.currentTarget.classList.add('selected'); 
+          if(resp.length>=seq.length) jsPsych.pluginAPI.setTimeout(end,160); 
+        };
+        
+        squares.forEach(s=>s.addEventListener('click',click)); 
+        show(0);
+      }
+    }; 
+  }
+  
+  for(let len=3; len<=6; len++){ 
+    const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len); 
+    trials.push(makeTrial(seq,len)); 
+  }
   return trials;
 }
 
 /* ========== PHONOLOGICAL AWARENESS ========== */
 const phoneme_instructions = {
   type: jsPsychHtmlButtonResponse,
-  render_on_canvas:false,
   stimulus:()=>`<h2>Sound Discrimination / 音の識別</h2>
     <p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p>
     <p style="color:#666">Trials: ${FILTERED_STIMULI.phoneme?.length||0}</p>`,
   choices:['Begin / 開始'],
 };
+
 const phoneme_trial = {
-  type: jsPsychHtmlKeyboardResponse, choices:'NO_KEYS',
+  type: jsPsychHtmlKeyboardResponse, 
+  choices:'NO_KEYS',
   stimulus:()=>`<div style="text-align:center;">
       <p id="status">Play both sounds, then choose.</p>
       <div style="margin:16px 0;">
@@ -292,17 +388,62 @@ const phoneme_trial = {
     </div>`,
   data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
-    const a1=new Audio(asset(jsPsych.timelineVariable('audio1'))); const a2=new Audio(asset(jsPsych.timelineVariable('audio2')));
-    a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }});
-    a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }});
-    const status=document.getElementById('status'), A=document.getElementById('playA'), B=document.getElementById('playB'), S=document.getElementById('btnSame'), D=document.getElementById('btnDiff');
-    let a=false,b=false,start=null; const enable=()=>{ if((a||A.disabled)&&(b||B.disabled)){ [S,D].forEach(x=>{x.disabled=false;x.style.opacity='1'}); status.textContent='Choose Same or Different.'; start=performance.now(); } };
-    A.addEventListener('click',()=>{ if(a||A.disabled) return; a=true; A.disabled=true; A.style.opacity='.5'; try{ a1.currentTime=0; a1.play(); }catch{} status.textContent='Played A'; enable(); });
-    B.addEventListener('click',()=>{ if(b||B.disabled) return; b=true; B.disabled=true; B.style.opacity='.5'; try{ a2.currentTime=0; a2.play(); }catch{} status.textContent='Played B'; enable(); });
+    const a1=new Audio(asset(jsPsych.timelineVariable('audio1'))); 
+    const a2=new Audio(asset(jsPsych.timelineVariable('audio2')));
+    
+    a1.addEventListener('error', ()=>{ 
+      const b=document.getElementById('playA'); 
+      if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }
+    });
+    a2.addEventListener('error', ()=>{ 
+      const b=document.getElementById('playB'); 
+      if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }
+    });
+    
+    const status=document.getElementById('status'), 
+          A=document.getElementById('playA'), 
+          B=document.getElementById('playB'), 
+          S=document.getElementById('btnSame'), 
+          D=document.getElementById('btnDiff');
+    
+    let a=false,b=false,start=null; 
+    
+    const enable=()=>{ 
+      if((a||A.disabled)&&(b||B.disabled)){ 
+        [S,D].forEach(x=>{x.disabled=false;x.style.opacity='1'}); 
+        status.textContent='Choose Same or Different.'; 
+        start=performance.now(); 
+      } 
+    };
+    
+    A.addEventListener('click',()=>{ 
+      if(a||A.disabled) return; 
+      a=true; 
+      A.disabled=true; 
+      A.style.opacity='.5'; 
+      try{ a1.currentTime=0; a1.play(); }catch{} 
+      status.textContent='Played A'; 
+      enable(); 
+    });
+    
+    B.addEventListener('click',()=>{ 
+      if(b||B.disabled) return; 
+      b=true; 
+      B.disabled=true; 
+      B.style.opacity='.5'; 
+      try{ a2.currentTime=0; a2.play(); }catch{} 
+      status.textContent='Played B'; 
+      enable(); 
+    });
+    
     S.addEventListener('click',()=>jsPsych.finishTrial({response_label:'same', rt:start?Math.round(performance.now()-start):null}));
     D.addEventListener('click',()=>jsPsych.finishTrial({response_label:'different', rt:start?Math.round(performance.now()-start):null}));
   },
-  on_finish:d=>{ const r=d.response_label||null; d.selected_option=r; d.correct=r?(r===d.correct_answer):null; }
+  on_finish:d=>{ 
+    const r=d.response_label||null; 
+    d.selected_option=r; 
+    d.correct=r?(r===d.correct_answer):null; 
+  }
 };
 
 /* ========== LDT ========== */
@@ -318,31 +459,51 @@ const ldt_stimuli = [
   { stimulus:'BOWLE',   correct_response:'n', word_type:'nonword'          },
   { stimulus:'PANKET',  correct_response:'n', word_type:'nonword'          },
 ];
-const ldt_instructions = { type: jsPsychHtmlKeyboardResponse, choices:[' '], render_on_canvas:false, stimulus:`
-  <h2>Word Recognition / 単語認識</h2>
-  <div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;">
-    <p><b>W</b> = word / <b>N</b> = not a word</p>
-  </div>
-  <p><b>Press SPACE to begin</b></p>`};
-const ldt_fixation = { type: jsPsychHtmlKeyboardResponse, stimulus:'<div style="font-size:60px;">+</div>', choices:'NO_KEYS', trial_duration:500 };
+
+const ldt_instructions = { 
+  type: jsPsychHtmlKeyboardResponse, 
+  choices:[' '], 
+  stimulus:`
+    <h2>Word Recognition / 単語認識</h2>
+    <div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;">
+      <p><b>W</b> = word / <b>N</b> = not a word</p>
+    </div>
+    <p><b>Press SPACE to begin</b></p>`
+};
+
+const ldt_fixation = { 
+  type: jsPsychHtmlKeyboardResponse, 
+  stimulus:'<div style="font-size:60px;">+</div>', 
+  choices:'NO_KEYS', 
+  trial_duration:500 
+};
+
 const ldt_trial = {
-  type: jsPsychHtmlKeyboardResponse, render_on_canvas:false,
+  type: jsPsychHtmlKeyboardResponse,
   stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
-  stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250,
+  stimulus_duration:1000, 
+  choices:['w','n'], 
+  trial_duration:2500, 
+  post_trial_gap:250,
   data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') },
   on_finish:d=>d.correct=(d.response===d.correct_response)
 };
-const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
 
-/* ========== PICTURE NAMING (with guaranteed intro) ========== */
+const ldt_procedure = { 
+  timeline:[ldt_fixation, ldt_trial], 
+  timeline_variables: ldt_stimuli, 
+  randomize_order:true 
+};
+
+/* ========== PICTURE NAMING (FIXED - persistent intro) ========== */
 const naming_intro = {
   type: jsPsychHtmlButtonResponse,
-  render_on_canvas:false,
   stimulus: ()=>`<h2>Picture Naming / 絵の命名</h2>
     <p>For each picture, click <b>Start recording</b> and say the English name. Recording stops automatically after 4s.</p>
     <p>各絵で「録音開始」をクリックし、英語名を言ってください（4秒で自動停止）。</p>
     <p style="color:#666">Pictures: ${FILTERED_STIMULI.picture?.length||0}</p>`,
   choices:['Begin / 開始'],
+  post_trial_gap: 500, // Add gap to prevent flashing
 };
 
 const naming_prepare = {
@@ -371,33 +532,44 @@ const naming_record = {
 
 const naming_text_fallback = {
   type: jsPsychSurveyText,
-  questions: [{ prompt: () => `
+  questions: [{ 
+    prompt: () => `
       <div style="text-align:center;">
         <img src="${asset(jsPsych.timelineVariable('image'))}" style="width:350px;border-radius:8px;">
         <p style="margin-top:20px;">Type the English name for this object:</p>
-      </div>`, name:'response', required:true }],
+      </div>`, 
+    name:'response', 
+    required:true 
+  }],
   data: { task:'picture_naming', target:jsPsych.timelineVariable('target'), category:jsPsych.timelineVariable('category') },
-  on_finish: d => { const r=(d.response?.response||'').toLowerCase().trim(); d.correct=(r===d.target); d.naming_response=r; }
+  on_finish: d => { 
+    const r=(d.response?.response||'').toLowerCase().trim(); 
+    d.correct=(r===d.target); 
+    d.naming_response=r; 
+  }
 };
 
 const naming_trials = {
   timeline: [
     naming_prepare,
-    { timeline:[naming_record],  conditional_function: () => !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) },
-    { timeline:[naming_text_fallback], conditional_function: () => !(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) }
+    { 
+      timeline:[naming_record],  
+      conditional_function: () => !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) 
+    },
+    { 
+      timeline:[naming_text_fallback], 
+      conditional_function: () => !(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia) 
+    }
   ],
   timeline_variables: () => FILTERED_STIMULI.picture,
   randomize_order: false,
 };
 
-const naming_block = { timeline: [naming_intro, naming_trials] };
-
-/* ========== FOLEY ICONICITY (resilient) ========== */
+/* ========== FOLEY ICONICITY (COMPLETELY REWORKED) ========== */
 const foley_intro = {
   type: jsPsychHtmlButtonResponse,
-  render_on_canvas:false,
   stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2>
-    <p>Play the sound and choose what it represents. If playback fails, you may answer by intuition or press <b>Skip</b>.</p>
+    <p>Play the sound and choose what it represents. If audio fails to load, you can still make your best guess.</p>
     <p style="color:#666">Sounds: ${FILTERED_STIMULI.foley?.length||0}</p>`,
   choices:['Begin / 開始'],
 };
@@ -408,8 +580,7 @@ const foley_trial = {
     <div style="text-align:center;">
       <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
         <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
-        <div id="foley-note"  style="font-size:13px;color:#666;margin-top:8px;visibility:hidden;">(played)</div>
-        <div id="foley-warn"  style="font-size:13px;color:#b00;margin-top:6px;display:none;"></div>
+        <div id="foley-status" style="font-size:13px;color:#666;margin-top:8px;">Click to play audio</div>
       </div>
       <p>What does this sound represent?</p>
       <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
@@ -420,100 +591,190 @@ const foley_trial = {
     task:'foley_iconicity',
     correct_answer: jsPsych.timelineVariable('correct'),
     mapping_type: jsPsych.timelineVariable('mapping_type'),
-    options_len: jsPsych.timelineVariable('options').length
+    options_len: jsPsych.timelineVariable('options').length,
+    audio_file: jsPsych.timelineVariable('audio')
   }),
   on_load: function(){
     const url = asset(jsPsych.timelineVariable('audio'));
-    const audio = new Audio(url); audio.preload='auto';
-    const btn=document.getElementById('foley-play'), note=document.getElementById('foley-note'), warn=document.getElementById('foley-warn');
-
-    // Hard failsafe: never block longer than 12s
-    const failsafe = jsPsych.pluginAPI.setTimeout(()=> {
-      if (!window.__foleyFinished) {
-        console.warn('[Foley] Hard timeout – auto-skip:', url);
-        window.__foleyFinished = true;
-        jsPsych.finishTrial({ response:null, rt:null, skipped:true, audio_timeout:true, audio_url:url });
+    const btn = document.getElementById('foley-play');
+    const status = document.getElementById('foley-status');
+    
+    // Create audio element
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.src = url;
+    
+    let audioLoaded = false;
+    let hasPlayed = false;
+    
+    // Audio event handlers
+    audio.addEventListener('canplaythrough', () => {
+      audioLoaded = true;
+      if (status) status.textContent = 'Audio ready - click to play';
+      if (btn) btn.disabled = false;
+    });
+    
+    audio.addEventListener('error', (e) => {
+      console.warn('Foley audio error:', e, url);
+      if (btn) {
+        btn.textContent = '❌ Audio unavailable';
+        btn.disabled = true;
       }
-    }, 12000);
-
-    const markError = (msg) => {
-      console.warn('[Foley audio error]', msg, url);
-      if (btn) { btn.textContent='❌ Audio unavailable'; btn.disabled=true; }
-      if (warn){ warn.textContent='Audio could not be loaded. You can answer by intuition or press “Skip”.'; warn.style.display='block'; }
-    };
-
-    audio.addEventListener('error', ()=> markError('network/404'));
-    audio.addEventListener('stalled',()=> markError('stalled'));
-    audio.addEventListener('emptied',()=> markError('emptied'));
-
-    if (btn) btn.addEventListener('click', ()=> { try { audio.currentTime=0; audio.play(); } catch{} if (note) note.style.visibility='visible'; });
-
-    window.__foleyAudio = audio;
-    window.__foleyFailsafe = failsafe;
-    window.__foleyFinished = false;
+      if (status) status.textContent = 'Audio failed to load - you can still answer';
+    });
+    
+    audio.addEventListener('ended', () => {
+      if (status) status.textContent = 'Audio finished playing';
+      hasPlayed = true;
+    });
+    
+    // Play button handler
+    if (btn) {
+      btn.addEventListener('click', () => {
+        if (audioLoaded) {
+          try {
+            audio.currentTime = 0;
+            audio.play().then(() => {
+              if (status) status.textContent = 'Playing audio...';
+              hasPlayed = true;
+            }).catch(e => {
+              console.warn('Audio play failed:', e);
+              if (status) status.textContent = 'Playback failed - you can still answer';
+            });
+          } catch (e) {
+            console.warn('Audio play error:', e);
+            if (status) status.textContent = 'Playback failed - you can still answer';
+          }
+        }
+      });
+    }
+    
+    // Timeout for audio loading
+    setTimeout(() => {
+      if (!audioLoaded && btn && !btn.disabled) {
+        btn.textContent = '❌ Audio timeout';
+        btn.disabled = true;
+        if (status) status.textContent = 'Audio loading timeout - you can still answer';
+      }
+    }, 5000);
   },
   on_finish: function(d){
-    if (window.__foleyFailsafe) jsPsych.pluginAPI.clearTimeout(window.__foleyFailsafe);
-    if (window.__foleyAudio) { try { window.__foleyAudio.pause(); window.__foleyAudio.src=''; } catch{} window.__foleyAudio=null; }
     const last = d.options_len; // index of "Skip"
-    if (typeof d.response === 'number' && d.response < last) { d.skipped=false; d.correct=(d.response===d.correct_answer); }
-    else { d.skipped=true; d.correct=null; }
+    if (typeof d.response === 'number' && d.response < last) { 
+      d.skipped = false; 
+      d.correct = (d.response === d.correct_answer); 
+    } else { 
+      d.skipped = true; 
+      d.correct = null; 
+    }
   }
 };
 
-const foley_block = { timeline:[foley_intro, { timeline:[foley_trial], timeline_variables: () => FILTERED_STIMULI.foley, randomize_order:true }] };
+const foley_block = { 
+  timeline:[foley_intro, { 
+    timeline:[foley_trial], 
+    timeline_variables: () => FILTERED_STIMULI.foley, 
+    randomize_order:true 
+  }] 
+};
 
-/* ========== VISUAL ICONICITY ========== */
+/* ========== VISUAL ICONICITY (FIXED) ========== */
 const visual_intro = {
-  type: jsPsychHtmlButtonResponse, render_on_canvas:false,
+  type: jsPsychHtmlButtonResponse,
   stimulus: ()=>`<h2>Shape–Word Matching / 形と単語のマッチング</h2>
     <p>Choose the word that best matches the shape.</p>
     <p style="color:#666">Shapes: ${FILTERED_STIMULI.visual?.length||0}</p>`,
   choices:['Begin / 開始'],
 };
+
 const visual_trial = {
   type: jsPsychHtmlButtonResponse,
   stimulus: ()=>`<div style="text-align:center;">
     <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
     <p style="margin-top:20px;">Which word matches this shape?</p>
   </div>`,
-  choices: jsPsych.timelineVariable('words'), post_trial_gap:250,
+  choices: () => jsPsych.timelineVariable('words'), 
+  post_trial_gap:250,
   data:{ task:'visual_iconicity', correct_answer:jsPsych.timelineVariable('expected'), shape_type:jsPsych.timelineVariable('shape_type') },
   on_finish: d=> d.correct=(d.response===d.correct_answer)
 };
-const visual_block = { timeline:[visual_intro, { timeline:[visual_trial], timeline_variables: () => FILTERED_STIMULI.visual, randomize_order:true }] };
+
+const visual_block = { 
+  timeline:[visual_intro, { 
+    timeline:[visual_trial], 
+    timeline_variables: () => FILTERED_STIMULI.visual, 
+    randomize_order:true 
+  }] 
+};
 
 /* ========== PROCEDURAL & IDEOPHONE ========== */
 const procedural_test = {
   type: jsPsychSurveyText,
-  questions: [{ prompt:`<h3>Quick Recipe Description</h3>
-    <p>List the main ingredients and 3–4 key steps for making pancakes.</p>
-    <p>パンケーキの主な材料と3–4手順を書いてください。</p>`, name:'pancake_procedure', rows:6, columns:60 }],
-  button_label:'Submit / 送信', data:{ task:'procedural_knowledge' }
+  questions: [{ 
+    prompt:`<h3>Quick Recipe Description</h3>
+      <p>List the main ingredients and 3–4 key steps for making pancakes.</p>
+      <p>パンケーキの主な材料と3–4手順を書いてください。</p>`, 
+    name:'pancake_procedure', 
+    rows:6, 
+    columns:60 
+  }],
+  button_label:'Submit / 送信', 
+  data:{ task:'procedural_knowledge' }
 };
+
 const ideophone_test = {
   type: jsPsychSurvey,
-  survey_json: { title:'Japanese Sound Words / 擬音語', showQuestionNumbers:'off', focusFirstQuestionAutomatic:false, showCompletedPage:false,
-    pages:[{ name:'ideo', elements:[
-      { type:'radiogroup', name:'frying_sound',  title:'Egg frying sound? / 卵を焼く音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
-      { type:'radiogroup', name:'stirring_sound', title:'Stirring sound? / かき混ぜる音は？',   isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
-    ]}]},
+  survey_json: { 
+    title:'Japanese Sound Words / 擬音語', 
+    showQuestionNumbers:'off', 
+    focusFirstQuestionAutomatic:false, 
+    showCompletedPage:false,
+    pages:[{ 
+      name:'ideo', 
+      elements:[
+        { type:'radiogroup', name:'frying_sound', title:'Egg frying sound? / 卵を焼く音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
+        { type:'radiogroup', name:'stirring_sound', title:'Stirring sound? / かき混ぜる音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
+      ]
+    }]
+  },
   data:{ task:'ideophone_mapping' },
-  on_finish:()=>setTimeout(()=>{ document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el=>el.remove()); },100)
+  on_finish:()=>setTimeout(()=>{ 
+    document.querySelectorAll('.sv-root, .sv_main, .sv-container, .sv-title').forEach(el=>{ 
+      try { el.remove(); } catch(_) {} 
+    }); 
+  },100)
 };
 
 /* ========== PRELOAD (populated later) ========== */
 let preload = {
   type: jsPsychPreload,
-  audio: [], images: [], max_load_time: 30000,
-  on_finish: (d)=>{ const failed=(d.failed_audio||[]).concat(d.failed_images||[]); if(failed.length) console.warn('Preload failed:', failed); }
+  audio: [], 
+  images: [], 
+  max_load_time: 30000,
+  on_finish: (d)=>{ 
+    const failed=(d.failed_audio||[]).concat(d.failed_images||[]); 
+    if(failed.length) console.warn('Preload failed:', failed); 
+  }
 };
 
-const welcome = { type: jsPsychHtmlButtonResponse, choices:['Begin / 開始'], stimulus:`
-  <h1>Pre-Test Battery / 事前テスト</h1>
-  <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`};
-const mic_request = { type: jsPsychInitializeMicrophone };
-const CLEAR = { type: jsPsychHtmlKeyboardResponse, stimulus:'', choices:'NO_KEYS', trial_duration:300 };
+const welcome = { 
+  type: jsPsychHtmlButtonResponse, 
+  choices:['Begin / 開始'], 
+  stimulus:`
+    <h1>Pre-Test Battery / 事前テスト</h1>
+    <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
+};
+
+const mic_request = { 
+  type: jsPsychInitializeMicrophone 
+};
+
+const CLEAR = { 
+  type: jsPsychHtmlKeyboardResponse, 
+  stimulus:'', 
+  choices:'NO_KEYS', 
+  trial_duration:300 
+};
 
 /* ========== INITIALIZE & BUILD TIMELINE ========== */
 async function initializeExperiment(){
@@ -523,15 +784,20 @@ async function initializeExperiment(){
     ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
     ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
   ]));
+  
   PRELOAD_IMAGES = Array.from(new Set([
     ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
     ...FILTERED_STIMULI.visual.map(s => asset(s.shape)),
   ]));
-  preload.audio = PRELOAD_AUDIO; preload.images = PRELOAD_IMAGES;
+  
+  preload.audio = PRELOAD_AUDIO; 
+  preload.images = PRELOAD_IMAGES;
+  
   console.log('Final PRELOAD_AUDIO:', PRELOAD_AUDIO);
   console.log('Final PRELOAD_IMAGES:', PRELOAD_IMAGES);
 
   const timeline=[];
+  
   timeline.push(welcome);
   timeline.push(preload);
   timeline.push(mic_request);
@@ -539,22 +805,55 @@ async function initializeExperiment(){
   timeline.push(participant_info);
   timeline.push(motion_sickness_questionnaire);
 
-  timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
-  timeline.push(digit_span_backward_instructions, { timeline: generateOptimizedDigitSpanTrials(false) }, CLEAR);
+  timeline.push(digit_span_forward_instructions);
+  timeline.push({ timeline: generateOptimizedDigitSpanTrials(true) });
+  timeline.push(CLEAR);
+  
+  timeline.push(digit_span_backward_instructions);
+  timeline.push({ timeline: generateOptimizedDigitSpanTrials(false) });
+  timeline.push(CLEAR);
 
-  timeline.push(spatial_span_instructions, { timeline: generateOptimizedSpatialSpanTrials() }, CLEAR);
+  timeline.push(spatial_span_instructions);
+  timeline.push({ timeline: generateOptimizedSpatialSpanTrials() });
+  timeline.push(CLEAR);
 
-  if (FILTERED_STIMULI.phoneme.length) timeline.push(phoneme_instructions, { timeline:[phoneme_trial], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order:true }, CLEAR);
+  if (FILTERED_STIMULI.phoneme.length) {
+    timeline.push(phoneme_instructions);
+    timeline.push({ 
+      timeline:[phoneme_trial], 
+      timeline_variables: FILTERED_STIMULI.phoneme, 
+      randomize_order:true 
+    });
+    timeline.push(CLEAR);
+  }
 
-  timeline.push(ldt_instructions, ldt_procedure, CLEAR);
+  timeline.push(ldt_instructions);
+  timeline.push(ldt_procedure);
+  timeline.push(CLEAR);
 
-  if (FILTERED_STIMULI.picture.length) timeline.push(naming_block, CLEAR);
-  if (FILTERED_STIMULI.foley.length)   timeline.push(foley_block,  CLEAR);
-  if (FILTERED_STIMULI.visual.length)  timeline.push(visual_intro, { timeline:[visual_trial], timeline_variables: FILTERED_STIMULI.visual, randomize_order:true }, CLEAR);
+  if (FILTERED_STIMULI.picture.length) {
+    timeline.push(naming_intro);  // Standalone intro
+    timeline.push(naming_trials); // Just the trials
+    timeline.push(CLEAR);
+  }
+  
+  if (FILTERED_STIMULI.foley.length) {
+    timeline.push(foley_block);
+    timeline.push(CLEAR);
+  }
+  
+  if (FILTERED_STIMULI.visual.length) {
+    timeline.push(visual_block);
+    timeline.push(CLEAR);
+  }
 
-  timeline.push(procedural_test, ideophone_test, CLEAR);
+  timeline.push(procedural_test);
+  timeline.push(ideophone_test);
+  timeline.push(CLEAR);
 
-  timeline.push({ type: jsPsychHtmlButtonResponse, choices:['Finish / 完了'],
+  timeline.push({ 
+    type: jsPsychHtmlButtonResponse, 
+    choices:['Finish / 完了'],
     stimulus:function(){
       if(!assignedCondition) assignCondition();
       const saved = JSON.parse(localStorage.getItem('pretest_latest')||'{}');
@@ -571,9 +870,11 @@ async function initializeExperiment(){
 }
 
 /* ========== UNLOAD GUARD ========== */
-window.onbeforeunload = function(){ if(jsPsych.data.get().count()>2) return 'Leave page? Progress will be lost.'; };
+window.onbeforeunload = function(){ 
+  if(jsPsych.data.get().count()>2) return 'Leave page? Progress will be lost.'; 
+};
 
-/* ========== SCORING HELPERS (unchanged) ========== */
+/* ========== SCORING HELPERS ========== */
 function getSummaryMetrics(data){
   const participantInfo = data.find(e=>e.task==='participant_info');
   const motionSicknessScore = calculateMotionSicknessRisk(data);
@@ -591,6 +892,7 @@ function getSummaryMetrics(data){
   const proceduralResponse = data.find(e=>e.task==='procedural_knowledge');
   const proceduralWordCount = countWords(proceduralResponse?.response?.pancake_procedure||'');
   const namingCompletion = calculateNamingCompletionRate(data);
+  
   return {
     participant_id: participantInfo?.response?.participant_id||null,
     background: participantInfo?.response||{},
@@ -612,15 +914,32 @@ function getSummaryMetrics(data){
     assigned_condition: assignedCondition,
   };
 }
+
 function saveDataToServer(data){
-  const metrics=getSummaryMetrics(data); latestMetrics=metrics;
-  jsPsych.data.addProperties({ participant_id:metrics.participant_id, assigned_condition:metrics.assigned_condition });
+  const metrics=getSummaryMetrics(data); 
+  latestMetrics=metrics;
+  jsPsych.data.addProperties({ 
+    participant_id:metrics.participant_id, 
+    assigned_condition:metrics.assigned_condition 
+  });
   const timestamp=new Date().toISOString().replace(/[:.]/g,'-');
   const filename=`pretest_${metrics.participant_id||'unknown'}_${timestamp}.json`;
-  try{ localStorage.setItem('pretest_latest', JSON.stringify({ metrics, raw_data:data, timestamp, filename })); }catch(e){ console.warn('localStorage save failed', e); }
+  
+  try{ 
+    localStorage.setItem('pretest_latest', JSON.stringify({ 
+      metrics, 
+      raw_data:data, 
+      timestamp, 
+      filename 
+    })); 
+  } catch(e){ 
+    console.warn('localStorage save failed', e); 
+  }
+  
   jsPsych.data.get().localSave('json', filename);
   console.log('Data saved as', filename);
 }
+
 function assignCondition(){
   const data=jsPsych.data.get().values();
   const m=latestMetrics||getSummaryMetrics(data);
@@ -629,23 +948,97 @@ function assignCondition(){
   const avgIcon=icon.length?icon.reduce((a,b)=>a+b,0)/icon.length:null;
   const avgWM=wm.length?wm.reduce((a,b)=>a+b,0)/wm.length:null;
   const lang=typeof m.ldt_accuracy==='number'?m.ldt_accuracy:null;
-  let c='Mixed-Iconicity VR'; if(avgIcon!==null&&avgIcon>=0.75)c='High-Iconicity VR'; else if(avgIcon!==null&&avgIcon<0.45)c='Low-Iconicity VR';
-  if(lang!==null&&lang<0.55)c='Foundational Vocabulary VR'; else if(avgWM!==null&&avgWM>=6)c='Challenge Mode VR'; assignedCondition=c;
-  jsPsych.data.addProperties({ assigned_condition:c }); console.log('Assigned condition:', c);
+  
+  let c='Mixed-Iconicity VR'; 
+  if(avgIcon!==null&&avgIcon>=0.75) c='High-Iconicity VR'; 
+  else if(avgIcon!==null&&avgIcon<0.45) c='Low-Iconicity VR';
+  if(lang!==null&&lang<0.55) c='Foundational Vocabulary VR'; 
+  else if(avgWM!==null&&avgWM>=6) c='Challenge Mode VR'; 
+  
+  assignedCondition=c;
+  jsPsych.data.addProperties({ assigned_condition:c }); 
+  console.log('Assigned condition:', c);
 }
-function calculateMotionSicknessRisk(data){ const e=data.find(t=>t.task==='motion_sickness'); if(!e||!e.response)return null; const v=Object.values(e.response).map(Number).filter(v=>!Number.isNaN(v)); return v.length?v.reduce((s,x)=>s+x,0)/v.length:null; }
-function calculateSpanScore(data,dir){ const t=data.filter(x=>x.task==='digit_span_response'&&x.direction===dir); if(!t.length)return null; let m=0; t.forEach(x=>{ if(x.correct)m=Math.max(m,x.length);}); return m||null; }
-function calculateSpatialSpanScore(data){ const t=data.filter(x=>x.task==='spatial_span'); if(!t.length)return null; let m=0; t.forEach(x=>{ if(x.correct)m=Math.max(m,x.length);}); return m||null; }
+
+function calculateMotionSicknessRisk(data){ 
+  const e=data.find(t=>t.task==='motion_sickness'); 
+  if(!e||!e.response)return null; 
+  const v=Object.values(e.response).map(Number).filter(v=>!Number.isNaN(v)); 
+  return v.length?v.reduce((s,x)=>s+x,0)/v.length:null; 
+}
+
+function calculateSpanScore(data,dir){ 
+  const t=data.filter(x=>x.task==='digit_span_response'&&x.direction===dir); 
+  if(!t.length)return null; 
+  let m=0; 
+  t.forEach(x=>{ if(x.correct)m=Math.max(m,x.length);}); 
+  return m||null; 
+}
+
+function calculateSpatialSpanScore(data){ 
+  const t=data.filter(x=>x.task==='spatial_span'); 
+  if(!t.length)return null; 
+  let m=0; 
+  t.forEach(x=>{ if(x.correct)m=Math.max(m,x.length);}); 
+  return m||null; 
+}
+
 function calculateAccuracy(data,task,filterKey=null){
-  let t=data.filter(x=>x.task===task&&typeof x.correct==='boolean'); if(!t.length)return null;
-  if(filterKey){ if(task==='phoneme_discrimination') t=t.filter(x=>x.contrast_type===filterKey);
-    else if(task==='lexical_decision'){ if(filterKey==='target') t=t.filter(x=> typeof x.word_type==='string' && x.word_type.startsWith('target')); else t=t.filter(x=>x.word_type===filterKey); } }
-  if(!t.length)return null; const ok=t.filter(x=>x.correct).length; return ok/t.length;
+  let t=data.filter(x=>x.task===task&&typeof x.correct==='boolean'); 
+  if(!t.length)return null;
+  
+  if(filterKey){ 
+    if(task==='phoneme_discrimination') {
+      t=t.filter(x=>x.contrast_type===filterKey);
+    } else if(task==='lexical_decision'){ 
+      if(filterKey==='target') {
+        t=t.filter(x=> typeof x.word_type==='string' && x.word_type.startsWith('target')); 
+      } else {
+        t=t.filter(x=>x.word_type===filterKey); 
+      }
+    } 
+  }
+  
+  if(!t.length)return null; 
+  const ok=t.filter(x=>x.correct).length; 
+  return ok/t.length;
 }
-function calculateMeanRT(data,task){ const t=data.filter(x=>x.task===task&&typeof x.rt==='number'); return t.length?t.reduce((s,x)=>s+x.rt,0)/t.length:null; }
-function calculateIdeophoneScore(data){ const e=data.find(x=>x.task==='ideophone_mapping'); if(!e||!e.response)return null; const exp={frying_sound:'ジュージュー',stirring_sound:'グルグル'}; let tot=0,ok=0; Object.entries(exp).forEach(([k,v])=>{ if(e.response[k]){ tot++; if(e.response[k]===v) ok++; }}); return tot?ok/tot:null; }
-function countWords(t){ if(!t||typeof t!=='string')return 0; const c=t.trim(); return c?c.split(/\s+/).length:0; }
-function calculateNamingCompletionRate(data){ const t=data.filter(x=>x.task==='picture_naming'); if(!t.length)return null; const c=t.filter(x=>x.response!==null&&x.response!==undefined); return c.length/t.length; }
+
+function calculateMeanRT(data,task){ 
+  const t=data.filter(x=>x.task===task&&typeof x.rt==='number'); 
+  return t.length?t.reduce((s,x)=>s+x.rt,0)/t.length:null; 
+}
+
+function calculateIdeophoneScore(data){ 
+  const e=data.find(x=>x.task==='ideophone_mapping'); 
+  if(!e||!e.response)return null; 
+  const exp={frying_sound:'ジュージュー',stirring_sound:'グルグル'}; 
+  let tot=0,ok=0; 
+  Object.entries(exp).forEach(([k,v])=>{ 
+    if(e.response[k]){ 
+      tot++; 
+      if(e.response[k]===v) ok++; 
+    }
+  }); 
+  return tot?ok/tot:null; 
+}
+
+function countWords(t){ 
+  if(!t||typeof t!=='string')return 0; 
+  const c=t.trim(); 
+  return c?c.split(/\s+/).length:0; 
+}
+
+function calculateNamingCompletionRate(data){ 
+  const t=data.filter(x=>x.task==='picture_naming'); 
+  if(!t.length)return null; 
+  const c=t.filter(x=>x.response!==null&&x.response!==undefined); 
+  return c.length/t.length; 
+}
 
 /* ========== BOOTSTRAP ========== */
-if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', initializeExperiment); } else { initializeExperiment(); }
+if (document.readyState === 'loading') { 
+  document.addEventListener('DOMContentLoaded', initializeExperiment); 
+} else { 
+  initializeExperiment(); 
+}
