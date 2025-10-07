@@ -7,7 +7,7 @@ The main mistakes are:
 
 ```javascript
 
-// Version 4.1 (FIXED) — Pre-Test (spoken naming + partial-order procedure)
+// Version 4.2 (Final Fixed Start) — Pre-Test (spoken naming + partial-order procedure)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
