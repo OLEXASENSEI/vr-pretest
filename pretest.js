@@ -1,19 +1,29 @@
-This is a common issue when merging code—the initialization logic and global variables get mixed up. Your Pre-Test script uses a completely different, self-launching structure than your Post-Test script, and relies on several non-standard jsPsych plugins (like `jsPsychSurvey` and the microphone plugins).
-
-The main mistakes are:
-1.  **PID/Phase Retrieval:** The logic for `currentPID()` and `namingPhase()` is overly complex and fragile, relying on local storage and URL params in a script that is *self-launching*.
-2.  **Plugin Guiding:** The code uses direct references like `type: jsPsychSurvey` which can throw an error if the plugin fails to load (a frequent problem in your environment).
-3.  **Mic Availability Timeline:** The logic for skipping the microphone task is complex, using an `async` function and a global flag which is prone to timing errors.
-
-
-// Version 4.2 (Final Fixed Start) — Pre-Test (spoken naming + partial-order procedure)
+// Version 4.3 (Fixed) — Pre-Test Battery
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
 let assignedCondition = null;
-let microphoneAvailable = false; // set after mic init
+let microphoneAvailable = false;
+let mic_plugins_available = false; // ADD THIS
 
-/* ========== ASSET HELPER (GitHub Pages friendly) ========== */
+/* ========== MISSING CONSTANTS ========== */
+// ADD THESE - adjust as needed for your actual procedure
+const PROCEDURE_STEPS = [
+  'Crack eggs',
+  'Add flour',
+  'Whisk mixture',
+  'Heat pan',
+  'Pour batter'
+];
+
+const PROC_CONSTRAINTS = [
+  ['Crack eggs', 'Whisk mixture'],
+  ['Add flour', 'Whisk mixture'],
+  ['Whisk mixture', 'Pour batter'],
+  ['Heat pan', 'Pour batter']
+];
+
+/* ========== ASSET HELPER ========== */
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 const asset = (p) => {
   const clean = p.replace(/^(\.\/|\/)/, "");
@@ -24,7 +34,7 @@ const asset = (p) => {
 const have = (name) => typeof window[name] !== 'undefined';
 const T = (name) => window[name];
 
-/* ========== GLOBAL CSS (Kept from your original script) ========== */
+/* ========== GLOBAL CSS ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
   .sv-root, .sv_main, .sv-container { position: static !important; }
@@ -38,31 +48,32 @@ surveyHeaderStyle.textContent = `
 `;
 document.head.appendChild(surveyHeaderStyle);
 
-/* Gentle cleanup */
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
   });
 }
 
-/* ========== INIT jsPsych (Guarded) ========== */
+/* ========== INIT jsPsych ========== */
 if (!have('initJsPsych')) {
     console.error('jsPsych core (initJsPsych) is not loaded. Cannot start Pre-Test.');
-    // Exit script execution if core is missing
     throw new Error("jsPsych core not loaded.");
 }
+
 const jsPsych = T('initJsPsych')({
   display_element: "jspsych-target",
   use_webaudio: true,
   show_progress_bar: true,
   message_progress_bar: "進捗 Progress",
   default_iti: 350,
-  on_trial_start: () => { try { window.scrollTo(0, 0); } catch (e) {} nukeSurveyArtifacts(); },
+  on_trial_start: () => { 
+    try { window.scrollTo(0, 0); } catch (e) {} 
+    nukeSurveyArtifacts(); 
+  },
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
 
-/* ========== STIMULI (raw) ========== */
-// NOTE: I've made all stimulus variables constants (as they should be)
+/* ========== STIMULI ========== */
 const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'l_r' },
   { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'control' },
@@ -94,8 +105,7 @@ const visual_iconicity_stimuli = [
   { shape: 'img/bowl_shape.svg',  words: ['container','cutter'], expected: 0, shape_type: 'container' },
 ];
 
-/* ========== PID/PHASE HELPERS (FIXED) ========== */
-// Global variable set on survey completion, much cleaner than parsing local storage
+/* ========== PID/PHASE HELPERS ========== */
 let currentPID_value = 'unknown'; 
 function currentPID() {
   return currentPID_value;
@@ -105,9 +115,8 @@ function namingPhase() {
   return (p === 'post') ? 'post' : 'pre';
 }
 
-/* ========== ROBUST ASSET CHECKS (UNCHANGED) ========== */
+/* ========== ASSET VALIDATION ========== */
 async function checkAudioExists(url) {
-// ... (omitted for brevity, assume unchanged and correct)
   return new Promise((resolve) => {
     const a = new Audio();
     let done = false;
@@ -120,7 +129,6 @@ async function checkAudioExists(url) {
 }
 
 async function checkImageExists(url) {
-// ... (omitted for brevity, assume unchanged and correct)
   return new Promise((resolve) => {
     const img = new Image();
     let done = false;
@@ -133,7 +141,7 @@ async function checkImageExists(url) {
 }
 
 async function filterExistingStimuli() {
-  console.log("Validating assets (with cache-buster)…");
+  console.log("Validating assets...");
 
   const phoneme = [];
   for (const s of phoneme_discrimination_stimuli) {
@@ -165,14 +173,14 @@ async function filterExistingStimuli() {
   return { phoneme, foley, picture, visual };
 }
 
-/* ========== PRELOAD ARRAYS (filled after filtering) ========== */
+/* ========== PRELOAD ARRAYS ========== */
 let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
-/* ========== SURVEYS (Using T('jsPsychSurvey') for robustness) ========== */
+/* ========== SURVEYS ========== */
 const participant_info = {
-  type: T('jsPsychSurvey'), // GUARDED
+  type: T('jsPsychSurvey'),
   survey_json: {
     title: 'Participant Info / 参加者情報',
     showQuestionNumbers: 'off',
@@ -191,7 +199,6 @@ const participant_info = {
   },
   data: { task: 'participant_info' },
   on_finish: (data) => {
-    // FIX: Set global PID here immediately upon completion of the first survey
     try {
       const resp = JSON.parse(data.response || '{}');
       currentPID_value = resp.participant_id || 'unknown';
@@ -203,7 +210,7 @@ const participant_info = {
 };
 
 const motion_sickness_questionnaire = {
-  type: T('jsPsychSurvey'), // GUARDED
+  type: T('jsPsychSurvey'),
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
@@ -264,7 +271,7 @@ const motion_sickness_questionnaire = {
   on_finish: () => setTimeout(nukeSurveyArtifacts, 100)
 };
 
-/* ========== DIGIT & SPATIAL SPAN (Using T(...) for robustness) ========== */
+/* ========== DIGIT & SPATIAL SPAN ========== */
 const digit_span_forward_instructions = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: `
@@ -318,13 +325,11 @@ const spatial_span_instructions = {
   choices: ['Begin / 開始'],
 };
 
-// --- Spatial Span Trial (Guard added) ---
 const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? generateOptimizedSpatialSpanTrials() : [];
 
 function generateOptimizedSpatialSpanTrials(){
   const trials=[];
   window.spatialSpanFailCount=0;
-  const totalSquares=9;
 
   function makeTrial(seq,len){
     return {
@@ -397,12 +402,11 @@ function generateOptimizedSpatialSpanTrials(){
   }
 
   for(let len=3; len<=6; len++){
-    const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len);
+    const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(9).keys()], len);
     trials.push(makeTrial(seq,len));
   }
   return trials;
 }
-
 
 /* ========== PHONOLOGICAL AWARENESS ========== */
 const phoneme_instructions = {
@@ -500,21 +504,36 @@ const ldt_instructions = {
     <p><b>Press SPACE to begin</b></p>`
 };
 
-const ldt_fixation = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<div style="font-size:60px;">+</div>', choices:'NO_KEYS', trial_duration:500 };
+const ldt_fixation = { 
+  type: T('jsPsychHtmlKeyboardResponse'), 
+  stimulus:'<div style="font-size:60px;">+</div>', 
+  choices:'NO_KEYS', 
+  trial_duration:500 
+};
 
 const ldt_trial = {
   type: T('jsPsychHtmlKeyboardResponse'),
   stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${T('jsPsych').timelineVariable('stimulus')}</div>`,
-  stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250,
-  data:{ task:'lexical_decision', correct_response:T('jsPsych').timelineVariable('correct_response'), word_type:T('jsPsych').timelineVariable('word_type') },
+  stimulus_duration:1000, 
+  choices:['w','n'], 
+  trial_duration:2500, 
+  post_trial_gap:250,
+  data:{ 
+    task:'lexical_decision', 
+    correct_response:T('jsPsych').timelineVariable('correct_response'), 
+    word_type:T('jsPsych').timelineVariable('word_type') 
+  },
   on_finish:d=>d.correct=(d.response===d.correct_response)
 };
 
-const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
+const ldt_procedure = { 
+  timeline:[ldt_fixation, ldt_trial], 
+  timeline_variables: ldt_stimuli, 
+  randomize_order:true 
+};
 
-/* ========== SPOKEN PICTURE NAMING (pre/post-compatible) ========== */
+/* ========== SPOKEN PICTURE NAMING ========== */
 function modelPronAudioFor(target) {
-  // Put optional model audio files here if you have them (gracefully skips if missing)
   return `pron/${(target||'').toLowerCase()}.mp3`;
 }
 
@@ -532,9 +551,8 @@ const mic_request = {
   type: T('jsPsychInitializeMicrophone'),
   data: { task: 'microphone_initialization' },
   on_finish: async function () {
-    // This is the simplified, more reliable check used in the final timeline build
     microphoneAvailable = true; 
-    console.log('Microphone init requested. Status will be known on check trial.');
+    console.log('Microphone initialized');
   }
 };
 
@@ -542,7 +560,7 @@ const naming_mic_check = {
   type: T('jsPsychHtmlAudioResponse'),
   stimulus: `<div style="max-width:640px;margin:0 auto;text-align:left">
       <h3>Microphone check / マイク確認</h3>
-      <p>Say “test” for about 2 seconds.</p>
+      <p>Say "test" for about 2 seconds.</p>
     </div>`,
   recording_duration: 2000,
   show_done_button: true,
@@ -550,7 +568,6 @@ const naming_mic_check = {
   accept_button_text: 'Sounds OK / 続行',
   data: { task: 'mic_check' },
   on_finish: (data) => {
-    // If the trial finishes, the mic was successfully initialized and recorded *something*.
     if (data.recorded_data_url) microphoneAvailable = true;
   }
 };
@@ -566,431 +583,4 @@ const naming_prepare = {
       <div style="text-align:center;">
         ${imgHTML}
         <div style="margin-top:12px;">
-          <button id="play-model" class="jspsych-btn" style="margin-right:8px;">▶️ Model</button>
-          <span id="model-status" style="font-size:13px;color:#666">Optional</span>
-        </div>
-        <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
-      </div>`;
-  },
-  choices: ['Start recording / 録音開始'],
-  post_trial_gap: 200,
-  data: () => ({
-    task: 'picture_naming_prepare',
-    target: T('jsPsych').timelineVariable('target') || 'unknown',
-    category: T('jsPsych').timelineVariable('category') || 'unknown',
-    image_file: T('jsPsych').timelineVariable('image') || 'none'
-  }),
-  on_load: () => {
-    const tgt   = T('jsPsych').timelineVariable('target') || '';
-    const model = modelPronAudioFor(tgt);
-    const btn   = document.getElementById('play-model');
-    const stat  = document.getElementById('model-status');
-
-    let a = null, ready = false;
-    const onCan = () => { ready = true; stat.textContent = 'Ready'; };
-    const onErr = () => { ready = false; stat.textContent = 'Not available'; btn.disabled = true; };
-
-    a = new Audio();
-    a.preload = 'auto';
-    a.addEventListener('canplaythrough', onCan);
-    a.addEventListener('error', onErr);
-    a.src = asset(model);
-
-    btn?.addEventListener('click', () => {
-      if (!ready) return;
-      try { a.currentTime = 0; a.play(); stat.textContent = 'Playing…'; } catch (e) {}
-    });
-  }
-};
-
-const naming_record = {
-  type: T('jsPsychHtmlAudioResponse'),
-  stimulus: () => {
-    const img = T('jsPsych').timelineVariable('image');
-    return `
-      <div style="text-align:center;">
-        ${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}
-        <p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p>
-      </div>`;
-  },
-  recording_duration: 4000,
-  show_done_button: false,
-  allow_playback: false,
-  data: () => ({
-    task: 'picture_naming_audio',
-    target: T('jsPsych').timelineVariable('target') || 'unknown',
-    category: T('jsPsych').timelineVariable('category') || 'unknown',
-    image_file: T('jsPsych').timelineVariable('image') || 'none',
-    phase: namingPhase(),
-    pid_snapshot: currentPID()
-  }),
-  on_finish: (d) => {
-    const pid   = d.pid_snapshot || currentPID();
-    const tgt   = (d.target || 'unknown').toLowerCase();
-    const idx   = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x';
-    const phase = d.phase || namingPhase();
-    const base  = `${phase}_${pid}_${tgt}_${idx}.wav`;
-    d.audio_filename = base;
-
-    try {
-      const blob = (d.response && d.response instanceof Blob) ? d.response
-                : (d.response?.recording && d.response.recording instanceof Blob) ? d.response.recording
-                : null;
-      if (blob) {
-        d.audio_blob_url = URL.createObjectURL(blob);
-      }
-    } catch (e) {}
-  }
-};
-
-/* ========== FOLEY ICONICITY (one sound per page + cleanup) ========== */
-const foley_intro = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2>
-    <p>Play the sound and choose what it represents.</p>
-    <p style="color:#666">Sounds: ${FILTERED_STIMULI.foley?.length||0}</p>
-    <p><b>NOTE: Please ensure your volume is adequate for this task.</b></p>`,
-  choices:['Begin / 開始'],
-};
-
-const foley_trial = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`
-    <div style="text-align:center;">
-      <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
-        <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
-        <div id="foley-status" style="font-size:13px;color:#666;margin-top:8px;">Click to play audio</div>
-      </div>
-      <p>What does this sound represent?</p>
-      <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
-    </div>`,
-  choices: () => {
-    const opts = T('jsPsych').timelineVariable('options') || [];
-    return [...opts, 'Skip / スキップ'];
-  },
-  post_trial_gap: 250,
-  data: () => ({
-    task:'foley_iconicity',
-    correct_answer: T('jsPsych').timelineVariable('correct'),
-    mapping_type: T('jsPsych').timelineVariable('mapping_type'),
-    options_len: (T('jsPsych').timelineVariable('options')||[]).length,
-    audio_file: T('jsPsych').timelineVariable('audio')
-  }),
-  on_load: function(){
-    const url = asset(T('jsPsych').timelineVariable('audio'));
-    const btn = document.getElementById('foley-play');
-    const status = document.getElementById('foley-status');
-
-    let audio = new Audio();
-    audio.preload = 'auto';
-    audio.src = url;
-
-    let audioLoaded = false;
-
-    const onCanPlay = () => {
-      audioLoaded = true;
-      if (status) status.textContent = 'Audio ready - click to play';
-      if (btn) btn.disabled = false;
-    };
-    const onError = () => {
-      if (btn) { btn.textContent = '❌ Audio unavailable'; btn.disabled = true; }
-      if (status) status.textContent = 'Audio failed to load - you can still answer';
-    };
-    const playHandler = () => {
-      if (!audioLoaded) return;
-      try {
-        audio.currentTime = 0;
-        audio.play().then(() => {
-          if (status) status.textContent = 'Playing audio...';
-        }).catch(() => {
-          if (status) status.textContent = 'Playback failed';
-        });
-      } catch (e) {}
-    };
-
-    audio.addEventListener('canplaythrough', onCanPlay);
-    audio.addEventListener('error', onError);
-    if (btn) btn.addEventListener('click', playHandler);
-
-    window.__foleyCleanup = () => {
-      try {
-        if (btn) btn.removeEventListener('click', playHandler);
-        if (audio) {
-          audio.pause();
-          audio.removeEventListener('canplaythrough', onCanPlay);
-          audio.removeEventListener('error', onError);
-          audio.src = '';
-          audio.load();
-        }
-      } catch (e) {}
-      audio = null;
-    };
-  },
-  on_finish: function(d){
-    const last = d.options_len; 
-    if (typeof d.response === 'number' && d.response < last) {
-      d.skipped = false;
-      d.correct = (d.response === d.correct_answer);
-    } else {
-      d.skipped = true;
-      d.correct = null;
-    }
-    try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch (e) {}
-    window.__foleyCleanup = null;
-  }
-};
-
-/* ========== VISUAL ICONICITY ========== */
-const visual_intro = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`<h2>Shape–Word Matching / 形と単語のマッチング</h2>
-    <p>Choose the word that best matches the shape.</p>
-    <p style="color:#666">Shapes: ${FILTERED_STIMULI.visual?.length||0}</p>`,
-  choices:['Begin / 開始'],
-};
-
-const visual_trial = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${asset(T('jsPsych').timelineVariable('shape'))}" style="width:200px;height:200px;" />
-      <p style="margin-top:20px;">Which word matches this shape?</p>
-    </div>`,
-  choices: () => T('jsPsych').timelineVariable('words') || [],
-  post_trial_gap: 250,
-  data: {
-    task: 'visual_iconicity',
-    correct_answer: T('jsPsych').timelineVariable('expected'),
-    shape_type: T('jsPsych').timelineVariable('shape_type')
-  },
-  on_finish: d => { d.correct = (d.response === d.correct_answer); }
-};
-
-
-/* ========== PROCEDURE (partial-order scoring) ========== */
-const procedural_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: `<h3>Quick Recipe Ordering</h3>
-    <p>Number the actions 1–5. <b>Multiple valid orders</b> exist, but some steps must precede others (e.g., whisk before pour).</p>
-    <p>番号（1–5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>`,
-  choices: ['OK']
-};
-
-const procedural_test = {
-  type: T('jsPsychSurveyText'), // GUARDED
-  preamble: '<h3>Assign a step number (1–5) to each action.</h3>',
-  questions: () => PROCEDURE_STEPS.map((label, i) => ({
-    prompt: `<b>${label}</b> — Step number (1–5)`,
-    name: `ord_${i}`,
-    required: true,
-    inputType: 'number', // Added for better mobile UX
-    min: 1, max: 5
-  })),
-  button_label: 'Submit / 送信',
-  data: { task: 'procedural_knowledge' },
-  on_finish: (data) => {
-    const resp = JSON.parse(data.responses || '{}');
-    const pos = {};
-    PROCEDURE_STEPS.forEach((label, i) => {
-      const v = parseInt(resp[`ord_${i}`], 10);
-      pos[label] = Number.isFinite(v) ? v : null;
-    });
-
-    let tot = 0, ok = 0, violations = [];
-    PROC_CONSTRAINTS.forEach(([a, b]) => {
-      if (pos[a] && pos[b]) {
-        tot++;
-        if (pos[a] < pos[b]) ok++;
-        else violations.push(`${a} → ${b}`);
-      }
-    });
-
-    data.responses_positions   = pos;
-    data.constraints_total     = tot;
-    data.constraints_satisfied = ok;
-    data.partial_order_score   = (tot > 0) ? ok / tot : null;
-    data.violations            = violations;
-  }
-};
-
-/* ========== IDEOPHONE ========== */
-const ideophone_test = {
-  type: T('jsPsychSurvey'), // GUARDED
-  survey_json: {
-    title:'Japanese Sound Words / 擬音語',
-    showQuestionNumbers:'off',
-    focusFirstQuestionAutomatic:false,
-    showCompletedPage:false,
-    pages:[{
-      name:'ideo',
-      elements:[
-        { type:'radiogroup', name:'frying_sound',  title:'Egg frying sound? / 卵を焼く音は？',    isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
-        { type:'radiogroup', name:'stirring_sound', title:'Stirring sound? / かき混ぜる音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
-      ]
-    }]
-  },
-  data:{ task:'ideophone_mapping' },
-  on_finish:()=>setTimeout(nukeSurveyArtifacts, 100)
-};
-
-/* ========== FINAL TIMELINE BUILD (FIXED) ========== */
-let preload_block = null;
-let welcome_block = null;
-
-async function initializeExperiment(){
-  // 1. Filter Stimuli (must be awaited)
-  FILTERED_STIMULI = await filterExistingStimuli();
-
-  // 2. Build Preload Arrays
-  PRELOAD_AUDIO = Array.from(new Set([
-    ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
-    ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
-    ...FILTERED_STIMULI.picture.map(s => asset(modelPronAudioFor(s.target)))
-  ]));
-  PRELOAD_IMAGES = Array.from(new Set([
-    ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
-    ...FILTERED_STIMULI.visual.map(s => asset(s.shape)),
-  ]));
-  if (have('jsPsychPreload')) {
-      preload.audio = PRELOAD_AUDIO;
-      preload.images = PRELOAD_IMAGES;
-      preload_block = preload;
-  } else {
-      preload_block = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<p>Loading skipped.</p>', choices:'NO_KEYS', trial_duration: 1 };
-  }
-  
-  // 3. Define the final timeline
-  const timeline=[];
-  const CLEAR = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'', choices:'NO_KEYS', trial_duration:300 };
-
-  timeline.push(preload_block);
-  if (have('jsPsychHtmlButtonResponse')) {
-      timeline.push({
-        type: T('jsPsychHtmlButtonResponse'),
-        choices:['Begin / 開始'],
-        stimulus:`<h1>Pre-Test Battery / 事前テスト</h1>
-          <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
-      });
-  }
-
-  // --- Surveys ---
-  if (have('jsPsychSurvey')) {
-    timeline.push(participant_info, motion_sickness_questionnaire);
-  } else {
-    console.error("Survey plugin not loaded. Skipping all SurveyJS tasks.");
-  }
-  
-  // --- Spans ---
-  if (have('jsPsychSurveyText') && have('jsPsychHtmlKeyboardResponse')) {
-      timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
-      timeline.push(digit_span_backward_instructions, { timeline: generateOptimizedDigitSpanTrials(false) }, CLEAR);
-      timeline.push(spatial_span_instructions, { timeline: spatial_span_trials }, CLEAR);
-  }
-
-  // --- Phonological Awareness ---
-  if (FILTERED_STIMULI.phoneme.length && have('jsPsychHtmlKeyboardResponse')) {
-    timeline.push(phoneme_instructions);
-    timeline.push({ timeline:[ldt_fixation, phoneme_trial], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order:true });
-    timeline.push(CLEAR);
-  }
-
-  // --- LDT ---
-  if (have('jsPsychHtmlKeyboardResponse')) {
-      timeline.push(ldt_instructions, ldt_procedure, CLEAR);
-  }
-
-  // --- Foley ---
-  if (FILTERED_STIMULI.foley.length && have('jsPsychHtmlButtonResponse')) {
-    timeline.push(foley_intro);
-    FILTERED_STIMULI.foley.forEach((stimulus, index) => {
-      timeline.push({
-        type: T('jsPsychHtmlKeyboardResponse'),
-        stimulus: `<div style="text-align: center; padding: 20px;"><p>Sound ${index + 1} of ${FILTERED_STIMULI.foley.length}</p><p>Press SPACE when ready / 次へ進むにはスペースキー</p></div>`,
-        choices: [' ']
-      });
-      timeline.push({ timeline: [foley_trial], timeline_variables: [stimulus] });
-    });
-    timeline.push(CLEAR);
-  }
-
-  // --- Spoken Picture Naming ---
-  if (FILTERED_STIMULI.picture.length && mic_plugins_available) {
-    timeline.push(mic_request); // Only need to initialize once
-    timeline.push(
-      naming_intro,
-      naming_mic_check,
-      { 
-        timeline: [naming_prepare, naming_record], 
-        timeline_variables: FILTERED_STIMULI.picture, 
-        randomize_order: false,
-        // The microphone check is the most reliable availability probe
-        conditional_function: () => microphoneAvailable === true 
-      },
-      CLEAR
-    );
-    // Fallback for mic failure
-    timeline.push({
-      conditional_function: () => microphoneAvailable !== true,
-      timeline: [
-        { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>`, choices: ['Continue'] },
-        CLEAR
-      ]
-    });
-  }
-
-  // --- Visual iconicity ---
-  if (FILTERED_STIMULI.visual.length && have('jsPsychHtmlButtonResponse')) {
-    timeline.push(visual_intro);
-    timeline.push({ timeline:[visual_trial], timeline_variables: FILTERED_STIMULI.visual, randomize_order:true });
-    timeline.push(CLEAR);
-  }
-
-  // --- Procedure (partial-order) ---
-  if (have('jsPsychSurveyText')) { // We used SurveyText for procedure in this version
-    timeline.push(procedural_instructions, procedural_test, CLEAR);
-  }
-
-  // --- Ideophone ---
-  if (have('jsPsychSurvey')) {
-    timeline.push(ideophone_test, CLEAR);
-  }
-
-  // --- End ---
-  if (have('jsPsychHtmlButtonResponse')) {
-      timeline.push({
-        type: T('jsPsychHtmlButtonResponse'),
-        choices:['Finish / 完了'],
-        stimulus:function(){
-          if(!assignedCondition) assignCondition();
-          const saved = JSON.parse(localStorage.getItem('pretest_latest')||'{}');
-          return `<div style="text-align:center;padding:40px;">
-            <h2>✅ Complete! / 完了！</h2>
-            <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
-            <p style="color:#666">Your data file will download automatically (${saved.filename||'pretest_data.json'}).</p>
-          </div>`;
-        },
-        on_finish: () => { window.onbeforeunload=null; }
-      });
-  }
-
-  jsPsych.run(timeline);
-}
-
-/* ========== UNLOAD GUARD (UNCHANGED) ========== */
-window.onbeforeunload = function(){
-  if(jsPsych.data.get().count()>2) return 'Leave page? Progress will be lost.';
-};
-
-/* ========== SCORING HELPERS (UNCHANGED) ========== */
-// ... (All scoring functions are omitted for brevity, but should be included) ...
-// (e.g., getSummaryMetrics, saveDataToServer, assignCondition, calculateAccuracy, etc.)
-
-// NOTE: Please ensure you include ALL your original scoring helper functions here!
-
-/* ========== BOOTSTRAP (UNCHANGED) ========== */
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', initializeExperiment);
-} else {
-  initializeExperiment();
-}
-```
+          <button
