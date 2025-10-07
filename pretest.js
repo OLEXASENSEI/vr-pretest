@@ -5,19 +5,11 @@ The main mistakes are:
 2.  **Plugin Guiding:** The code uses direct references like `type: jsPsychSurvey` which can throw an error if the plugin fails to load (a frequent problem in your environment).
 3.  **Mic Availability Timeline:** The logic for skipping the microphone task is complex, using an `async` function and a global flag which is prone to timing errors.
 
-I have fixed the script by **simplifying the PID retrieval**, making the **plugin checks robust**, and **simplifying the microphone conditional logic.**
-
-### Final, Fixed `pretest.js`
-
-You should **replace the content of your `pretest.js` file** with the code below.
-
-**Crucial Note on HTML/Environment:** For this to work, you must ensure your HTML loads **all** required libraries correctly. Given your previous issues, you likely need to **host SurveyJS files and the microphone plugins locally** to avoid the CORS errors.
-
 ```javascript
-// Version 4.1 (FIXED) — Pre-Test (spoken naming + partial-order procedure)
-// - Fixed: Robust plugin checks, simplified PID logic, cleaner microphone conditional.
 
-/* ========== GLOBAL STATE (Updated) ========== */
+// Version 4.1 (FIXED) — Pre-Test (spoken naming + partial-order procedure)
+
+/* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
 let assignedCondition = null;
 let microphoneAvailable = false; // set after mic init
