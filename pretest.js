@@ -1,11 +1,8 @@
-// Version 3.8.1
-// - Pre-Test Battery (syntax fixed, Foley single-trial pages, mic-gated naming)
-// - Fix: stray '}' and older-browser-incompatible `catch {}` -> `catch (e) {}`
-// - Fix: removed duplicate Foley block
-// - Foley: one sound per page + progress interstitial + robust audio cleanup 
-// - Picture naming: mic-gated only (no text fallback)
-// - SurveyJS radiogroups for MSSQ kept
-// - GH Pages cache-busting & asset existence checks retained
+// Version 4.0 — Pre-Test (spoken naming + partial-order procedure)
+// - Spoken picture naming: optional model playback, 4s recording, file names tagged with phase=pre
+// - Mic sanity check before naming
+// - Procedure task scored by precedence constraints (partial-order), not a single fixed sequence
+// - Keeps your asset checks, surveys, spans, LDT, Foley, Visual tasks, saving, and assignment logic
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -33,7 +30,7 @@ surveyHeaderStyle.textContent = `
 `;
 document.head.appendChild(surveyHeaderStyle);
 
-/* Gentle cleanup: do NOT remove .sd-root/.sv-root or .sd-title */
+/* Gentle cleanup */
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
@@ -481,46 +478,103 @@ const ldt_trial = {
 
 const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
 
-/* ========== PICTURE NAMING (mic-gated only; no text fallback) ========== */
+/* ========== SPOKEN PICTURE NAMING (pre/post-compatible) ========== */
+// Helpers for naming
+function currentPID() {
+  try {
+    const saved = JSON.parse(localStorage.getItem('pretest_latest')||'{}');
+    return saved?.metrics?.participant_id
+      || jsPsych?.data?.get()?.values()?.find(x=>x.task==='participant_info')?.response?.participant_id
+      || 'unknown';
+  } catch (e) { return 'unknown'; }
+}
+function namingPhase() {
+  const p = new URLSearchParams(location.search).get('phase');
+  return (p === 'post') ? 'post' : 'pre';
+}
+function modelPronAudioFor(target) {
+  // Put optional model audio files here if you have them (gracefully skips if missing)
+  return `pron/${(target||'').toLowerCase()}.mp3`;
+}
+
 const naming_intro = {
   type: jsPsychHtmlButtonResponse,
   stimulus: () => `<h2>Picture Naming / 絵の命名</h2>
-    <p>For each picture, you'll see it and then record your response (4s).</p>
-    <p>各絵を見て、4秒間録音します。</p>
+    <p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p>
+    <p>各絵：（1）モデル音声（任意）、（2）4秒録音。</p>
     <p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>`,
   choices: ['Begin / 開始'],
   post_trial_gap: 500,
 };
 
+const naming_mic_check = {
+  type: jsPsychHtmlAudioResponse,
+  stimulus: `<div style="max-width:640px;margin:0 auto;text-align:left">
+      <h3>Microphone check / マイク確認</h3>
+      <p>Say “test” for about 2 seconds.</p>
+    </div>`,
+  recording_duration: 2000,
+  show_done_button: true,
+  allow_playback: true,
+  accept_button_text: 'Sounds OK / 続行',
+  data: { task: 'mic_check' }
+};
+
 const naming_prepare = {
   type: jsPsychHtmlButtonResponse,
   stimulus: () => {
-    const img = jsPsych.timelineVariable('image');
-    if (!img) return '<p style="color:#c00">Missing image for this trial.</p>';
+    const img   = jsPsych.timelineVariable('image');
+    const tgt   = jsPsych.timelineVariable('target') || '';
+    const pron  = modelPronAudioFor(tgt);
+    const imgHTML = img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>';
     return `
       <div style="text-align:center;">
-        <img src="${asset(img)}" style="width:350px;border-radius:8px;" />
+        ${imgHTML}
+        <div style="margin-top:12px;">
+          <button id="play-model" class="jspsych-btn" style="margin-right:8px;">▶️ Model</button>
+          <span id="model-status" style="font-size:13px;color:#666">Optional</span>
+        </div>
         <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
       </div>`;
   },
   choices: ['Start recording / 録音開始'],
-  post_trial_gap: 250,
+  post_trial_gap: 200,
   data: () => ({
     task: 'picture_naming_prepare',
     target: jsPsych.timelineVariable('target') || 'unknown',
     category: jsPsych.timelineVariable('category') || 'unknown',
     image_file: jsPsych.timelineVariable('image') || 'none'
-  })
+  }),
+  on_load: () => {
+    const tgt   = jsPsych.timelineVariable('target') || '';
+    const model = modelPronAudioFor(tgt);
+    const btn   = document.getElementById('play-model');
+    const stat  = document.getElementById('model-status');
+
+    let a = null, ready = false;
+    const onCan = () => { ready = true; stat.textContent = 'Ready'; };
+    const onErr = () => { ready = false; stat.textContent = 'Not available'; btn.disabled = true; };
+
+    a = new Audio();
+    a.preload = 'auto';
+    a.addEventListener('canplaythrough', onCan);
+    a.addEventListener('error', onErr);
+    a.src = asset(model);
+
+    btn?.addEventListener('click', () => {
+      if (!ready) return;
+      try { a.currentTime = 0; a.play(); stat.textContent = 'Playing…'; } catch (e) {}
+    });
+  }
 };
 
 const naming_record = {
   type: jsPsychHtmlAudioResponse,
   stimulus: () => {
     const img = jsPsych.timelineVariable('image');
-    if (!img) return '<p style="color:#c00">Missing image for this trial.</p>';
     return `
       <div style="text-align:center;">
-        <img src="${asset(img)}" style="width:350px;border-radius:8px;" />
+        ${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}
         <p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p>
       </div>`;
   },
@@ -531,8 +585,29 @@ const naming_record = {
     task: 'picture_naming_audio',
     target: jsPsych.timelineVariable('target') || 'unknown',
     category: jsPsych.timelineVariable('category') || 'unknown',
-    image_file: jsPsych.timelineVariable('image') || 'none'
-  })
+    image_file: jsPsych.timelineVariable('image') || 'none',
+    phase: namingPhase(),
+    pid_snapshot: currentPID()
+  }),
+  on_finish: (d) => {
+    const pid   = d.pid_snapshot || currentPID();
+    const tgt   = (d.target || 'unknown').toLowerCase();
+    const idx   = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x';
+    const phase = d.phase || namingPhase();
+    const base  = `${phase}_${pid}_${tgt}_${idx}.wav`;
+    d.audio_filename = base;
+
+    try {
+      const blob = (d.response && d.response instanceof Blob) ? d.response
+                : (d.response?.recording && d.response.recording instanceof Blob) ? d.response.recording
+                : null;
+      if (blob) {
+        d.audio_blob_url = URL.createObjectURL(blob);
+        // Optional per-clip download:
+        // const a = document.createElement('a'); a.href = d.audio_blob_url; a.download = base; a.click();
+      }
+    } catch (e) {}
+  }
 };
 
 /* ========== FOLEY ICONICITY (one sound per page + cleanup) ========== */
@@ -603,7 +678,6 @@ const foley_trial = {
     audio.addEventListener('error', onError);
     if (btn) btn.addEventListener('click', playHandler);
 
-    // Window-scoped cleanup so on_finish can always reach it
     window.__foleyCleanup = () => {
       try {
         if (btn) btn.removeEventListener('click', playHandler);
@@ -646,26 +720,69 @@ const visual_trial = {
   stimulus: ()=>`<div style="text-align:center;">
     <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
     <p style="margin-top:20px;">Which word matches this shape?</p>
-  </div>`,
+  </div>``,
   choices: () => jsPsych.timelineVariable('words') || [],
   post_trial_gap:250,
   data:{ task:'visual_iconicity', correct_answer:jsPsych.timelineVariable('expected'), shape_type:jsPsych.timelineVariable('shape_type') },
   on_finish: d=> d.correct=(d.response===d.correct_answer)
 };
 
-/* ========== PROCEDURAL & IDEOPHONE ========== */
-const procedural_test = {
-  type: jsPsychSurveyText,
-  questions: [{
-    prompt:`<h3>Quick Recipe Description</h3>
-      <p>List the main ingredients and 3–4 key steps for making pancakes.</p>
-      <p>パンケーキの主な材料と3–4手順を書いてください。</p>`,
-    name:'pancake_procedure', rows:6, columns:60
-  }],
-  button_label:'Submit / 送信',
-  data:{ task:'procedural_knowledge' }
+/* ========== PROCEDURE (partial-order scoring) ========== */
+const PROCEDURE_STEPS = [
+  'crack egg', 'add flour & milk', 'whisk batter', 'pour on pan', 'flip & serve'
+];
+// A must be before B:
+const PROC_CONSTRAINTS = [
+  ['crack egg',        'whisk batter'],
+  ['add flour & milk', 'whisk batter'],
+  ['whisk batter',     'pour on pan'],
+  ['pour on pan',      'flip & serve']
+];
+
+const procedural_instructions = {
+  type: jsPsychHtmlButtonResponse,
+  stimulus: `<h3>Quick Recipe Ordering</h3>
+    <p>Number the actions 1–5. <b>Multiple valid orders</b> exist, but some steps must precede others (e.g., whisk before pour).</p>
+    <p>番号（1–5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>`,
+  choices: ['OK']
 };
 
+const procedural_test = {
+  type: jsPsychSurveyText,
+  preamble: '<h3>Assign a step number (1–5) to each action.</h3>',
+  questions: () => PROCEDURE_STEPS.map((label, i) => ({
+    prompt: `<b>${label}</b> — Step number (1–5)`,
+    name: `ord_${i}`,
+    required: true
+  })),
+  button_label: 'Submit / 送信',
+  data: { task: 'procedural_knowledge' },
+  on_finish: (data) => {
+    const resp = JSON.parse(data.responses || '{}');
+    const pos = {};
+    PROCEDURE_STEPS.forEach((label, i) => {
+      const v = parseInt(resp[`ord_${i}`], 10);
+      pos[label] = Number.isFinite(v) ? v : null;
+    });
+
+    let tot = 0, ok = 0, violations = [];
+    PROC_CONSTRAINTS.forEach(([a, b]) => {
+      if (pos[a] && pos[b]) {
+        tot++;
+        if (pos[a] < pos[b]) ok++;
+        else violations.push(`${a} → ${b}`);
+      }
+    });
+
+    data.responses_positions   = pos;
+    data.constraints_total     = tot;
+    data.constraints_satisfied = ok;
+    data.partial_order_score   = (tot > 0) ? ok / tot : null;
+    data.violations            = violations;
+  }
+};
+
+/* ========== IDEOPHONE ========== */
 const ideophone_test = {
   type: jsPsychSurvey,
   survey_json: {
@@ -706,27 +823,21 @@ const welcome = {
     <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
 };
 
-// Mic init with older-browser-safe catch + permissions probe
+// Mic init + availability probe
 const mic_request = {
   type: jsPsychInitializeMicrophone,
   data: { task: 'microphone_initialization' },
   on_finish: async function () {
     let ok = false;
     try {
-      // Prefer Permissions API if available (no extra prompt)
       if (navigator.permissions && navigator.permissions.query) {
         try {
           const p = await navigator.permissions.query({ name: 'microphone' });
-          ok = (p.state === 'granted' || p.state === 'prompt'); // 'prompt' still OK to try recording
+          ok = (p.state === 'granted' || p.state === 'prompt');
         } catch (e) {}
       }
-      // Heuristic fallback
-      if (!ok) {
-        ok = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-      }
-    } catch (e) {
-      ok = false;
-    }
+      if (!ok) ok = !!(window.isSecureContext && navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+    } catch (e) { ok = false; }
     microphoneAvailable = ok;
     console.log('Microphone available (post-init check):', microphoneAvailable);
   }
@@ -741,6 +852,8 @@ async function initializeExperiment(){
   PRELOAD_AUDIO = Array.from(new Set([
     ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
     ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
+    // Optional: model audios for naming (comment out if you don’t have them)
+    ...FILTERED_STIMULI.picture.map(s => asset(modelPronAudioFor(s.target)))
   ]));
   PRELOAD_IMAGES = Array.from(new Set([
     ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
@@ -767,10 +880,9 @@ async function initializeExperiment(){
 
   timeline.push(ldt_instructions, ldt_procedure, CLEAR);
 
-  // Foley: one sound per page with progress interstitial BEFORE EACH trial
+  // Foley (progress interstitial + one sound per page)
   if (FILTERED_STIMULI.foley.length) {
     timeline.push(foley_intro);
-
     FILTERED_STIMULI.foley.forEach((stimulus, index) => {
       const total = FILTERED_STIMULI.foley.length;
       timeline.push({
@@ -781,53 +893,43 @@ async function initializeExperiment(){
         </div>`,
         choices: [' ']
       });
-      timeline.push({
-        timeline: [foley_trial],
-        timeline_variables: [stimulus]
-      });
+      timeline.push({ timeline: [foley_trial], timeline_variables: [stimulus] });
     });
-
     timeline.push(CLEAR);
   }
 
-  // Picture Naming (runtime-gated; no text fallback)
+  // Spoken Picture Naming
   if (FILTERED_STIMULI.picture.length) {
-    // If mic is available at runtime
     timeline.push({
       conditional_function: () => microphoneAvailable === true,
       timeline: [
         naming_intro,
-        {
-          timeline: [naming_prepare, naming_record],
-          timeline_variables: FILTERED_STIMULI.picture,
-          randomize_order: false
-        },
+        naming_mic_check,
+        { timeline: [naming_prepare, naming_record], timeline_variables: FILTERED_STIMULI.picture, randomize_order: false },
         CLEAR
       ]
     });
-
-    // If mic is NOT available at runtime
     timeline.push({
       conditional_function: () => microphoneAvailable !== true,
       timeline: [
-        {
-          type: jsPsychHtmlButtonResponse,
-          stimulus: `<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>`,
-          choices: ['Continue']
-        },
+        { type: jsPsychHtmlButtonResponse, stimulus: `<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>`, choices: ['Continue'] },
         CLEAR
       ]
     });
   }
 
-  // Visual
+  // Visual iconicity
   if (FILTERED_STIMULI.visual.length) {
     timeline.push(visual_intro);
     timeline.push({ timeline:[visual_trial], timeline_variables: FILTERED_STIMULI.visual, randomize_order:true });
     timeline.push(CLEAR);
   }
 
-  timeline.push(procedural_test, ideophone_test, CLEAR);
+  // Procedure (partial-order)
+  timeline.push(procedural_instructions, procedural_test, CLEAR);
+
+  // Ideophone
+  timeline.push(ideophone_test, CLEAR);
 
   timeline.push({
     type: jsPsychHtmlButtonResponse,
@@ -867,8 +969,8 @@ function getSummaryMetrics(data){
   const foleyScore = calculateAccuracy(data,'foley_iconicity');
   const visualScore = calculateAccuracy(data,'visual_iconicity');
   const ideophoneScore = calculateIdeophoneScore(data);
-  const proceduralResponse = data.find(e=>e.task==='procedural_knowledge');
-  const proceduralWordCount = countWords(proceduralResponse?.response?.pancake_procedure||'');
+  const procedural = data.find(e=>e.task==='procedural_knowledge');
+  const proceduralWordCount = countWords(procedural?.response?.pancake_procedure||''); // legacy field if present
   const namingCompletion = calculateNamingCompletionRate(data);
 
   return {
