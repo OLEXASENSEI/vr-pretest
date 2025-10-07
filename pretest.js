@@ -514,10 +514,10 @@ const phoneme_trial = {
         <button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different</button>
       </div>
     </div>`,
-  data:{ task:'phoneme_discrimination', correct_answer:T('jsPsych').timelineVariable('correct'), contrast_type:T('jsPsych').timelineVariable('contrast') },
+  data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
-    const a1=new Audio(asset(T('jsPsych').timelineVariable('audio1')));
-    const a2=new Audio(asset(T('jsPsych').timelineVariable('audio2')));
+    const a1=new Audio(asset(jsPsych.timelineVariable('audio1')));
+    const a2=new Audio(asset(jsPsych.timelineVariable('audio2')));
 
     a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }});
     a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }});
@@ -591,9 +591,9 @@ const ldt_fixation = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<div st
 
 const ldt_trial = {
   type: T('jsPsychHtmlKeyboardResponse'),
-  stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${T('jsPsych').timelineVariable('stimulus')}</div>`,
+  stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
   stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250,
-  data:{ task:'lexical_decision', correct_response:T('jsPsych').timelineVariable('correct_response'), word_type:T('jsPsych').timelineVariable('word_type') },
+  data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') },
   on_finish:d=>d.correct=(d.response===d.correct_response)
 };
 
@@ -642,8 +642,8 @@ const naming_mic_check = {
 const naming_prepare = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: () => {
-    const img   = T('jsPsych').timelineVariable('image');
-    const tgt   = T('jsPsych').timelineVariable('target') || '';
+    const img   = jsPsych.timelineVariable('image');
+    const tgt   = jsPsych.timelineVariable('target') || '';
     const pron  = modelPronAudioFor(tgt);
     const imgHTML = img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>';
     return `
@@ -660,12 +660,12 @@ const naming_prepare = {
   post_trial_gap: 200,
   data: () => ({
     task: 'picture_naming_prepare',
-    target: T('jsPsych').timelineVariable('target') || 'unknown',
-    category: T('jsPsych').timelineVariable('category') || 'unknown',
-    image_file: T('jsPsych').timelineVariable('image') || 'none'
+    target: jsPsych.timelineVariable('target') || 'unknown',
+    category: jsPsych.timelineVariable('category') || 'unknown',
+    image_file: jsPsych.timelineVariable('image') || 'none'
   }),
   on_load: () => {
-    const tgt   = T('jsPsych').timelineVariable('target') || '';
+    const tgt   = jsPsych.timelineVariable('target') || '';
     const model = modelPronAudioFor(tgt);
     const btn   = document.getElementById('play-model');
     const stat  = document.getElementById('model-status');
@@ -690,7 +690,7 @@ const naming_prepare = {
 const naming_record = {
   type: T('jsPsychHtmlAudioResponse'),
   stimulus: () => {
-    const img = T('jsPsych').timelineVariable('image');
+    const img = jsPsych.timelineVariable('image');
     return `
       <div style="text-align:center;">
         ${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}
@@ -702,9 +702,9 @@ const naming_record = {
   allow_playback: false,
   data: () => ({
     task: 'picture_naming_audio',
-    target: T('jsPsych').timelineVariable('target') || 'unknown',
-    category: T('jsPsych').timelineVariable('category') || 'unknown',
-    image_file: T('jsPsych').timelineVariable('image') || 'none',
+    target: jsPsych.timelineVariable('target') || 'unknown',
+    category: jsPsych.timelineVariable('category') || 'unknown',
+    image_file: jsPsych.timelineVariable('image') || 'none',
     phase: namingPhase(),
     pid_snapshot: currentPID()
   }),
@@ -749,19 +749,19 @@ const foley_trial = {
       <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
     </div>`,
   choices: () => {
-    const opts = T('jsPsych').timelineVariable('options') || [];
+    const opts = jsPsych.timelineVariable('options') || [];
     return [...opts, 'Skip / スキップ'];
   },
   post_trial_gap: 250,
   data: () => ({
     task:'foley_iconicity',
-    correct_answer: T('jsPsych').timelineVariable('correct'),
-    mapping_type: T('jsPsych').timelineVariable('mapping_type'),
-    options_len: (T('jsPsych').timelineVariable('options')||[]).length,
-    audio_file: T('jsPsych').timelineVariable('audio')
+    correct_answer: jsPsych.timelineVariable('correct'),
+    mapping_type: jsPsych.timelineVariable('mapping_type'),
+    options_len: (jsPsych.timelineVariable('options')||[]).length,
+    audio_file: jsPsych.timelineVariable('audio')
   }),
   on_load: function(){
-    const url = asset(T('jsPsych').timelineVariable('audio'));
+    const url = asset(jsPsych.timelineVariable('audio'));
     const btn = document.getElementById('foley-play');
     const status = document.getElementById('foley-status');
 
