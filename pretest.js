@@ -62,8 +62,8 @@ function nukeSurveyArtifacts() {
 
 /* ========== INIT jsPsych ========== */
 if (!have('initJsPsych')) {
-    console.error('jsPsych core (initJsPsych) is not loaded. Cannot start Pre-Test.');
-    throw new Error("jsPsych core not loaded.");
+  console.error('jsPsych core (initJsPsych) is not loaded. Cannot start Pre-Test.');
+  throw new Error("jsPsych core not loaded.");
 }
 
 const jsPsych = T('initJsPsych')({
@@ -99,13 +99,16 @@ const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/heat.mp3',   audio2: 'sounds/hit.mp3',    correct: 'different', contrast: 'vowel_length' },
 ];
 
+// UPDATED to match your available files (see comments)
 const foley_stimuli = [
   { audio: 'sounds/high_tinkle.mp3',   options: ['small sugar granule', 'large mixing bowl'], correct: 0, mapping_type: 'size_pitch' },
   { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                              correct: 1, mapping_type: 'texture'   },
   { audio: 'sounds/liquid_flow.mp3',   options: ['sugar', 'milk'],                              correct: 1, mapping_type: 'texture'   },
-  { audio: 'sounds/sharp_crack.mp3',   options: ['stirring', 'cracking'],                       correct: 1, mapping_type: 'action'    },
+  // was sharp_crack.mp3 → use egg_crack.mp3 (present)
+  { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                       correct: 1, mapping_type: 'action'    },
   { audio: 'sounds/circular_whir.mp3', options: ['mixing', 'pouring'],                          correct: 0, mapping_type: 'action'    },
-  { audio: 'sounds/sizzle.mp3',        options: ['cold batter', 'cooking on pan'],              correct: 1, mapping_type: 'process'   },
+  // was sizzle.mp3 → use bubbling.mp3 (present)
+  { audio: 'sounds/bubbling.mp3',      options: ['cold batter', 'cooking on pan'],              correct: 1, mapping_type: 'process'   },
 ];
 
 const picture_naming_stimuli = [
@@ -197,7 +200,6 @@ function getSummaryMetrics(data) {
 }
 
 /* ========== PRELOAD DEFINITION (ADDED) ========== */
-// Define the preload block template
 const preload = {
   type: T('jsPsychPreload'),
   audio: [],  // Will be filled dynamically
@@ -391,7 +393,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
       post_trial_gap: 250,
       data:{ task:'digit_span_response', correct_answer: forward?digits.join(''):digits.slice().reverse().join(''), length, direction:forward?'forward':'backward' },
       on_finish: d => {
-        const rraw = d.response?.response ?? d.response; // plugin may nest
+        const rraw = d.response?.response ?? d.response;
         const r = String(rraw ?? '').replace(/\s/g,'');
         d.entered_response=r;
         d.correct = r===d.correct_answer;
@@ -882,7 +884,6 @@ const procedural_test = {
   button_label: 'Submit / 送信',
   data: { task: 'procedural_knowledge' },
   on_finish: (data) => {
-    // Robustly read response whether it is an object or JSON string
     const respObj = asObject(data.response ?? data.responses);
     const pos = {};
     PROCEDURE_STEPS.forEach((label, i) => {
@@ -939,7 +940,8 @@ async function initializeExperiment(){
   PRELOAD_AUDIO = Array.from(new Set([
     ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
     ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
-    ...FILTERED_STIMULI.picture.map(s => asset(modelPronAudioFor(s.target)))
+    // removed modelPronAudio preload to avoid warnings if pron/ files are missing
+    // ...FILTERED_STIMULI.picture.map(s => asset(modelPronAudioFor(s.target)))
   ]));
   PRELOAD_IMAGES = Array.from(new Set([
     ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
@@ -947,11 +949,11 @@ async function initializeExperiment(){
   ]));
   
   if (have('jsPsychPreload')) {
-      preload.audio = PRELOAD_AUDIO;
-      preload.images = PRELOAD_IMAGES;
-      preload_block = preload;
+    preload.audio = PRELOAD_AUDIO;
+    preload.images = PRELOAD_IMAGES;
+    preload_block = preload;
   } else {
-      preload_block = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<p>Loading skipped.</p>', choices:'NO_KEYS', trial_duration: 1 };
+    preload_block = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<p>Loading skipped.</p>', choices:'NO_KEYS', trial_duration: 1 };
   }
   
   // 3. Define the final timeline
@@ -961,12 +963,12 @@ async function initializeExperiment(){
   timeline.push(preload_block);
   
   if (have('jsPsychHtmlButtonResponse')) {
-      timeline.push({
-        type: T('jsPsychHtmlButtonResponse'),
-        choices:['Begin / 開始'],
-        stimulus:`<h1>Pre-Test Battery / 事前テスト</h1>
-          <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
-      });
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      choices:['Begin / 開始'],
+      stimulus:`<h1>Pre-Test Battery / 事前テスト</h1>
+        <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
+    });
   }
 
   // --- Surveys ---
@@ -978,9 +980,9 @@ async function initializeExperiment(){
   
   // --- Spans ---
   if (have('jsPsychSurveyText') && have('jsPsychHtmlKeyboardResponse')) {
-      timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
-      timeline.push(digit_span_backward_instructions, { timeline: generateOptimizedDigitSpanTrials(false) }, CLEAR);
-      timeline.push(spatial_span_instructions, { timeline: spatial_span_trials }, CLEAR);
+    timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
+    timeline.push(digit_span_backward_instructions, { timeline: generateOptimizedDigitSpanTrials(false) }, CLEAR);
+    timeline.push(spatial_span_instructions, { timeline: spatial_span_trials }, CLEAR);
   }
 
   // --- Phonological Awareness ---
@@ -992,7 +994,7 @@ async function initializeExperiment(){
 
   // --- LDT ---
   if (have('jsPsychHtmlKeyboardResponse')) {
-      timeline.push(ldt_instructions, ldt_procedure, CLEAR);
+    timeline.push(ldt_instructions, ldt_procedure, CLEAR);
   }
 
   // --- Foley ---
@@ -1052,20 +1054,20 @@ async function initializeExperiment(){
 
   // --- End ---
   if (have('jsPsychHtmlButtonResponse')) {
-      timeline.push({
-        type: T('jsPsychHtmlButtonResponse'),
-        choices:['Finish / 完了'],
-        stimulus:function(){
-          if(!assignedCondition) assignCondition();
-          const saved = asObject(localStorage.getItem('pretest_latest') ? JSON.parse(localStorage.getItem('pretest_latest')) : {});
-          return `<div style="text-align:center;padding:40px;">
-            <h2>✅ Complete! / 完了！</h2>
-            <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
-            <p style="color:#666">Your data file will download automatically (${saved.filename||'pretest_data.json'}).</p>
-          </div>`;
-        },
-        on_finish: () => { window.onbeforeunload=null; }
-      });
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      choices:['Finish / 完了'],
+      stimulus:function(){
+        if(!assignedCondition) assignCondition();
+        const saved = asObject(localStorage.getItem('pretest_latest') ? JSON.parse(localStorage.getItem('pretest_latest')) : {});
+        return `<div style="text-align:center;padding:40px;">
+          <h2>✅ Complete! / 完了！</h2>
+          <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
+          <p style="color:#666">Your data file will download automatically (${saved.filename||'pretest_data.json'}).</p>
+        </div>`;
+      },
+      on_finish: () => { window.onbeforeunload=null; }
+    });
   }
 
   jsPsych.run(timeline);
