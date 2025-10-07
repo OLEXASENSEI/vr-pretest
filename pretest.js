@@ -5,7 +5,6 @@ The main mistakes are:
 2.  **Plugin Guiding:** The code uses direct references like `type: jsPsychSurvey` which can throw an error if the plugin fails to load (a frequent problem in your environment).
 3.  **Mic Availability Timeline:** The logic for skipping the microphone task is complex, using an `async` function and a global flag which is prone to timing errors.
 
-```javascript
 
 // Version 4.2 (Final Fixed Start) — Pre-Test (spoken naming + partial-order procedure)
 
