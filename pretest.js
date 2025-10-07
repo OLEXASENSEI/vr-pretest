@@ -717,15 +717,21 @@ const visual_intro = {
 
 const visual_trial = {
   type: jsPsychHtmlButtonResponse,
-  stimulus: ()=>`<div style="text-align:center;">
-    <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
-    <p style="margin-top:20px;">Which word matches this shape?</p>
-  </div>``,
+  stimulus: () => `
+    <div style="text-align:center;">
+      <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
+      <p style="margin-top:20px;">Which word matches this shape?</p>
+    </div>`,
   choices: () => jsPsych.timelineVariable('words') || [],
-  post_trial_gap:250,
-  data:{ task:'visual_iconicity', correct_answer:jsPsych.timelineVariable('expected'), shape_type:jsPsych.timelineVariable('shape_type') },
-  on_finish: d=> d.correct=(d.response===d.correct_answer)
+  post_trial_gap: 250,
+  data: {
+    task: 'visual_iconicity',
+    correct_answer: jsPsych.timelineVariable('expected'),
+    shape_type: jsPsych.timelineVariable('shape_type')
+  },
+  on_finish: d => { d.correct = (d.response === d.correct_answer); }
 };
+
 
 /* ========== PROCEDURE (partial-order scoring) ========== */
 const PROCEDURE_STEPS = [
