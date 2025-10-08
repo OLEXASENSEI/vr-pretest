@@ -1,4 +1,4 @@
-// Version 4.2 (Final Fixed) — Pre-Test Battery
+// Version 4.3 (Fixed) — Pre-Test Battery
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -50,13 +50,65 @@ document.head.appendChild(baseStyle);
 const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
+  
+  /* Hide SurveyJS ugly controls */
+  .sd-action-bar, .sd-question__erbox-clear, .sv-action-bar, 
+  .sd-btn--action.sd-navigation__complete-btn,
+  button[title="Clear"], button[aria-label="Clear"],
+  .sd-item__control-label::after { display: none !important; }
+  
+  /* Hide dropdown arrows for radio groups */
+  .sd-selectbase:not(select) { display: none !important; }
+  
+  /* Better radio button styling */
+  .sd-radio, .sd-item__control {
+    margin: 8px 12px 8px 0 !important;
+  }
+  
+  .sd-item {
+    display: inline-flex !important;
+    align-items: center !important;
+  }
+  
+  .sd-item__control-label {
+    padding: 6px 12px !important;
+    background: #f0f0f0 !important;
+    border: 2px solid #ddd !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
+  }
+  
+  .sd-item--checked .sd-item__control-label {
+    background: #4CAF50 !important;
+    color: white !important;
+    border-color: #4CAF50 !important;
+  }
+  
+  .sd-item__control-label:hover {
+    border-color: #4CAF50 !important;
+    background: #f8f8f8 !important;
+  }
+  
+  /* Force radio groups to display properly */
+  .sd-radiogroup, .sd-question--radiogroup {
+    display: block !important;
+  }
+  
+  .sd-radiogroup__item, .sd-item {
+    margin: 4px 0 !important;
+  }
 `;
 document.head.appendChild(surveyHeaderStyle);
 
-/* Gentle cleanup */
+/* Enhanced cleanup */
 function nukeSurveyArtifacts() {
-  document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
+  document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
+  });
+  // Also hide any lingering elements
+  document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
+    try { el.style.display = 'none'; } catch (e) {}
   });
 }
 
@@ -75,6 +127,9 @@ const jsPsych = T('initJsPsych')({
   on_trial_start: () => { 
     try { window.scrollTo(0, 0); } catch (e) {} 
     nukeSurveyArtifacts(); 
+  },
+  on_trial_finish: () => {
+    setTimeout(nukeSurveyArtifacts, 50);
   },
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
@@ -99,23 +154,29 @@ const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/heat.mp3',   audio2: 'sounds/hit.mp3',    correct: 'different', contrast: 'vowel_length' },
 ];
 
-// UPDATED to match your available files (see comments)
+// FIXED: Removed bubbling.mp3 (spoken word), removed skip option
 const foley_stimuli = [
   { audio: 'sounds/high_tinkle.mp3',   options: ['small sugar granule', 'large mixing bowl'], correct: 0, mapping_type: 'size_pitch' },
   { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                              correct: 1, mapping_type: 'texture'   },
   { audio: 'sounds/liquid_flow.mp3',   options: ['sugar', 'milk'],                              correct: 1, mapping_type: 'texture'   },
-  // was sharp_crack.mp3 → use egg_crack.mp3 (present)
   { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                       correct: 1, mapping_type: 'action'    },
   { audio: 'sounds/circular_whir.mp3', options: ['mixing', 'pouring'],                          correct: 0, mapping_type: 'action'    },
-  // was sizzle.mp3 → use bubbling.mp3 (present)
-  { audio: 'sounds/bubbling.mp3',      options: ['cold batter', 'cooking on pan'],              correct: 1, mapping_type: 'process'   },
 ];
 
+// FIXED: Added action/verb images
 const picture_naming_stimuli = [
+  // Objects
   { image: 'img/bowl.jpg',    target: 'bowl',    category: 'utensil'    },
   { image: 'img/egg.jpg',     target: 'egg',     category: 'ingredient' },
   { image: 'img/flour.jpg',   target: 'flour',   category: 'ingredient' },
   { image: 'img/spatula.jpg', target: 'spatula', category: 'utensil'    },
+  // Actions/Verbs
+  { image: 'img/mixing.jpg',   target: 'mixing',   category: 'action' },
+  { image: 'img/cracking.jpg', target: 'cracking', category: 'action' },
+  { image: 'img/pouring.jpg',  target: 'pouring',  category: 'action' },
+  { image: 'img/flipping.jpg', target: 'flipping', category: 'action' },
+  { image: 'img/heating.jpg',  target: 'heating',  category: 'action' },
+  { image: 'img/sizzling.jpg', target: 'sizzling', category: 'process' },
 ];
 
 const visual_iconicity_stimuli = [
@@ -135,21 +196,18 @@ function namingPhase() {
   return (p === 'post') ? 'post' : 'pre';
 }
 
-/* ========== MISSING HELPER FUNCTIONS (ADDED) ========== */
-// Save data function
+/* ========== HELPER FUNCTIONS ========== */
 function saveDataToServer(data) {
   try {
     const filename = `pretest_${currentPID()}_${Date.now()}.json`;
     const json = JSON.stringify(data, null, 2);
     
-    // Save to localStorage
     localStorage.setItem('pretest_latest', JSON.stringify({
       filename: filename,
       timestamp: new Date().toISOString(),
       data: data
     }));
     
-    // Trigger download
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -166,27 +224,20 @@ function saveDataToServer(data) {
   }
 }
 
-// Assign condition function
 function assignCondition() {
   const conditions = ['haptic', 'visual', 'control'];
   assignedCondition = conditions[Math.floor(Math.random() * conditions.length)];
-  
-  // Store in localStorage
   localStorage.setItem('assigned_condition', assignedCondition);
-  
   return assignedCondition;
 }
 
-// Calculate accuracy helper
 function calculateAccuracy(data, taskName) {
   const trials = data.filter(d => d.task === taskName);
   if (trials.length === 0) return null;
-  
   const correct = trials.filter(d => d.correct === true).length;
   return correct / trials.length;
 }
 
-// Get summary metrics
 function getSummaryMetrics(data) {
   return {
     phoneme_accuracy: calculateAccuracy(data, 'phoneme_discrimination'),
@@ -199,17 +250,17 @@ function getSummaryMetrics(data) {
   };
 }
 
-/* ========== PRELOAD DEFINITION (ADDED) ========== */
+/* ========== PRELOAD DEFINITION ========== */
 const preload = {
   type: T('jsPsychPreload'),
-  audio: [],  // Will be filled dynamically
-  images: [], // Will be filled dynamically
+  audio: [],
+  images: [],
   show_progress_bar: true,
   message: 'Loading resources...',
   error_message: 'Some resources failed to load. The experiment will continue with available resources.'
 };
 
-/* ========== ROBUST ASSET CHECKS ========== */
+/* ========== ASSET CHECKS ========== */
 async function checkAudioExists(url) {
   return new Promise((resolve) => {
     const a = new Audio();
@@ -267,12 +318,11 @@ async function filterExistingStimuli() {
   return { phoneme, foley, picture, visual };
 }
 
-/* ========== PRELOAD ARRAYS ========== */
 let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
-/* ========== SURVEYS ========== */
+/* ========== SURVEYS (FIXED DROPDOWNS) ========== */
 const participant_info = {
   type: T('jsPsychSurvey'),
   survey_json: {
@@ -283,11 +333,53 @@ const participant_info = {
     pages: [{
       name: 'p1',
       elements: [
-        { type: 'text', name: 'participant_id', title: 'Participant ID', description:'参加者ID', isRequired: true, placeholder: 'Enter ID here' },
-        { type: 'dropdown', name: 'age', title: 'Age', description:'年齢', isRequired: true, choices: ['18-25','26-35','36-45','46-55','56+'] },
-        { type: 'radiogroup', name: 'native_language', title: 'Native Language', description:'母語', isRequired: true, choices: ['Japanese / 日本語','Other / その他'] },
-        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description:'英語学習年数', isRequired: true, choices: ['0-3','4-6','7-10','10+'] },
-        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description:'VR経験', isRequired: true, choices: ['None / なし','1–2 times / 1-2回','Several / 数回','Regular / 定期的'] },
+        { 
+          type: 'text', 
+          name: 'participant_id', 
+          title: 'Participant ID', 
+          description:'参加者ID', 
+          isRequired: true, 
+          placeholder: 'Enter ID here' 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'age', 
+          title: 'Age', 
+          description:'年齢', 
+          isRequired: true, 
+          choices: ['18-25','26-35','36-45','46-55','56+'],
+          colCount: 5,
+          showClearButton: false
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'native_language', 
+          title: 'Native Language', 
+          description:'母語', 
+          isRequired: true, 
+          choices: ['Japanese / 日本語','Other / その他'],
+          showClearButton: false
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'english_years', 
+          title: 'English Learning Years', 
+          description:'英語学習年数', 
+          isRequired: true, 
+          choices: ['0-3','4-6','7-10','10+'],
+          colCount: 4,
+          showClearButton: false
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'vr_experience', 
+          title: 'VR Experience', 
+          description:'VR経験', 
+          isRequired: true, 
+          choices: ['None / なし','1–2 times / 1-2回','Several / 数回','Regular / 定期的'],
+          colCount: 2,
+          showClearButton: false
+        },
       ]
     }],
   },
@@ -319,6 +411,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick when reading in a car?',
           description: '車で読書をしている時に気分が悪くなりますか？',
           isRequired: true,
+          showClearButton: false,
           choices: [
             { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
             { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
@@ -330,6 +423,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick on boats?',
           description: '船に乗っている時に気分が悪くなりますか？',
           isRequired: true,
+          showClearButton: false,
           choices: [
             { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
             { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
@@ -341,6 +435,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel dizzy playing video games?',
           description: 'ゲームをしている時にめまいを感じますか？',
           isRequired: true,
+          showClearButton: false,
           choices: [
             { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
             { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
@@ -352,6 +447,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick in VR (if experienced)?',
           description: '（VR経験がある場合）VR中に気分が悪くなりますか？',
           isRequired: false,
+          showClearButton: false,
           choices: [
             { value: 0, text: 'No experience' },
             { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
@@ -740,7 +836,7 @@ const naming_record = {
   }
 };
 
-/* ========== FOLEY ICONICITY ========== */
+/* ========== FOLEY ICONICITY (FIXED - NO SKIP) ========== */
 const foley_intro = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2>
@@ -761,16 +857,12 @@ const foley_trial = {
       <p>What does this sound represent?</p>
       <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
     </div>`,
-  choices: () => {
-    const opts = jsPsych.timelineVariable('options') || [];
-    return [...opts, 'Skip / スキップ'];
-  },
+  choices: () => jsPsych.timelineVariable('options'),  // REMOVED skip option
   post_trial_gap: 250,
   data: () => ({
     task:'foley_iconicity',
     correct_answer: jsPsych.timelineVariable('correct'),
     mapping_type: jsPsych.timelineVariable('mapping_type'),
-    options_len: (jsPsych.timelineVariable('options')||[]).length,
     audio_file: jsPsych.timelineVariable('audio')
   }),
   on_load: function(){
@@ -824,14 +916,8 @@ const foley_trial = {
     };
   },
   on_finish: function(d){
-    const last = d.options_len; 
-    if (typeof d.response === 'number' && d.response < last) {
-      d.skipped = false;
-      d.correct = (d.response === d.correct_answer);
-    } else {
-      d.skipped = true;
-      d.correct = null;
-    }
+    d.skipped = false;
+    d.correct = (d.response === d.correct_answer);
     try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch (e) {}
     window.__foleyCleanup = null;
   }
@@ -863,7 +949,7 @@ const visual_trial = {
   on_finish: d => { d.correct = (d.response === d.correct_answer); }
 };
 
-/* ========== PROCEDURE ========== */
+/* ========== PROCEDURAL (FIXED - RANDOMIZED WITH ELIMINATION) ========== */
 const procedural_instructions = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: `<h3>Quick Recipe Ordering</h3>
@@ -873,21 +959,95 @@ const procedural_instructions = {
 };
 
 const procedural_test = {
-  type: T('jsPsychSurveyText'),
-  preamble: '<h3>Assign a step number (1–5) to each action.</h3>',
-  questions: () => PROCEDURE_STEPS.map((label, i) => ({
-    prompt: `<b>${label}</b> — Step number (1–5)`,
-    name: `ord_${i}`,
-    required: true,
-    placeholder: '1-5'
-  })),
-  button_label: 'Submit / 送信',
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: function() {
+    const randomizedSteps = jsPsych.randomization.shuffle([...PROCEDURE_STEPS]);
+    
+    let html = `
+      <div style="max-width: 600px; margin: 0 auto; text-align: left;">
+        <h3>Assign a step number (1–5) to each action.</h3>
+        <p>各アクションに番号を割り当ててください (1–5)</p>
+        <div style="margin-top: 20px;">
+    `;
+    
+    randomizedSteps.forEach((step, index) => {
+      html += `
+        <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+          <label style="display: block; margin-bottom: 5px;"><b>${step}</b></label>
+          <select id="step_${index}" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;">
+            <option value="">Select order / 選択...</option>
+            <option value="1">1 (First / 最初)</option>
+            <option value="2">2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5 (Last / 最後)</option>
+          </select>
+        </div>
+      `;
+    });
+    
+    html += `
+        </div>
+        <p id="validation-msg" style="color: red; display: none;">Please assign each number only once / 各番号は1回のみ使用してください</p>
+      </div>
+    `;
+    
+    window._randomizedSteps = randomizedSteps;
+    return html;
+  },
+  choices: ['Submit / 送信'],
+  on_load: function() {
+    const selectors = document.querySelectorAll('.step-selector');
+    const submitBtn = document.querySelector('.jspsych-btn');
+    const validationMsg = document.getElementById('validation-msg');
+    
+    submitBtn.disabled = true;
+    submitBtn.style.opacity = '0.5';
+    
+    const validateSelections = () => {
+      const values = Array.from(selectors).map(s => s.value).filter(v => v !== '');
+      const allFilled = values.length === 5;
+      const allUnique = new Set(values).size === values.length;
+      
+      if (allFilled && allUnique) {
+        submitBtn.disabled = false;
+        submitBtn.style.opacity = '1';
+        validationMsg.style.display = 'none';
+      } else {
+        submitBtn.disabled = true;
+        submitBtn.style.opacity = '0.5';
+        if (allFilled && !allUnique) {
+          validationMsg.style.display = 'block';
+        }
+      }
+    };
+    
+    selectors.forEach((selector) => {
+      selector.addEventListener('change', function() {
+        const selectedValues = Array.from(selectors).map(s => s.value).filter(v => v !== '');
+        
+        selectors.forEach(s => {
+          const currentValue = s.value;
+          Array.from(s.options).forEach(opt => {
+            if (opt.value !== '') {
+              opt.disabled = selectedValues.includes(opt.value) && opt.value !== currentValue;
+            }
+          });
+        });
+        
+        validateSelections();
+      });
+    });
+  },
   data: { task: 'procedural_knowledge' },
   on_finish: (data) => {
-    const respObj = asObject(data.response ?? data.responses);
+    const selectors = document.querySelectorAll('.step-selector');
+    const randomizedSteps = window._randomizedSteps;
+    
     const pos = {};
-    PROCEDURE_STEPS.forEach((label, i) => {
-      const v = parseInt(respObj[`ord_${i}`], 10);
+    randomizedSteps.forEach((label, i) => {
+      const selector = selectors[i];
+      const v = parseInt(selector.value, 10);
       pos[label] = Number.isFinite(v) ? v : null;
     });
 
@@ -905,6 +1065,9 @@ const procedural_test = {
     data.constraints_satisfied = ok;
     data.partial_order_score   = (tot > 0) ? ok / tot : null;
     data.violations            = violations;
+    data.randomized_order      = randomizedSteps;
+    
+    delete window._randomizedSteps;
   }
 };
 
@@ -929,25 +1092,19 @@ const ideophone_test = {
 };
 
 /* ========== FINAL TIMELINE BUILD ========== */
-let preload_block = null;
-let welcome_block = null;
-
 async function initializeExperiment(){
-  // 1. Filter Stimuli
   FILTERED_STIMULI = await filterExistingStimuli();
 
-  // 2. Build Preload Arrays
   PRELOAD_AUDIO = Array.from(new Set([
     ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
     ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
-    // removed modelPronAudio preload to avoid warnings if pron/ files are missing
-    // ...FILTERED_STIMULI.picture.map(s => asset(modelPronAudioFor(s.target)))
   ]));
   PRELOAD_IMAGES = Array.from(new Set([
     ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
     ...FILTERED_STIMULI.visual.map(s => asset(s.shape)),
   ]));
   
+  let preload_block;
   if (have('jsPsychPreload')) {
     preload.audio = PRELOAD_AUDIO;
     preload.images = PRELOAD_IMAGES;
@@ -956,7 +1113,6 @@ async function initializeExperiment(){
     preload_block = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<p>Loading skipped.</p>', choices:'NO_KEYS', trial_duration: 1 };
   }
   
-  // 3. Define the final timeline
   const timeline=[];
   const CLEAR = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'', choices:'NO_KEYS', trial_duration:300 };
 
@@ -971,33 +1127,26 @@ async function initializeExperiment(){
     });
   }
 
-  // --- Surveys ---
   if (have('jsPsychSurvey')) {
     timeline.push(participant_info, motion_sickness_questionnaire);
-  } else {
-    console.error("Survey plugin not loaded. Skipping all SurveyJS tasks.");
   }
   
-  // --- Spans ---
   if (have('jsPsychSurveyText') && have('jsPsychHtmlKeyboardResponse')) {
     timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
     timeline.push(digit_span_backward_instructions, { timeline: generateOptimizedDigitSpanTrials(false) }, CLEAR);
     timeline.push(spatial_span_instructions, { timeline: spatial_span_trials }, CLEAR);
   }
 
-  // --- Phonological Awareness ---
   if (FILTERED_STIMULI.phoneme.length && have('jsPsychHtmlKeyboardResponse')) {
     timeline.push(phoneme_instructions);
     timeline.push({ timeline:[ldt_fixation, phoneme_trial], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order:true });
     timeline.push(CLEAR);
   }
 
-  // --- LDT ---
   if (have('jsPsychHtmlKeyboardResponse')) {
     timeline.push(ldt_instructions, ldt_procedure, CLEAR);
   }
 
-  // --- Foley ---
   if (FILTERED_STIMULI.foley.length && have('jsPsychHtmlButtonResponse')) {
     timeline.push(foley_intro);
     FILTERED_STIMULI.foley.forEach((stimulus, index) => {
@@ -1011,7 +1160,6 @@ async function initializeExperiment(){
     timeline.push(CLEAR);
   }
 
-  // --- Spoken Picture Naming ---
   if (FILTERED_STIMULI.picture.length && mic_plugins_available()) {
     timeline.push(mic_request);
     timeline.push(
@@ -1025,7 +1173,6 @@ async function initializeExperiment(){
       },
       CLEAR
     );
-    // Fallback for mic failure
     timeline.push({
       conditional_function: () => microphoneAvailable !== true,
       timeline: [
@@ -1035,24 +1182,20 @@ async function initializeExperiment(){
     });
   }
 
-  // --- Visual iconicity ---
   if (FILTERED_STIMULI.visual.length && have('jsPsychHtmlButtonResponse')) {
     timeline.push(visual_intro);
     timeline.push({ timeline:[visual_trial], timeline_variables: FILTERED_STIMULI.visual, randomize_order:true });
     timeline.push(CLEAR);
   }
 
-  // --- Procedure ---
   if (have('jsPsychSurveyText')) {
     timeline.push(procedural_instructions, procedural_test, CLEAR);
   }
 
-  // --- Ideophone ---
   if (have('jsPsychSurvey')) {
     timeline.push(ideophone_test, CLEAR);
   }
 
-  // --- End ---
   if (have('jsPsychHtmlButtonResponse')) {
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
@@ -1073,12 +1216,10 @@ async function initializeExperiment(){
   jsPsych.run(timeline);
 }
 
-/* ========== UNLOAD GUARD ========== */
 window.onbeforeunload = function(){
   if(jsPsych.data.get().count()>2) return 'Leave page? Progress will be lost.';
 };
 
-/* ========== BOOTSTRAP ========== */
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeExperiment);
 } else {
