@@ -1,4 +1,9 @@
-// Version 4.8 — Pre-Test Battery (ASCII-safe; removed emojis & smart punctuation)
+// Version 4.9 — Pre-Test Battery
+// Changes:
+// - Hardened asset(): only accepts strings or {href/src/url}; otherwise returns '' and logs once
+// - Preload lists filtered to drop empties
+// - All renderers guard <img src> / audio src usage
+// - ASCII-only UI strings (no emoji)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -21,15 +26,30 @@ const PROC_CONSTRAINTS = [
   ['Pour batter on pan', 'Flip when ready']
 ];
 
-/* ========== ASSET HELPER (do NOT strip leading slash) ========== */
+/* ========== ASSET HELPER (hardened) ========== */
 const ASSET_BUST = Math.floor(Math.random() * 100000);
-const asset = (p) => {
-  if (!p && p !== 0) return '';
-  const s = (typeof p === 'string') ? p : (p?.href || p?.src || String(p));
-  if (typeof s !== 'string') return '';
-  const sep = s.includes('?') ? '&' : '?';
-  return s + sep + 'v=' + ASSET_BUST;
-};
+let __assetWarnedOnce = false;
+
+function asset(p) {
+  if (typeof p === 'string') {
+    const sep = p.includes('?') ? '&' : '?';
+    return p + sep + 'v=' + ASSET_BUST;
+  }
+  if (p && typeof p === 'object') {
+    const s = p.href || p.src || p.url || null;
+    if (typeof s === 'string' && s.length) {
+      const sep = s.includes('?') ? '&' : '?';
+      return s + sep + 'v=' + ASSET_BUST;
+    }
+    if (!__assetWarnedOnce) {
+      __assetWarnedOnce = true;
+      console.warn('asset(): non-string arg without href/src/url — ignoring', p);
+      try { console.trace(); } catch(e) {}
+    }
+    return '';
+  }
+  return '';
+}
 
 /* ========== PLUGIN/GLOBAL ACCESS HELPERS ========== */
 const have = (name) => typeof window[name] !== 'undefined';
@@ -178,6 +198,7 @@ const preload = {
 /* ========== ASSET CHECKS ========== */
 async function checkAudioExists(url) {
   return new Promise((resolve) => {
+    if (!url) return resolve(false);
     const a = new Audio();
     let done = false;
     const finish = ok => { if (!done) { done = true; resolve(ok); } };
@@ -190,6 +211,7 @@ async function checkAudioExists(url) {
 
 async function checkImageExists(url) {
   return new Promise((resolve) => {
+    if (!url) return resolve(false);
     const img = new Image();
     let done = false;
     const finish = ok => { if (!done) { done = true; resolve(ok); } };
@@ -392,52 +414,63 @@ const phoneme_trial = {
     '</div>',
   data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
-    const srcA = asset(jsPsych.timelineVariable('audio1'));
-    const srcB = asset(jsPsych.timelineVariable('audio2'));
-    const a1=new Audio(srcA);
-    const a2=new Audio(srcB);
+    const aPath = jsPsych.timelineVariable('audio1');
+    const bPath = jsPsych.timelineVariable('audio2');
+    const srcA = asset(aPath);
+    const srcB = asset(bPath);
 
     const dbg = document.getElementById('dbg');
-    if (dbg) dbg.textContent = 'A: ' + srcA + ' | B: ' + srcB;
+    if (dbg) dbg.textContent = 'A: ' + (srcA||'(none)') + ' | B: ' + (srcB||'(none)');
 
-    a1.addEventListener('canplaythrough', ()=>{});
-    a2.addEventListener('canplaythrough', ()=>{});
+    const A=document.getElementById('playA');
+    const B=document.getElementById('playB');
+    const S=document.getElementById('btnSame');
+    const D=document.getElementById('btnDiff');
+    const status=document.getElementById('status');
 
-    a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='Audio A unavailable'; b.disabled=true; }});
-    a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='Audio B unavailable'; b.disabled=true; }});
+    let aPlayable=false, bPlayable=false, start=null;
+    let a1=null, a2=null;
 
-    const status=document.getElementById('status'),
-          A=document.getElementById('playA'),
-          B=document.getElementById('playB'),
-          S=document.getElementById('btnSame'),
-          D=document.getElementById('btnDiff');
+    if (srcA) {
+      a1 = new Audio(srcA);
+      a1.addEventListener('canplaythrough', ()=>{ aPlayable=true; });
+      a1.addEventListener('error', ()=>{ if (A){ A.textContent='Audio A unavailable'; A.disabled=true; } });
+    } else { if (A){ A.textContent='Audio A unavailable'; A.disabled=true; } }
 
-    let a=false,b=false,start=null;
+    if (srcB) {
+      a2 = new Audio(srcB);
+      a2.addEventListener('canplaythrough', ()=>{ bPlayable=true; });
+      a2.addEventListener('error', ()=>{ if (B){ B.textContent='Audio B unavailable'; B.disabled=true; } });
+    } else { if (B){ B.textContent='Audio B unavailable'; B.disabled=true; } }
 
-    const enable=()=>{
-      if((a||A.disabled)&&(b||B.disabled)){
+    const maybeEnable=()=>{
+      const aDone = aPlayable || (A && A.disabled);
+      const bDone = bPlayable || (B && B.disabled);
+      if (aDone && bDone) {
         [S,D].forEach(x=>{x.disabled=false;x.style.opacity='1';});
         status.textContent='Choose Same or Different.';
         start=performance.now();
       }
     };
 
-    A.addEventListener('click',()=>{
-      if(a||A.disabled) return;
-      a=true; A.disabled=true; A.style.opacity='.5';
-      try{ a1.currentTime=0; a1.play(); }catch (e) {}
-      status.textContent='Played A'; enable();
+    if (A) A.addEventListener('click',()=>{
+      if (!a1 || !aPlayable || A.disabled) return;
+      try { a1.currentTime=0; a1.play(); } catch(e){}
+      status.textContent='Played A';
+      A.disabled=true; A.style.opacity='.5';
+      maybeEnable();
     });
 
-    B.addEventListener('click',()=>{
-      if(b||B.disabled) return;
-      b=true; B.disabled=true; B.style.opacity='.5';
-      try{ a2.currentTime=0; a2.play(); }catch (e) {}
-      status.textContent='Played B'; enable();
+    if (B) B.addEventListener('click',()=>{
+      if (!a2 || !bPlayable || B.disabled) return;
+      try { a2.currentTime=0; a2.play(); } catch(e){}
+      status.textContent='Played B';
+      B.disabled=true; B.style.opacity='.5';
+      maybeEnable();
     });
 
-    S.addEventListener('click',()=>jsPsych.finishTrial({response_label:'same', rt:start?Math.round(performance.now()-start):null}));
-    D.addEventListener('click',()=>jsPsych.finishTrial({response_label:'different', rt:start?Math.round(performance.now()-start):null}));
+    if (!A || A.disabled) maybeEnable();
+    if (!B || B.disabled) maybeEnable();
   },
   on_finish:d=>{ 
     const r=d.response_label||null;
@@ -495,7 +528,10 @@ const naming_prepare = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: () => {
     const img   = jsPsych.timelineVariable('image');
-    const imgHTML = img ? '<img src="' + asset(img) + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>';
+    const imgURL = asset(img);
+    const imgHTML = (imgURL && imgURL.length)
+      ? '<img src="' + imgURL + '" style="width:350px;border-radius:8px;" />'
+      : '<p style="color:#c00">Missing image.</p>';
     return '<div style="text-align:center;">' + imgHTML +
            '<div style="margin-top:12px;"><button id="play-model" class="jspsych-btn" style="margin-right:8px;">Play model</button>' +
            '<span id="model-status" style="font-size:13px;color:#666">Optional</span></div>' +
@@ -523,8 +559,9 @@ const naming_record = {
   type: T('jsPsychHtmlAudioResponse'),
   stimulus: () => {
     const img = jsPsych.timelineVariable('image');
+    const imgURL = asset(img);
     return '<div style="text-align:center;">' +
-      (img ? '<img src="' + asset(img) + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>') +
+      (imgURL ? '<img src="' + imgURL + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>') +
       '<p style="margin-top:16px; color:#d32f2f; font-weight:bold;">Recording... speak now!</p></div>';
   },
   recording_duration: 4000,
@@ -570,18 +607,25 @@ const foley_trial = {
     const url = asset(jsPsych.timelineVariable('audio'));
     const btn = document.getElementById('foley-play');
     const status = document.getElementById('foley-status');
-    let audio = new Audio(); audio.preload = 'auto'; audio.src = url;
+    let audio = null;
     let audioLoaded = false;
-    const onCanPlay = () => { audioLoaded = true; if (status) status.textContent = 'Audio ready - click to play'; if (btn) btn.disabled = false; };
-    const onError = () => { if (btn) { btn.textContent = 'Audio unavailable'; btn.disabled = true; } if (status) status.textContent = 'Audio failed to load - you can still answer'; };
-    const playHandler = () => { if (!audioLoaded) return; try { audio.currentTime = 0; audio.play(); if (status) status.textContent = 'Playing audio...'; } catch (e) {} };
-    audio.addEventListener('canplaythrough', onCanPlay);
-    audio.addEventListener('error', onError);
+
+    if (url) {
+      audio = new Audio(); audio.preload = 'auto'; audio.src = url;
+      audio.addEventListener('canplaythrough', ()=>{ audioLoaded = true; if (status) status.textContent = 'Audio ready - click to play'; if (btn) btn.disabled = false; });
+      audio.addEventListener('error', ()=>{ if (btn) { btn.textContent = 'Audio unavailable'; btn.disabled = true; } if (status) status.textContent = 'Audio failed to load - you can still answer'; });
+    } else {
+      if (btn) { btn.textContent = 'Audio unavailable'; btn.disabled = true; }
+      if (status) status.textContent = 'Audio path missing - you can still answer';
+    }
+
+    const playHandler = () => { if (!audioLoaded || !audio) return; try { audio.currentTime = 0; audio.play(); if (status) status.textContent = 'Playing audio...'; } catch (e) {} };
     if (btn) btn.addEventListener('click', playHandler);
+
     window.__foleyCleanup = () => {
       try {
         if (btn) btn.removeEventListener('click', playHandler);
-        if (audio) { audio.pause(); audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); audio.src = ''; audio.load(); }
+        if (audio) { audio.pause(); audio.src = ''; audio.load(); }
       } catch (e) {}
       audio = null;
     };
@@ -598,7 +642,11 @@ const visual_intro = {
 
 const visual_trial = {
   type: T('jsPsychHtmlButtonResponse'),
-  stimulus: () => '<div style="text-align:center;"><img src="' + asset(jsPsych.timelineVariable('shape')) + '" style="width:200px;height:200px;" /><p style="margin-top:20px;">Which word matches this shape?</p></div>',
+  stimulus: () => {
+    const shapeURL = asset(jsPsych.timelineVariable('shape'));
+    const img = shapeURL ? '<img src="' + shapeURL + '" style="width:200px;height:200px;" />' : '<p style="color:#c00">Missing shape.</p>';
+    return '<div style="text-align:center;">' + img + '<p style="margin-top:20px;">Which word matches this shape?</p></div>';
+  },
   choices: () => jsPsych.timelineVariable('words') || [],
   post_trial_gap: 250,
   data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
@@ -699,11 +747,12 @@ async function initializeExperiment(){
   PRELOAD_AUDIO = Array.from(new Set([
     ...FILTERED_STIMULI.phoneme.flatMap(s => [asset(s.audio1), asset(s.audio2)]),
     ...FILTERED_STIMULI.foley.map(s => asset(s.audio)),
-  ]));
+  ])).filter(u => typeof u === 'string' && u.length);
+
   PRELOAD_IMAGES = Array.from(new Set([
     ...FILTERED_STIMULI.picture.map(s => asset(s.image)),
     ...FILTERED_STIMULI.visual.map(s => asset(s.shape)),
-  ]));
+  ])).filter(u => typeof u === 'string' && u.length);
   
   let preload_block;
   if (have('jsPsychPreload')) {
