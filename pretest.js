@@ -1,4 +1,4 @@
-// Version 4.5 (Fixed “first page won’t continue”) — Pre-Test Battery
+// Version 4.5 (Final Complete) — Pre-Test Battery
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -36,7 +36,7 @@ const mic_plugins_available = () => {
   return have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 };
 
-/* ========== GLOBAL CSS (FIXED) ========== */
+/* ========== GLOBAL CSS ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
   .sv-root, .sv_main, .sv-container { position: static !important; }
@@ -46,74 +46,94 @@ document.head.appendChild(baseStyle);
 
 const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
+  /* Hide survey headers */
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
-
-  /* DO NOT hide the action bar anymore — it contains the Continue/Complete buttons */
-  /* .sd-action-bar { display: none !important; } */
-
-  /* Keep only the error 'clear' icon hidden if you want */
-  .sd-question__erbox-clear { display: none !important; }
-
-  /* Make sure the complete/continue buttons are visible */
-  .sd-btn--action.sd-navigation__complete-btn,
-  .sd-btn--action.sd-navigation__next-btn {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    background: #4CAF50 !important;
-    color: white !important;
-    padding: 10px 24px !important;
-    border: none !important;
-    border-radius: 4px !important;
+  
+  /* Center and constrain the survey */
+  .sd-root-modern, .sd-body, .sv_main {
+    max-width: 800px !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
+  }
+  
+  /* Question container - clean spacing */
+  .sd-question {
+    margin-bottom: 35px !important;
+    padding: 25px !important;
+    background: #ffffff !important;
+    border: 1px solid #e0e0e0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
+  }
+  
+  /* Question title */
+  .sd-question__title {
+    font-weight: 600 !important;
     font-size: 16px !important;
-    cursor: pointer !important;
-    margin-top: 20px !important;
+    margin-bottom: 8px !important;
+    color: #1a1a1a !important;
   }
-
-  .sd-btn--action.sd-navigation__complete-btn:hover,
-  .sd-btn--action.sd-navigation__next-btn:hover {
-    background: #45a049 !important;
+  
+  /* Description text */
+  .sd-question__description {
+    color: #666 !important;
+    font-size: 14px !important;
+    margin-bottom: 15px !important;
+    font-style: italic !important;
   }
-
-  .sd-radiogroup, .sd-item, .sd-radio__item {
-    display: block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    position: relative !important;
-  }
-
+  
+  /* Radio group container - horizontal layout */
   .sd-radiogroup {
-    margin: 10px 0 20px 0 !important;
     display: flex !important;
     flex-wrap: wrap !important;
     gap: 10px !important;
-    align-items: center !important;
+    margin: 15px 0 !important;
+    justify-content: flex-start !important;
   }
-
+  
+  /* Individual radio item - pill style */
   .sd-item {
     display: inline-flex !important;
     align-items: center !important;
-    margin: 0 !important;
-    padding: 8px 12px !important;
+    padding: 10px 18px !important;
     background: #f5f5f5 !important;
-    border: 2px solid transparent !important;
-    border-radius: 6px !important;
+    border: 2px solid #e0e0e0 !important;
+    border-radius: 25px !important;
     cursor: pointer !important;
-    transition: all 0.2s !important;
+    transition: all 0.2s ease !important;
+    margin: 0 !important;
   }
-
-  .sd-item:hover { background: #e8f5e9 !important; border-color: #4CAF50 !important; }
-  .sd-item--checked { background: #4CAF50 !important; border-color: #4CAF50 !important; }
-  .sd-item--checked .sd-item__control-label { color: white !important; font-weight: bold !important; }
-
+  
+  /* Hover state */
+  .sd-item:hover {
+    background: #e8f5e9 !important;
+    border-color: #81c784 !important;
+    transform: translateY(-1px) !important;
+  }
+  
+  /* Selected state */
+  .sd-item--checked {
+    background: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
+  }
+  
+  .sd-item--checked .sd-item__control-label {
+    color: white !important;
+    font-weight: 600 !important;
+  }
+  
+  /* Radio input - keep visible but styled */
   input[type="radio"].sd-visuallyhidden {
     position: relative !important;
     opacity: 1 !important;
-    width: auto !important;
-    height: auto !important;
-    margin-right: 6px !important;
+    width: 16px !important;
+    height: 16px !important;
+    margin-right: 8px !important;
+    accent-color: #4CAF50 !important;
   }
-
+  
+  /* Label text */
   .sd-item__control-label {
     display: inline !important;
     cursor: pointer !important;
@@ -121,49 +141,75 @@ surveyHeaderStyle.textContent = `
     margin: 0 !important;
     background: transparent !important;
     border: none !important;
+    font-size: 14px !important;
   }
-
+  
+  /* Text inputs */
   .sd-input, input[type="text"] {
     display: block !important;
     width: 100% !important;
     max-width: 500px !important;
-    padding: 10px !important;
+    padding: 12px !important;
     font-size: 16px !important;
-    border: 1px solid #ccc !important;
-    border-radius: 4px !important;
-    margin-top: 8px !important;
+    border: 2px solid #e0e0e0 !important;
+    border-radius: 6px !important;
+    margin-top: 10px !important;
+    transition: border-color 0.2s !important;
   }
-
-  .sd-question { margin-bottom: 30px !important; padding: 20px 0 !important; border-bottom: 1px solid #eee !important; }
-  .sd-question__title { font-weight: bold !important; font-size: 16px !important; margin-bottom: 8px !important; color: #333 !important; }
-  .sd-question__description { color: #666 !important; font-size: 14px !important; margin-bottom: 12px !important; }
-  .sd-footer { margin-top: 30px !important; padding-top: 20px !important; text-align: center !important; }
+  
+  .sd-input:focus, input[type="text"]:focus {
+    outline: none !important;
+    border-color: #4CAF50 !important;
+    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1) !important;
+  }
+  
+  /* Complete button */
+  .sd-btn--action.sd-navigation__complete-btn {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #4CAF50 !important;
+    color: white !important;
+    padding: 14px 32px !important;
+    border: none !important;
+    border-radius: 6px !important;
+    font-size: 16px !important;
+    font-weight: 600 !important;
+    cursor: pointer !important;
+    margin-top: 30px !important;
+    transition: all 0.2s !important;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+  }
+  
+  .sd-btn--action.sd-navigation__complete-btn:hover {
+    background: #45a049 !important;
+    transform: translateY(-1px) !important;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
+  }
+  
+  /* Footer centering */
+  .sd-footer {
+    margin-top: 40px !important;
+    padding-top: 20px !important;
+    text-align: center !important;
+    border-top: 2px solid #e0e0e0 !important;
+  }
+  
+  /* Page container */
+  .sd-page {
+    padding: 0 !important;
+  }
 `;
 document.head.appendChild(surveyHeaderStyle);
-
-/* Safety: unhide action bar/buttons if some other CSS wins specificity */
-function ensureSurveyButtonsVisible() {
-  try {
-    document.querySelectorAll('.sd-action-bar').forEach(el => {
-      el.style.display = 'block';
-      el.style.visibility = 'visible';
-      el.style.opacity = '1';
-    });
-    document.querySelectorAll('.sd-navigation__complete-btn, .sd-navigation__next-btn').forEach(btn => {
-      btn.style.display = 'inline-block';
-      btn.style.visibility = 'visible';
-      btn.style.opacity = '1';
-    });
-  } catch(e) {}
-}
 
 /* Enhanced cleanup */
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
   });
-  // Do NOT hide/remove .sd-action-bar anymore
-  ensureSurveyButtonsVisible();
+  document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
+    try { el.style.display = 'none'; } catch (e) {}
+  });
 }
 
 /* ========== INIT jsPsych ========== */
@@ -447,9 +493,8 @@ const participant_info = {
   on_load: function() {
     console.log('Participant info survey loaded');
     setTimeout(() => {
-      ensureSurveyButtonsVisible();   // <— keep the button visible
       nukeSurveyArtifacts();
-
+      
       // Debug: Check what's actually in the DOM
       const radioGroups = document.querySelectorAll('.sd-radiogroup');
       console.log(`Found ${radioGroups.length} radio groups`);
@@ -495,7 +540,6 @@ const motion_sickness_questionnaire = {
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
     showCompletedPage: false,
-    completeText: 'Continue / 続行',
     pages: [{
       name: 'mssq',
       elements: [
@@ -570,7 +614,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
         const r = String(rraw ?? '').replace(/\s/g,'');
         d.entered_response=r;
         d.correct = r===d.correct_answer;
-        if (!d.correct && ++failCount>=2) jsPsych.endCurrentTimeline();
+        if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline(); // FIXED: was endCurrentTimeline
       }
     });
   }
@@ -650,7 +694,7 @@ function generateOptimizedSpatialSpanTrials(){
           jsPsych.pluginAPI.clearAllTimeouts();
           const rt=start?Math.round(performance.now()-start):null;
           const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]);
-          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.endCurrentTimeline();
+          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.abortCurrentTimeline(); // FIXED: was endCurrentTimeline
           jsPsych.finishTrial({response:resp, click_sequence:resp.join(','), rt, correct:ok});
         };
 
@@ -1156,7 +1200,6 @@ const ideophone_test = {
     showQuestionNumbers:'off',
     focusFirstQuestionAutomatic:false,
     showCompletedPage:false,
-    completeText:'Continue / 続行',
     pages:[{
       name:'ideo',
       elements:[
@@ -1292,9 +1335,7 @@ async function initializeExperiment(){
       choices:['Finish / 完了'],
       stimulus:function(){
         if(!assignedCondition) assignCondition();
-        const latestRaw = localStorage.getItem('pretest_latest');
-        let saved = {};
-        try { saved = latestRaw ? JSON.parse(latestRaw) : {}; } catch {}
+        const saved = asObject(localStorage.getItem('pretest_latest') ? JSON.parse(localStorage.getItem('pretest_latest')) : {});
         return `<div style="text-align:center;padding:40px;">
           <h2>✅ Complete! / 完了！</h2>
           <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
