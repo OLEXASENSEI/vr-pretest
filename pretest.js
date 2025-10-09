@@ -48,74 +48,81 @@ const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
   
-  /* Hide SurveyJS ugly controls */
-  .sd-action-bar, .sd-question__erbox-clear, .sv-action-bar, 
-  .sd-btn--action.sd-navigation__complete-btn,
-  button[title="Clear"], button[aria-label="Clear"],
-  .sd-item__control-label::after { display: none !important; }
+  /* Hide only specific SurveyJS controls, not all */
+  .sd-action-bar, .sd-question__erbox-clear { display: none !important; }
   
-  /* Force radio buttons to show */
-  .sd-item, .sd-radio, .sd-radio__item {
+  /* Make sure radio groups and items are visible */
+  .sd-radiogroup, .sd-item, .sd-radio__item {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
+    position: relative !important;
   }
   
-  .sd-selectbase { display: none !important; }
-  
-  /* Radio button container */
+  /* Radio group container */
   .sd-radiogroup {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
+    margin: 10px 0 !important;
   }
   
-  /* Individual radio items */
+  /* Individual radio button items - make them inline */
   .sd-item {
-    display: inline-flex !important;
-    align-items: center !important;
-    margin: 4px !important;
-  }
-  
-  /* Hide the actual radio input */
-  .sd-item__control {
-    position: absolute !important;
-    opacity: 0 !important;
-  }
-  
-  /* Style the label as a button */
-  .sd-item__control-label {
     display: inline-block !important;
-    padding: 8px 16px !important;
-    background: #f0f0f0 !important;
-    border: 2px solid #ddd !important;
-    border-radius: 6px !important;
+    margin: 6px 8px !important;
+    vertical-align: middle !important;
+  }
+  
+  /* The actual radio input circle */
+  input[type="radio"].sd-visuallyhidden {
+    position: relative !important;
+    opacity: 1 !important;
+    width: auto !important;
+    height: auto !important;
+    margin-right: 6px !important;
+  }
+  
+  /* Label text next to radio */
+  .sd-item__control-label {
+    display: inline !important;
     cursor: pointer !important;
-    transition: all 0.2s !important;
-    font-size: 14px !important;
+    padding: 4px 8px !important;
+    background: transparent !important;
+    border: none !important;
+  }
+  
+  /* Hover effect */
+  .sd-item:hover {
+    background: #f5f5f5 !important;
+    border-radius: 4px !important;
   }
   
   /* Selected state */
-  .sd-radio__item--checked .sd-item__control-label,
-  .sd-item--checked .sd-item__control-label {
-    background: #4CAF50 !important;
-    color: white !important;
-    border-color: #4CAF50 !important;
-  }
-  
-  /* Hover state */
-  .sd-item__control-label:hover {
-    border-color: #4CAF50 !important;
-    background: #f8f8f8 !important;
+  .sd-item--checked {
+    background: #e8f5e9 !important;
+    border-radius: 4px !important;
   }
   
   /* Make sure text inputs show */
-  .sd-input {
+  .sd-input, input[type="text"] {
     display: block !important;
     width: 100% !important;
     max-width: 400px !important;
     padding: 8px !important;
     font-size: 16px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+  }
+  
+  /* Question titles */
+  .sd-question__title {
+    font-weight: bold !important;
+    margin-bottom: 8px !important;
+  }
+  
+  /* Descriptions */
+  .sd-question__description {
+    color: #666 !important;
+    font-size: 14px !important;
+    margin-bottom: 10px !important;
   }
 `;
 document.head.appendChild(surveyHeaderStyle);
