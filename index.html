@@ -1,29 +1,36 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <title>VR Cooking Pre-Test</title>
-  
-  <!-- jsPsych Core -->
-  <script src="https://unpkg.com/jspsych@8.0.2"></script>
-  <link href="https://unpkg.com/jspsych@8.0.2/css/jspsych.css" rel="stylesheet" />
-  
-  <!-- SurveyJS (REQUIRED for forms) -->
-  <script src="https://unpkg.com/survey-core@1.9.131/survey.core.min.js"></script>
-  <link href="https://unpkg.com/survey-core@1.9.131/defaultV2.min.css" rel="stylesheet" />
-  
-  <!-- jsPsych Survey Plugin -->
-  <script src="https://unpkg.com/@jspsych/plugin-survey@2.0.0"></script>
-  
-  <!-- Other jsPsych plugins -->
-  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey-text@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-preload@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@2.0.0"></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@2.0.0"></script>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VR Cooking Pre-Test Battery</title>
+
+  <!-- jsPsych core + plugins -->
+  <script src="https://unpkg.com/jspsych@7.3.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-preload@1.1.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey@1.0.0"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.2"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.2"></script>
+
+  <!-- SurveyJS runtime required by plugin-survey -->
+  <script src="https://unpkg.com/survey-core@1.9.132/survey.core.min.js"></script>
+
+  <!-- Styles -->
+  <link href="https://unpkg.com/jspsych@7.3.3/css/jspsych.css" rel="stylesheet" />
+  <link href="https://unpkg.com/survey-core@1.9.132/defaultV2.min.css" rel="stylesheet" />
+
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; }
+    #jspsych-target { max-width: 900px; margin: 0 auto; padding: 20px; }
+  </style>
 </head>
 <body>
   <div id="jspsych-target"></div>
+
+  <!-- Main experiment logic -->
   <script src="pretest.js"></script>
 </body>
 </html>
