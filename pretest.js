@@ -1,4 +1,4 @@
-// Version 4.7 — Pre-Test Battery (audio fix: asset() no path strip + centering)
+// Version 4.8 — Pre-Test Battery (ASCII-safe; removed emojis & smart punctuation)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -28,7 +28,7 @@ const asset = (p) => {
   const s = (typeof p === 'string') ? p : (p?.href || p?.src || String(p));
   if (typeof s !== 'string') return '';
   const sep = s.includes('?') ? '&' : '?';
-  return `${s}${sep}v=${ASSET_BUST}`;
+  return s + sep + 'v=' + ASSET_BUST;
 };
 
 /* ========== PLUGIN/GLOBAL ACCESS HELPERS ========== */
@@ -86,7 +86,7 @@ const jsPsych = T('initJsPsych')({
   display_element: "jspsych-target",
   use_webaudio: false,
   show_progress_bar: true,
-  message_progress_bar: "進捗 Progress",
+  message_progress_bar: "Progress",
   default_iti: 350,
   on_trial_start: () => { try { window.scrollTo(0, 0); } catch (e) {} nukeSurveyArtifacts(); },
   on_trial_finish: () => setTimeout(nukeSurveyArtifacts, 50),
@@ -120,16 +120,16 @@ const foley_stimuli = [
 ];
 
 const picture_naming_stimuli = [
-  { image: 'img/bowl.jpg',    target: 'bowl',    category: 'utensil'    },
-  { image: 'img/egg.jpg',     target: 'egg',     category: 'ingredient' },
-  { image: 'img/flour.jpg',   target: 'flour',   category: 'ingredient' },
-  { image: 'img/spatula.jpg', target: 'spatula', category: 'utensil'    },
-  { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action' },
-  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action' },
-  { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action' },
-  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action' },
-  { image: 'img/heating.jpeg',  target: 'heating',  category: 'action' },
-  { image: 'img/sizzling.jpeg', target: 'sizzling', category: 'process' },
+  { image: 'img/bowl.jpg',     target: 'bowl',     category: 'utensil'    },
+  { image: 'img/egg.jpg',      target: 'egg',      category: 'ingredient' },
+  { image: 'img/flour.jpg',    target: 'flour',    category: 'ingredient' },
+  { image: 'img/spatula.jpg',  target: 'spatula',  category: 'utensil'    },
+  { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action'    },
+  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action'    },
+  { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action'    },
+  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action'    },
+  { image: 'img/heating.jpeg',  target: 'heating',  category: 'action'    },
+  { image: 'img/sizzling.jpeg', target: 'sizzling', category: 'process'   },
 ];
 
 const visual_iconicity_stimuli = [
@@ -139,14 +139,17 @@ const visual_iconicity_stimuli = [
 ];
 
 /* ========== PHASE HELPERS ========== */
-let currentPID_value = 'unknown'; 
+let currentPID_value = 'unknown';
 function currentPID() { return currentPID_value; }
-function namingPhase() { const p = new URLSearchParams(location.search).get('phase'); return (p === 'post') ? 'post' : 'pre'; }
+function namingPhase() {
+  const p = new URLSearchParams(location.search).get('phase');
+  return (p === 'post') ? 'post' : 'pre';
+}
 
 /* ========== SAVE ========== */
 function saveDataToServer(data) {
   try {
-    const filename = `pretest_${currentPID()}_${Date.now()}.json`;
+    const filename = 'pretest_' + currentPID() + '_' + Date.now() + '.json';
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a'); a.href = url; a.download = filename;
@@ -163,7 +166,14 @@ function assignCondition() {
 }
 
 /* ========== PRELOAD ========== */
-const preload = { type: T('jsPsychPreload'), audio: [], images: [], show_progress_bar: true, message: 'Loading resources...', error_message: 'Some resources failed to load.' };
+const preload = {
+  type: T('jsPsychPreload'),
+  audio: [],
+  images: [],
+  show_progress_bar: true,
+  message: 'Loading resources...',
+  error_message: 'Some resources failed to load.'
+};
 
 /* ========== ASSET CHECKS ========== */
 async function checkAudioExists(url) {
@@ -191,7 +201,7 @@ async function checkImageExists(url) {
 }
 
 async function filterExistingStimuli() {
-  console.log("Validating assets (with cache-buster)…");
+  console.log("Validating assets (with cache-buster)...");
   const phoneme = [];
   for (const s of phoneme_discrimination_stimuli) {
     const ok1 = await checkAudioExists(asset(s.audio1));
@@ -213,7 +223,7 @@ async function filterExistingStimuli() {
     const ok = await checkImageExists(asset(s.shape));
     if (ok) visual.push(s); else console.warn("Skipping visual:", s.shape);
   }
-  console.log(`Final counts — Phoneme:${phoneme.length} Foley:${foley.length} Picture:${picture.length} Visual:${visual.length}`);
+  console.log("Final counts — Phoneme:" + phoneme.length + " Foley:" + foley.length + " Picture:" + picture.length + " Visual:" + visual.length);
   return { phoneme, foley, picture, visual };
 }
 
@@ -237,7 +247,7 @@ const participant_info = have('jsPsychSurvey') ? {
         { type: 'radiogroup', name: 'age', title: 'Age', description: '年齢', isRequired: true, choices: ['18-25', '26-35', '36-45', '46-55', '56+'] },
         { type: 'radiogroup', name: 'native_language', title: 'Native Language', description: '母語', isRequired: true, choices: ['Japanese / 日本語', 'Other / その他'] },
         { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description: '英語学習年数', isRequired: true, choices: ['0-3', '4-6', '7-10', '10+'] },
-        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description: 'VR経験', isRequired: true, choices: ['None / なし', '1–2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] }
+        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description: 'VR経験', isRequired: true, choices: ['None / なし', '1-2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] }
       ]
     }]
   },
@@ -267,26 +277,49 @@ const motion_sickness_questionnaire = have('jsPsychSurvey') ? {
 } : null;
 
 /* ========== DIGIT & SPATIAL SPAN ========== */
-const digit_span_forward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>`, choices: ['Begin / 開始'] };
+const digit_span_forward_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>',
+  choices: ['Begin / 開始']
+};
 
 function generateOptimizedDigitSpanTrials(forward = true) {
   const trials = []; let failCount = 0;
   for (let length = 3; length <= 8; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random()*10));
-    trials.push({ type: T('jsPsychHtmlKeyboardResponse'), stimulus: `<div style="font-size:48px;padding:20px 24px;">${digits.join(' ')}</div>`, choices: 'NO_KEYS', trial_duration: 800*length, data: { task:'digit_span_presentation', digits:digits.join(''), length, direction:forward?'forward':'backward' } });
+    trials.push({
+      type: T('jsPsychHtmlKeyboardResponse'),
+      stimulus: '<div style="font-size:48px;padding:20px 24px;">' + digits.join(' ') + '</div>',
+      choices: 'NO_KEYS',
+      trial_duration: 800*length,
+      data: { task:'digit_span_presentation', digits:digits.join(''), length, direction:forward?'forward':'backward' }
+    });
     trials.push({
       type: T('jsPsychSurveyText'),
       questions:[{ prompt: forward?'Enter SAME order / 同じ順番':'Enter REVERSE order / 逆順', name:'response', required:true }],
       post_trial_gap: 250,
       data:{ task:'digit_span_response', correct_answer: forward?digits.join(''):digits.slice().reverse().join(''), length, direction:forward?'forward':'backward' },
-      on_finish: d => { const r = String(d.response?.response ?? d.response ?? '').replace(/\s/g,''); d.entered_response=r; d.correct = r===d.correct_answer; if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline(); }
+      on_finish: d => {
+        const r = String(d.response?.response ?? d.response ?? '').replace(/\s/g,'');
+        d.entered_response=r; d.correct = r===d.correct_answer;
+        if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline();
+      }
     });
   }
   return trials;
 }
 
-const digit_span_backward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. 例: 1 2 3 → 3 2 1</p>`, choices: ['Begin / 開始'] };
-const spatial_span_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Spatial Memory Test / 空間記憶テスト</h2><p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>`, choices: ['Begin / 開始'] };
+const digit_span_backward_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. Example: 1 2 3 -> 3 2 1</p>',
+  choices: ['Begin / 開始']
+};
+
+const spatial_span_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Spatial Memory Test / 空間記憶テスト</h2><p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>',
+  choices: ['Begin / 開始']
+};
 
 function generateOptimizedSpatialSpanTrials(){
   const trials=[]; window.spatialSpanFailCount=0; const totalSquares=9;
@@ -295,19 +328,20 @@ function generateOptimizedSpatialSpanTrials(){
       type: T('jsPsychHtmlKeyboardResponse'),
       choices:'NO_KEYS',
       stimulus:()=>{ 
-        let h=`<style>
-          .spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}
-          .spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}
-          .spatial-square.active{background:#ffd966;}
-          .spatial-square.selected{background:#8ecae6;}
-          .spatial-square.clickable{cursor:pointer;}
-        </style><div class="spatial-grid">`;
-        for(let i=0;i<9;i++) h+=`<div class="spatial-square" data-index="${i}"></div>`;
-        return h+`</div><p id="spatial-instruction">Watch the sequence. / 覚えてください。</p>`;
+        let h='<style>\n' +
+          '.spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}\n' +
+          '.spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}\n' +
+          '.spatial-square.active{background:#ffd966;}\n' +
+          '.spatial-square.selected{background:#8ecae6;}\n' +
+          '.spatial-square.clickable{cursor:pointer;}\n' +
+        '</style><div class="spatial-grid">';
+        for(let i=0;i<9;i++) h+='<div class="spatial-square" data-index="'+i+'"></div>';
+        return h + '</div><p id="spatial-instruction">Watch the sequence. / 覚えてください。</p>';
       },
       data:{ task:'spatial_span', correct_answer: seq.join(','), length: len },
       on_load: function(){
-        const squares=[...document.querySelectorAll('.spatial-square')]; const ins=document.getElementById('spatial-instruction'); const hi=500, gap=220; const resp=[]; let enabled=false, start=null;
+        const squares=[...document.querySelectorAll('.spatial-square')];
+        const ins=document.getElementById('spatial-instruction'); const hi=500, gap=220; const resp=[]; let enabled=false, start=null;
         squares.forEach(s=>s.classList.remove('clickable'));
         const show=(i)=>{
           if(i>=seq.length){
@@ -335,23 +369,27 @@ function generateOptimizedSpatialSpanTrials(){
 const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? generateOptimizedSpatialSpanTrials() : [];
 
 /* ========== PHONOLOGICAL AWARENESS ========== */
-const phoneme_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus:()=>`<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ${FILTERED_STIMULI.phoneme?.length||0}</p>`, choices:['Begin / 開始'] };
+const phoneme_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: ()=>'<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ' + (FILTERED_STIMULI.phoneme?.length||0) + '</p>',
+  choices:['Begin / 開始']
+};
 
 const phoneme_trial = {
   type: T('jsPsychHtmlKeyboardResponse'),
   choices:'NO_KEYS',
-  stimulus:()=>`<div style="text-align:center;">
-      <p id="status">Play both sounds, then choose.</p>
-      <div style="margin:16px 0;">
-        <button id="playA" class="jspsych-btn" style="margin:0 8px;">🔊 Sound A</button>
-        <button id="playB" class="jspsych-btn" style="margin:0 8px;">🔊 Sound B</button>
-      </div>
-      <div>
-        <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same</button>
-        <button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different</button>
-      </div>
-      <p id="dbg" style="font-size:12px;color:#888;"></p>
-    </div>`,
+  stimulus:()=>'<div style="text-align:center;">' +
+      '<p id="status">Play both sounds, then choose.</p>' +
+      '<div style="margin:16px 0;">' +
+        '<button id="playA" class="jspsych-btn" style="margin:0 8px;">Sound A</button>' +
+        '<button id="playB" class="jspsych-btn" style="margin:0 8px;">Sound B</button>' +
+      '</div>' +
+      '<div>' +
+        '<button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same</button>' +
+        '<button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different</button>' +
+      '</div>' +
+      '<p id="dbg" style="font-size:12px;color:#888;"></p>' +
+    '</div>',
   data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
     const srcA = asset(jsPsych.timelineVariable('audio1'));
@@ -360,13 +398,13 @@ const phoneme_trial = {
     const a2=new Audio(srcB);
 
     const dbg = document.getElementById('dbg');
-    if (dbg) dbg.textContent = `A: ${srcA} | B: ${srcB}`;
+    if (dbg) dbg.textContent = 'A: ' + srcA + ' | B: ' + srcB;
 
-    a1.addEventListener('canplaythrough', ()=>{ /* ready */ });
-    a2.addEventListener('canplaythrough', ()=>{ /* ready */ });
+    a1.addEventListener('canplaythrough', ()=>{});
+    a2.addEventListener('canplaythrough', ()=>{});
 
-    a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }});
-    a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }});
+    a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='Audio A unavailable'; b.disabled=true; }});
+    a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='Audio B unavailable'; b.disabled=true; }});
 
     const status=document.getElementById('status'),
           A=document.getElementById('playA'),
@@ -378,7 +416,7 @@ const phoneme_trial = {
 
     const enable=()=>{
       if((a||A.disabled)&&(b||B.disabled)){
-        [S,D].forEach(x=>{x.disabled=false;x.style.opacity='1'});
+        [S,D].forEach(x=>{x.disabled=false;x.style.opacity='1';});
         status.textContent='Choose Same or Different.';
         start=performance.now();
       }
@@ -422,25 +460,46 @@ const ldt_stimuli = [
   { stimulus:'PANKET',  correct_response:'n', word_type:'nonword'          },
 ];
 
-const ldt_instructions = { type: T('jsPsychHtmlKeyboardResponse'), choices:[' '], stimulus: `<h2>Word Recognition / 単語認識</h2><div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;"><p><b>W</b> = word / <b>N</b> = not a word</p></div><p><b>Press SPACE to begin</b></p>` };
+const ldt_instructions = {
+  type: T('jsPsychHtmlKeyboardResponse'),
+  choices:[' '],
+  stimulus: '<h2>Word Recognition / 単語認識</h2><div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;"><p><b>W</b> = word / <b>N</b> = not a word</p></div><p><b>Press SPACE to begin</b></p>'
+};
 const ldt_fixation = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<div style="font-size:60px;">+</div>', choices:'NO_KEYS', trial_duration:500 };
-const ldt_trial = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`, stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250, data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') }, on_finish:d=>d.correct=(d.response===d.correct_response) };
+const ldt_trial = {
+  type: T('jsPsychHtmlKeyboardResponse'),
+  stimulus:()=>'<div style="font-size:48px;font-weight:bold;">' + jsPsych.timelineVariable('stimulus') + '</div>',
+  stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250,
+  data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') },
+  on_finish:d=>d.correct=(d.response===d.correct_response)
+};
 const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
 
 /* ========== NAMING ========== */
-function modelPronAudioFor(target) { return `pron/${(target||'').toLowerCase()}.mp3`; }
-const naming_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: () => `<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：（1）モデル音声（任意）、（2）4秒録音。</p><p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>`, choices: ['Begin / 開始'], post_trial_gap: 500 };
+function modelPronAudioFor(target) { return 'pron/' + (target||'').toLowerCase() + '.mp3'; }
+const naming_intro = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: () => '<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：(1) モデル音声（任意）、(2) 4秒録音。</p><p style="color:#666">Pictures available: ' + (FILTERED_STIMULI.picture?.length || 0) + '</p>',
+  choices: ['Begin / 開始'], post_trial_gap: 500
+};
 const mic_request = { type: T('jsPsychInitializeMicrophone'), data: { task: 'microphone_initialization' }, on_finish: async function () { microphoneAvailable = true; } };
 
-const naming_mic_check = { type: T('jsPsychHtmlAudioResponse'), stimulus: `<div style="max-width:640px;margin:0 auto;text-align:left"><h3>Microphone check / マイク確認</h3><p>Say "test" for about 2 seconds.</p></div>`, recording_duration: 2000, show_done_button: true, allow_playback: true, accept_button_text: 'Sounds OK / 続行', data: { task: 'mic_check' }, on_finish: (data) => { if (data.recorded_data_url) microphoneAvailable = true; } };
+const naming_mic_check = {
+  type: T('jsPsychHtmlAudioResponse'),
+  stimulus: '<div style="max-width:640px;margin:0 auto;text-align:left"><h3>Microphone check / マイク確認</h3><p>Say "test" for about 2 seconds.</p></div>',
+  recording_duration: 2000, show_done_button: true, allow_playback: true, accept_button_text: 'Sounds OK / 続行', data: { task: 'mic_check' },
+  on_finish: (data) => { if (data.recorded_data_url) microphoneAvailable = true; }
+};
 
 const naming_prepare = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: () => {
     const img   = jsPsych.timelineVariable('image');
-    const tgt   = jsPsych.timelineVariable('target') || '';
-    const imgHTML = img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>';
-    return `<div style="text-align:center;">${imgHTML}<div style="margin-top:12px;"><button id="play-model" class="jspsych-btn" style="margin-right:8px;">▶️ Model</button><span id="model-status" style="font-size:13px;color:#666">Optional</span></div><p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p></div>`;
+    const imgHTML = img ? '<img src="' + asset(img) + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>';
+    return '<div style="text-align:center;">' + imgHTML +
+           '<div style="margin-top:12px;"><button id="play-model" class="jspsych-btn" style="margin-right:8px;">Play model</button>' +
+           '<span id="model-status" style="font-size:13px;color:#666">Optional</span></div>' +
+           '<p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p></div>';
   },
   choices: ['Start recording / 録音開始'],
   post_trial_gap: 200,
@@ -456,7 +515,7 @@ const naming_prepare = {
     const src = asset(model);
     if (!src) { onErr(); return; }
     a = new Audio(); a.preload = 'auto'; a.addEventListener('canplaythrough', onCan); a.addEventListener('error', onErr); a.src = src;
-    btn?.addEventListener('click', () => { if (!ready) return; try { a.currentTime = 0; a.play(); stat.textContent = 'Playing…'; } catch (e) {} });
+    if (btn) btn.addEventListener('click', () => { if (!ready) return; try { a.currentTime = 0; a.play(); stat.textContent = 'Playing...'; } catch (e) {} });
   }
 };
 
@@ -464,7 +523,9 @@ const naming_record = {
   type: T('jsPsychHtmlAudioResponse'),
   stimulus: () => {
     const img = jsPsych.timelineVariable('image');
-    return `<div style="text-align:center;">${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}<p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p></div>`;
+    return '<div style="text-align:center;">' +
+      (img ? '<img src="' + asset(img) + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>') +
+      '<p style="margin-top:16px; color:#d32f2f; font-weight:bold;">Recording... speak now!</p></div>';
   },
   recording_duration: 4000,
   show_done_button: false,
@@ -475,7 +536,7 @@ const naming_record = {
     const tgt   = (d.target || 'unknown').toLowerCase();
     const idx   = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x';
     const phase = d.phase || namingPhase();
-    d.audio_filename = `${phase}_${pid}_${tgt}_${idx}.wav`;
+    d.audio_filename = phase + '_' + pid + '_' + tgt + '_' + idx + '.wav';
     try {
       const blob = (d.response && d.response instanceof Blob) ? d.response : (d.response?.recording && d.response.recording instanceof Blob) ? d.response.recording : null;
       if (blob) d.audio_blob_url = URL.createObjectURL(blob);
@@ -484,19 +545,24 @@ const naming_record = {
 };
 
 /* ========== FOLEY ICONICITY ========== */
-const foley_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p style="color:#666">Sounds: ${FILTERED_STIMULI.foley?.length||0}</p>`, choices:['Begin / 開始'] };
+const foley_intro = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: ()=>'<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p style="color:#666">Sounds: ' + (FILTERED_STIMULI.foley?.length||0) + '</p>',
+  choices:['Begin / 開始']
+};
 
 const foley_trial = {
   type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`
-    <div style="text-align:center;">
-      <div style="padding:12px;margin-bottom:16px;">
-        <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
-        <div id="foley-status" style="font-size:13px;color:#666;margin-top:8px;">Click to play audio</div>
-      </div>
-      <p>What does this sound represent?</p>
-      <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
-    </div>`,
+  stimulus: ()=>(
+    '<div style="text-align:center;">' +
+      '<div style="padding:12px;margin-bottom:16px;">' +
+        '<button id="foley-play" class="jspsych-btn">Play sound</button>' +
+        '<div id="foley-status" style="font-size:13px;color:#666;margin-top:8px;">Click to play audio</div>' +
+      '</div>' +
+      '<p>What does this sound represent?</p>' +
+      '<p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>' +
+    '</div>'
+  ),
   choices: () => jsPsych.timelineVariable('options'),
   post_trial_gap: 250,
   data: () => ({ task:'foley_iconicity', correct_answer: jsPsych.timelineVariable('correct'), mapping_type: jsPsych.timelineVariable('mapping_type'), audio_file: jsPsych.timelineVariable('audio') }),
@@ -507,22 +573,32 @@ const foley_trial = {
     let audio = new Audio(); audio.preload = 'auto'; audio.src = url;
     let audioLoaded = false;
     const onCanPlay = () => { audioLoaded = true; if (status) status.textContent = 'Audio ready - click to play'; if (btn) btn.disabled = false; };
-    const onError = () => { if (btn) { btn.textContent = '❌ Audio unavailable'; btn.disabled = true; } if (status) status.textContent = 'Audio failed to load - you can still answer'; };
+    const onError = () => { if (btn) { btn.textContent = 'Audio unavailable'; btn.disabled = true; } if (status) status.textContent = 'Audio failed to load - you can still answer'; };
     const playHandler = () => { if (!audioLoaded) return; try { audio.currentTime = 0; audio.play(); if (status) status.textContent = 'Playing audio...'; } catch (e) {} };
     audio.addEventListener('canplaythrough', onCanPlay);
     audio.addEventListener('error', onError);
     if (btn) btn.addEventListener('click', playHandler);
-    window.__foleyCleanup = () => { try { if (btn) btn.removeEventListener('click', playHandler); if (audio) { audio.pause(); audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); audio.src = ''; audio.load(); } } catch (e) {} audio = null; };
+    window.__foleyCleanup = () => {
+      try {
+        if (btn) btn.removeEventListener('click', playHandler);
+        if (audio) { audio.pause(); audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); audio.src = ''; audio.load(); }
+      } catch (e) {}
+      audio = null;
+    };
   },
   on_finish: function(d){ d.skipped = false; d.correct = (d.response === d.correct_answer); try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch (e) {} window.__foleyCleanup = null; }
 };
 
 /* ========== VISUAL ICONICITY ========== */
-const visual_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: ()=>`<h2>Shape–Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p style="color:#666">Shapes: ${FILTERED_STIMULI.visual?.length||0}</p>`, choices:['Begin / 開始'] };
+const visual_intro = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: ()=>'<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p style="color:#666">Shapes: ' + (FILTERED_STIMULI.visual?.length||0) + '</p>',
+  choices:['Begin / 開始']
+};
 
 const visual_trial = {
   type: T('jsPsychHtmlButtonResponse'),
-  stimulus: () => `<div style="text-align:center;"><img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" /><p style="margin-top:20px;">Which word matches this shape?</p></div>`,
+  stimulus: () => '<div style="text-align:center;"><img src="' + asset(jsPsych.timelineVariable('shape')) + '" style="width:200px;height:200px;" /><p style="margin-top:20px;">Which word matches this shape?</p></div>',
   choices: () => jsPsych.timelineVariable('words') || [],
   post_trial_gap: 250,
   data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
@@ -530,17 +606,28 @@ const visual_trial = {
 };
 
 /* ========== PROCEDURAL ========== */
-const procedural_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h3>Quick Recipe Ordering</h3><p>Number the actions 1–5. <b>Multiple valid orders</b> exist, but some steps must precede others (e.g., whisk before pour).</p><p>番号（1–5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>`, choices: ['OK'] };
+const procedural_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h3>Quick Recipe Ordering</h3><p>Number the actions 1-5. Multiple valid orders exist, but some steps must precede others (e.g., whisk before pour).</p><p>番号（1-5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>',
+  choices: ['OK']
+};
 
 const procedural_test = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: function() {
     const randomizedSteps = jsPsych.randomization.shuffle([...PROCEDURE_STEPS]);
-    let html = `<div style="max-width: 600px; margin: 0 auto; text-align: left;"><h3>Assign a step number (1–5) to each action.</h3><p>各アクションに番号を割り当ててください (1–5)</p><div style="margin-top: 20px;">`;
+    let html = '<div style="max-width: 600px; margin: 0 auto; text-align: left;"><h3>Assign a step number (1-5) to each action.</h3><p>各アクションに番号を割り当ててください (1-5)</p><div style="margin-top: 20px;">';
     randomizedSteps.forEach((step, index) => {
-      html += `<div style="margin: 15px 0;"><label style="display: block; margin-bottom: 5px;"><b>${step}</b></label><select id="step_${index}" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;"><option value="">Select order / 選択...</option><option value="1">1 (First / 最初)</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 (Last / 最後)</option></select></div>`;
+      html += '<div style="margin: 15px 0;"><label style="display: block; margin-bottom: 5px;"><b>' + step + '</b></label><select id="step_' + index + '" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;">' +
+              '<option value="">Select order / 選択...</option>' +
+              '<option value="1">1 (First / 最初)</option>' +
+              '<option value="2">2</option>' +
+              '<option value="3">3</option>' +
+              '<option value="4">4</option>' +
+              '<option value="5">5 (Last / 最後)</option>' +
+              '</select></div>';
     });
-    html += `</div><p id="validation-msg" style="color: red; display: none;">Please assign each number only once / 各番号は1回のみ使用してください</p></div>`;
+    html += '</div><p id="validation-msg" style="color: red; display: none;">Please assign each number only once / 各番号は1回のみ使用してください</p></div>';
     window._randomizedSteps = randomizedSteps;
     return html;
   },
@@ -577,7 +664,7 @@ const procedural_test = {
     const pos = {};
     randomizedSteps.forEach((label, i) => { const v = parseInt(selectors[i].value, 10); pos[label] = Number.isFinite(v) ? v : null; });
     let tot = 0, ok = 0, violations = [];
-    PROC_CONSTRAINTS.forEach(([a, b]) => { if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(`${a} → ${b}`); } });
+    PROC_CONSTRAINTS.forEach(([a, b]) => { if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(a + ' -> ' + b); } });
     data.responses_positions   = pos;
     data.constraints_total     = tot;
     data.constraints_satisfied = ok;
@@ -636,8 +723,7 @@ async function initializeExperiment(){
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
       choices:['Begin / 開始'],
-      stimulus:`<h1>Pre-Test Battery / 事前テスト</h1>
-        <p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>`
+      stimulus:'<h1>Pre-Test Battery / 事前テスト</h1><p>Please use headphones if available. / 可能ならヘッドフォンをご使用ください。</p>'
     });
   }
 
@@ -665,7 +751,7 @@ async function initializeExperiment(){
     FILTERED_STIMULI.foley.forEach((stimulus, index) => {
       timeline.push({
         type: T('jsPsychHtmlKeyboardResponse'),
-        stimulus: `<div style="text-align: center; padding: 20px;"><p>Sound ${index + 1} of ${FILTERED_STIMULI.foley.length}</p><p>Press SPACE when ready / 次へ進むにはスペースキー</p></div>`,
+        stimulus: '<div style="text-align: center; padding: 20px;"><p>Sound ' + (index + 1) + ' of ' + FILTERED_STIMULI.foley.length + '</p><p>Press SPACE when ready / 次へ進むにはスペースキー</p></div>',
         choices: [' ']
       });
       timeline.push({ timeline: [foley_trial], timeline_variables: [stimulus] });
@@ -689,7 +775,7 @@ async function initializeExperiment(){
     timeline.push({
       conditional_function: () => microphoneAvailable !== true,
       timeline: [
-        { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>`, choices: ['Continue'] },
+        { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h2>Picture Naming</h2><p>Microphone not available; skipping this task.</p>', choices: ['Continue'] },
         CLEAR
       ]
     });
@@ -717,11 +803,11 @@ async function initializeExperiment(){
         if(!assignedCondition) assignCondition();
         const savedMetaRaw = localStorage.getItem('pretest_latest');
         let saved = {}; try { saved = savedMetaRaw ? JSON.parse(savedMetaRaw) : {}; } catch {}
-        return `<div style="text-align:center;padding:40px;">
-          <h2>✅ Complete! / 完了！</h2>
-          <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
-          <p style="color:#666">Your data file will download automatically (${saved.filename||'pretest_data.json'}).</p>
-        </div>`;
+        return '<div style="text-align:center;padding:40px;">' +
+          '<h2>Complete!</h2>' +
+          '<p><strong>Your assigned condition:</strong> <span style="color:#2196F3">' + (assignedCondition||'—') + '</span></p>' +
+          '<p style="color:#666">Your data file will download automatically (' + (saved.filename||'pretest_data.json') + ').</p>' +
+        '</div>';
       },
       on_finish: () => { window.onbeforeunload=null; }
     });
@@ -738,8 +824,4 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeExperiment);
 } else {
   initializeExperiment();
-}"""
-open_path = "/mnt/data/pretest_v4_7_audio_centered.js"
-with open(open_path,"w") as f:
-    f.write(code)
-print(open_path)
+}
