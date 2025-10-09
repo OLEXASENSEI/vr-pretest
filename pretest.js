@@ -1,4 +1,4 @@
-// Version 4.5 (Final Complete) — Pre-Test Battery
+// Version 4.6 — Pre-Test Battery (asset() fix + cleaner SurveyJS look)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -21,11 +21,20 @@ const PROC_CONSTRAINTS = [
   ['Pour batter on pan', 'Flip when ready']
 ];
 
-/* ========== ASSET HELPER ========== */
+/* ========== ASSET HELPER (robust) ========== */
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 const asset = (p) => {
-  const clean = p.replace(/^(\.\/|\/)/, "");
-  return clean + (clean.includes("?") ? "&" : "?") + "v=" + ASSET_BUST;
+  try {
+    if (!p) return '';
+    // Accept strings, URL objects, elements with src/href, etc.
+    const s = (typeof p === 'string') ? p : (p?.href || p?.src || String(p));
+    if (typeof s !== 'string') return '';
+    const clean = s.replace(/^(\.\/|\/)/, "");
+    return clean + (clean.includes("?") ? "&" : "?") + "v=" + ASSET_BUST;
+  } catch (e) {
+    console.warn('asset() failed for', p, e);
+    return typeof p === 'string' ? p : '';
+  }
 };
 
 /* ========== PLUGIN/GLOBAL ACCESS HELPERS ========== */
@@ -36,11 +45,12 @@ const mic_plugins_available = () => {
   return have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 };
 
-/* ========== GLOBAL CSS ========== */
+/* ========== GLOBAL CSS (simplified, centered headings) ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
   .sv-root, .sv_main, .sv-container { position: static !important; }
   .jspsych-content { position: relative !important; }
+  .jspsych-content h1, .jspsych-content h2, .jspsych-content h3 { text-align: center !important; }
 `;
 document.head.appendChild(baseStyle);
 
@@ -48,157 +58,84 @@ const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
   /* Hide survey headers */
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
-  
-  /* Center and constrain the survey */
-  .sd-root-modern, .sd-body, .sv_main {
-    max-width: 800px !important;
-    margin: 0 auto !important;
-    padding: 20px !important;
-  }
-  
-  /* Question container - clean spacing */
-  .sd-question {
-    margin-bottom: 35px !important;
-    padding: 25px !important;
-    background: #ffffff !important;
-    border: 1px solid #e0e0e0 !important;
-    border-radius: 8px !important;
-    box-shadow: 0 1px 3px rgba(0,0,0,0.05) !important;
-  }
-  
-  /* Question title */
-  .sd-question__title {
-    font-weight: 600 !important;
-    font-size: 16px !important;
-    margin-bottom: 8px !important;
-    color: #1a1a1a !important;
-  }
-  
-  /* Description text */
-  .sd-question__description {
-    color: #666 !important;
-    font-size: 14px !important;
-    margin-bottom: 15px !important;
-    font-style: italic !important;
-  }
-  
-  /* Radio group container - horizontal layout */
-  .sd-radiogroup {
-    display: flex !important;
-    flex-wrap: wrap !important;
-    gap: 10px !important;
-    margin: 15px 0 !important;
-    justify-content: flex-start !important;
-  }
-  
-  /* Individual radio item - pill style */
-  .sd-item {
-    display: inline-flex !important;
-    align-items: center !important;
-    padding: 10px 18px !important;
-    background: #f5f5f5 !important;
-    border: 2px solid #e0e0e0 !important;
-    border-radius: 25px !important;
-    cursor: pointer !important;
-    transition: all 0.2s ease !important;
-    margin: 0 !important;
-  }
-  
-  /* Hover state */
-  .sd-item:hover {
-    background: #e8f5e9 !important;
-    border-color: #81c784 !important;
-    transform: translateY(-1px) !important;
-  }
-  
-  /* Selected state */
-  .sd-item--checked {
-    background: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-    box-shadow: 0 2px 4px rgba(76, 175, 80, 0.3) !important;
-  }
-  
-  .sd-item--checked .sd-item__control-label {
-    color: white !important;
-    font-weight: 600 !important;
-  }
-  
-  /* Radio input - keep visible but styled */
-  input[type="radio"].sd-visuallyhidden {
-    position: relative !important;
-    opacity: 1 !important;
-    width: 16px !important;
-    height: 16px !important;
-    margin-right: 8px !important;
-    accent-color: #4CAF50 !important;
-  }
-  
-  /* Label text */
-  .sd-item__control-label {
-    display: inline !important;
-    cursor: pointer !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    font-size: 14px !important;
-  }
-  
-  /* Text inputs */
-  .sd-input, input[type="text"] {
-    display: block !important;
-    width: 100% !important;
-    max-width: 500px !important;
-    padding: 12px !important;
-    font-size: 16px !important;
-    border: 2px solid #e0e0e0 !important;
-    border-radius: 6px !important;
-    margin-top: 10px !important;
-    transition: border-color 0.2s !important;
-  }
-  
-  .sd-input:focus, input[type="text"]:focus {
-    outline: none !important;
-    border-color: #4CAF50 !important;
-    box-shadow: 0 0 0 3px rgba(76, 175, 80, 0.1) !important;
-  }
-  
-  /* Complete button */
+
+  /* Keep action bar visible so Complete button is usable */
+  .sd-action-bar { display: flex !important; gap: 8px !important; justify-content: center !important; }
+
+  /* Hide Prev/Next/Start when single-page */
+  .sd-navigation__prev-btn,
+  .sd-navigation__start-btn,
+  .sd-navigation__next-btn { display: none !important; }
+
+  /* Complete button (keep, but simple) */
   .sd-btn--action.sd-navigation__complete-btn {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
     background: #4CAF50 !important;
     color: white !important;
-    padding: 14px 32px !important;
+    padding: 10px 24px !important;
     border: none !important;
-    border-radius: 6px !important;
+    border-radius: 4px !important;
     font-size: 16px !important;
-    font-weight: 600 !important;
     cursor: pointer !important;
-    margin-top: 30px !important;
-    transition: all 0.2s !important;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1) !important;
+    margin-top: 20px !important;
   }
-  
-  .sd-btn--action.sd-navigation__complete-btn:hover {
-    background: #45a049 !important;
-    transform: translateY(-1px) !important;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.15) !important;
-  }
-  
-  /* Footer centering */
-  .sd-footer {
-    margin-top: 40px !important;
-    padding-top: 20px !important;
-    text-align: center !important;
-    border-top: 2px solid #e0e0e0 !important;
-  }
-  
-  /* Page container */
-  .sd-page {
+  .sd-btn--action.sd-navigation__complete-btn:hover { background: #45a049 !important; }
+
+  /* Clean question layout — remove boxes */
+  .sd-question {
+    margin: 24px 0 !important;
     padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
+
+  /* Titles left or centered? User asked to center: */
+  .sd-question__title { 
+    font-weight: 600 !important; 
+    font-size: 16px !important; 
+    margin-bottom: 8px !important; 
+    color: #1a1a1a !important;
+    text-align: center !important;
+  }
+  .sd-question__description {
+    color: #666 !important;
+    font-size: 14px !important;
+    margin-bottom: 10px !important;
+    text-align: center !important;
+  }
+
+  /* Radios: remove pill boxes; use default look with better spacing */
+  .sd-radiogroup { display: flex !important; flex-wrap: wrap !important; gap: 12px !important; justify-content: center !important; }
+  .sd-item { padding: 0 !important; background: transparent !important; border: none !important; border-radius: 0 !important; }
+  .sd-item--checked { background: transparent !important; border: none !important; box-shadow: none !important; }
+  .sd-item__control-label { font-size: 14px !important; }
+
+  /* Keep actual radio inputs visible for reliable clicks */
+  input[type="radio"].sd-visuallyhidden {
+    position: relative !important;
+    opacity: 1 !important;
+    width: auto !important;
+    height: auto !important;
+    margin-right: 6px !important;
+  }
+
+  /* Text inputs */
+  .sd-input, input[type="text"] {
+    display: block !important;
+    width: 100% !important;
+    max-width: 500px !important;
+    padding: 10px !important;
+    font-size: 16px !important;
+    border: 1px solid #ccc !important;
+    border-radius: 4px !important;
+    margin: 8px auto 0 auto !important;
+  }
+
+  /* Footer centered */
+  .sd-footer { margin-top: 24px !important; text-align: center !important; }
 `;
 document.head.appendChild(surveyHeaderStyle);
 
@@ -219,13 +156,11 @@ if (!have('initJsPsych')) {
 }
 
 if (!have('jsPsychSurvey')) {
-  console.error('❌ jsPsychSurvey plugin not loaded! Surveys will not work.');
-  alert('Survey plugin failed to load. Please refresh the page.');
+  console.warn('⚠️ jsPsychSurvey plugin not loaded! Surveys will be skipped.');
 }
 
 if (typeof window.Survey === 'undefined') {
-  console.error('❌ SurveyJS library not loaded!');
-  alert('SurveyJS library failed to load. Please refresh the page.');
+  console.warn('⚠️ SurveyJS library not loaded (styling may differ).');
 } else {
   console.log('✅ SurveyJS library loaded successfully');
 }
@@ -297,10 +232,7 @@ const visual_iconicity_stimuli = [
 
 /* ========== PID/PHASE HELPERS ========== */
 let currentPID_value = 'unknown'; 
-function currentPID() {
-  return currentPID_value;
-}
-
+function currentPID() { return currentPID_value; }
 function namingPhase() {
   const p = new URLSearchParams(location.search).get('phase');
   return (p === 'post') ? 'post' : 'pre';
@@ -311,23 +243,13 @@ function saveDataToServer(data) {
   try {
     const filename = `pretest_${currentPID()}_${Date.now()}.json`;
     const json = JSON.stringify(data, null, 2);
-    
-    localStorage.setItem('pretest_latest', JSON.stringify({
-      filename: filename,
-      timestamp: new Date().toISOString(),
-      data: data
-    }));
-    
+    localStorage.setItem('pretest_latest', JSON.stringify({ filename, timestamp: new Date().toISOString() }));
     const blob = new Blob([json], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
     URL.revokeObjectURL(url);
-    
     console.log('Data saved:', filename);
   } catch (e) {
     console.error('Failed to save data:', e);
@@ -433,7 +355,7 @@ let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
 /* ========== SURVEYS ========== */
-const participant_info = {
+const participant_info = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
     title: 'Participant Info / 参加者情報',
@@ -444,143 +366,48 @@ const participant_info = {
     pages: [{
       name: 'p1',
       elements: [
-        { 
-          type: 'text', 
-          name: 'participant_id', 
-          title: 'Participant ID', 
-          description: '参加者ID', 
-          isRequired: true, 
-          placeholder: 'Enter ID here'
-        },
-        { 
-          type: 'radiogroup', 
-          name: 'age', 
-          title: 'Age', 
-          description: '年齢', 
-          isRequired: true,
-          choices: ['18-25', '26-35', '36-45', '46-55', '56+'],
-          colCount: 0
-        },
-        { 
-          type: 'radiogroup', 
-          name: 'native_language', 
-          title: 'Native Language', 
-          description: '母語', 
-          isRequired: true,
-          choices: ['Japanese / 日本語', 'Other / その他']
-        },
-        { 
-          type: 'radiogroup', 
-          name: 'english_years', 
-          title: 'English Learning Years', 
-          description: '英語学習年数', 
-          isRequired: true,
-          choices: ['0-3', '4-6', '7-10', '10+'],
-          colCount: 0
-        },
-        { 
-          type: 'radiogroup', 
-          name: 'vr_experience', 
-          title: 'VR Experience', 
-          description: 'VR経験', 
-          isRequired: true,
-          choices: ['None / なし', '1–2 times / 1-2回', 'Several / 数回', 'Regular / 定期的']
-        }
+        { type: 'text', name: 'participant_id', title: 'Participant ID', description: '参加者ID', isRequired: true, placeholder: 'Enter ID here' },
+        { type: 'radiogroup', name: 'age', title: 'Age', description: '年齢', isRequired: true, choices: ['18-25', '26-35', '36-45', '46-55', '56+'], colCount: 0 },
+        { type: 'radiogroup', name: 'native_language', title: 'Native Language', description: '母語', isRequired: true, choices: ['Japanese / 日本語', 'Other / その他'] },
+        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description: '英語学習年数', isRequired: true, choices: ['0-3', '4-6', '7-10', '10+'], colCount: 0 },
+        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description: 'VR経験', isRequired: true, choices: ['None / なし', '1–2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] }
       ]
     }]
   },
   data: { task: 'participant_info' },
-  on_load: function() {
-    console.log('Participant info survey loaded');
-    setTimeout(() => {
-      nukeSurveyArtifacts();
-      
-      // Debug: Check what's actually in the DOM
-      const radioGroups = document.querySelectorAll('.sd-radiogroup');
-      console.log(`Found ${radioGroups.length} radio groups`);
-      
-      const items = document.querySelectorAll('.sd-item');
-      console.log(`Found ${items.length} radio items`);
-      
-      const inputs = document.querySelectorAll('input[type="radio"]');
-      console.log(`Found ${inputs.length} actual radio inputs`);
-      
-      if (items.length === 0) {
-        console.error('❌ No radio buttons rendered!');
-      }
-      
-      if (inputs.length === 0) {
-        console.error('❌ No radio inputs found in DOM!');
-      } else {
-        console.log('✅ Radio inputs exist, checking visibility...');
-        inputs.forEach((input, i) => {
-          const computed = window.getComputedStyle(input);
-          console.log(`Radio ${i}: display=${computed.display}, visibility=${computed.visibility}, opacity=${computed.opacity}`);
-        });
-      }
-    }, 200);
-  },
+  on_load: function() { setTimeout(nukeSurveyArtifacts, 200); },
   on_finish: (data) => {
     try {
       const resp = asObject(data.response);
       currentPID_value = resp.participant_id || 'unknown';
-      console.log('Participant ID set to:', currentPID_value);
     } catch (e) {
-      console.error('Error parsing participant info:', e);
       currentPID_value = 'unknown_parse_fail';
     }
     setTimeout(nukeSurveyArtifacts, 100);
   }
-};
+} : null;
 
-const motion_sickness_questionnaire = {
+const motion_sickness_questionnaire = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
     title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
     showCompletedPage: false,
+    completeText: 'Continue / 続行',
     pages: [{
       name: 'mssq',
       elements: [
-        {
-          type: 'radiogroup',
-          name: 'mssq_car_reading',
-          title: 'How often do you feel sick when reading in a car?',
-          description: '車で読書をしている時に気分が悪くなりますか？',
-          isRequired: true,
-          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
-        },
-        {
-          type: 'radiogroup',
-          name: 'mssq_boat',
-          title: 'How often do you feel sick on boats?',
-          description: '船に乗っている時に気分が悪くなりますか？',
-          isRequired: true,
-          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
-        },
-        {
-          type: 'radiogroup',
-          name: 'mssq_games',
-          title: 'How often do you feel dizzy playing video games?',
-          description: 'ゲームをしている時にめまいを感じますか？',
-          isRequired: true,
-          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
-        },
-        {
-          type: 'radiogroup',
-          name: 'mssq_vr',
-          title: 'How often do you feel sick in VR (if experienced)?',
-          description: '（VR経験がある場合）VR中に気分が悪くなりますか？',
-          isRequired: false,
-          choices: ['No experience', 'Never', 'Rarely', 'Sometimes', 'Often', 'Always']
-        }
+        { type: 'radiogroup', name: 'mssq_car_reading', title: 'How often do you feel sick when reading in a car?', description: '車で読書をしている時に気分が悪くなりますか？', isRequired: true, choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'] },
+        { type: 'radiogroup', name: 'mssq_boat', title: 'How often do you feel sick on boats?', description: '船に乗っている時に気分が悪くなりますか？', isRequired: true, choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'] },
+        { type: 'radiogroup', name: 'mssq_games', title: 'How often do you feel dizzy playing video games?', description: 'ゲームをしている時にめまいを感じますか？', isRequired: true, choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always'] },
+        { type: 'radiogroup', name: 'mssq_vr', title: 'How often do you feel sick in VR (if experienced)?', description: '（VR経験がある場合）VR中に気分が悪くなりますか？', isRequired: false, choices: ['No experience', 'Never', 'Rarely', 'Sometimes', 'Often', 'Always'] }
       ]
     }]
   },
   data: { task: 'motion_sickness' },
   on_finish: () => setTimeout(nukeSurveyArtifacts, 100)
-};
+} : null;
 
 /* ========== DIGIT & SPATIAL SPAN ========== */
 const digit_span_forward_instructions = {
@@ -614,7 +441,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
         const r = String(rraw ?? '').replace(/\s/g,'');
         d.entered_response=r;
         d.correct = r===d.correct_answer;
-        if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline(); // FIXED: was endCurrentTimeline
+        if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline();
       }
     });
   }
@@ -694,7 +521,7 @@ function generateOptimizedSpatialSpanTrials(){
           jsPsych.pluginAPI.clearAllTimeouts();
           const rt=start?Math.round(performance.now()-start):null;
           const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]);
-          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.abortCurrentTimeline(); // FIXED: was endCurrentTimeline
+          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.abortCurrentTimeline();
           jsPsych.finishTrial({response:resp, click_sequence:resp.join(','), rt, correct:ok});
         };
 
@@ -746,8 +573,10 @@ const phoneme_trial = {
     </div>`,
   data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
-    const a1=new Audio(asset(jsPsych.timelineVariable('audio1')));
-    const a2=new Audio(asset(jsPsych.timelineVariable('audio2')));
+    const a1src = asset(jsPsych.timelineVariable('audio1'));
+    const a2src = asset(jsPsych.timelineVariable('audio2'));
+    const a1=new Audio(a1src);
+    const a2=new Audio(a2src);
 
     a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }});
     a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }});
@@ -874,7 +703,6 @@ const naming_prepare = {
   stimulus: () => {
     const img   = jsPsych.timelineVariable('image');
     const tgt   = jsPsych.timelineVariable('target') || '';
-    const pron  = modelPronAudioFor(tgt);
     const imgHTML = img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>';
     return `
       <div style="text-align:center;">
@@ -902,13 +730,17 @@ const naming_prepare = {
 
     let a = null, ready = false;
     const onCan = () => { ready = true; stat.textContent = 'Ready'; };
-    const onErr = () => { ready = false; stat.textContent = 'Not available'; btn.disabled = true; };
+    const onErr = () => { ready = false; stat.textContent = 'Not available'; if (btn) btn.disabled = true; };
+
+    // Guard: if model is empty like 'pron/.mp3', still try; else disable
+    const src = asset(model);
+    if (!src) { onErr(); return; }
 
     a = new Audio();
     a.preload = 'auto';
     a.addEventListener('canplaythrough', onCan);
     a.addEventListener('error', onErr);
-    a.src = asset(model);
+    a.src = src;
 
     btn?.addEventListener('click', () => {
       if (!ready) return;
@@ -971,7 +803,7 @@ const foley_trial = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: ()=>`
     <div style="text-align:center;">
-      <div style="padding:20px;background:#f8f9fa;border-radius:10px;margin-bottom:16px;">
+      <div style="padding:12px;margin-bottom:16px;">
         <button id="foley-play" class="jspsych-btn">▶️ Play sound</button>
         <div id="foley-status" style="font-size:13px;color:#666;margin-top:8px;">Click to play audio</div>
       </div>
@@ -1093,7 +925,7 @@ const procedural_test = {
     
     randomizedSteps.forEach((step, index) => {
       html += `
-        <div style="margin: 15px 0; padding: 10px; background: #f5f5f5; border-radius: 5px;">
+        <div style="margin: 15px 0;">
           <label style="display: block; margin-bottom: 5px;"><b>${step}</b></label>
           <select id="step_${index}" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;">
             <option value="">Select order / 選択...</option>
@@ -1193,13 +1025,14 @@ const procedural_test = {
 };
 
 /* ========== IDEOPHONE ========== */
-const ideophone_test = {
+const ideophone_test = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
     title:'Japanese Sound Words / 擬音語',
     showQuestionNumbers:'off',
     focusFirstQuestionAutomatic:false,
     showCompletedPage:false,
+    completeText: 'Continue / 続行',
     pages:[{
       name:'ideo',
       elements:[
@@ -1222,7 +1055,7 @@ const ideophone_test = {
   },
   data:{ task:'ideophone_mapping' },
   on_finish:()=>setTimeout(nukeSurveyArtifacts, 100)
-};
+} : null;
 
 /* ========== FINAL TIMELINE BUILD ========== */
 async function initializeExperiment(){
@@ -1260,9 +1093,8 @@ async function initializeExperiment(){
     });
   }
 
-  if (have('jsPsychSurvey')) {
-    timeline.push(participant_info, motion_sickness_questionnaire);
-  }
+  if (participant_info) timeline.push(participant_info);
+  if (motion_sickness_questionnaire) timeline.push(motion_sickness_questionnaire);
   
   if (have('jsPsychSurveyText') && have('jsPsychHtmlKeyboardResponse')) {
     timeline.push(digit_span_forward_instructions, { timeline: generateOptimizedDigitSpanTrials(true) }, CLEAR);
@@ -1325,7 +1157,7 @@ async function initializeExperiment(){
     timeline.push(procedural_instructions, procedural_test, CLEAR);
   }
 
-  if (have('jsPsychSurvey')) {
+  if (ideophone_test) {
     timeline.push(ideophone_test, CLEAR);
   }
 
@@ -1335,7 +1167,8 @@ async function initializeExperiment(){
       choices:['Finish / 完了'],
       stimulus:function(){
         if(!assignedCondition) assignCondition();
-        const saved = asObject(localStorage.getItem('pretest_latest') ? JSON.parse(localStorage.getItem('pretest_latest')) : {});
+        const savedMetaRaw = localStorage.getItem('pretest_latest');
+        let saved = {}; try { saved = savedMetaRaw ? JSON.parse(savedMetaRaw) : {}; } catch {}
         return `<div style="text-align:center;padding:40px;">
           <h2>✅ Complete! / 完了！</h2>
           <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
