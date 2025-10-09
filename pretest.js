@@ -1,4 +1,4 @@
-// Version 4.3 (Fixed) — Pre-Test Battery
+// Version 4.4 (Final Complete) — Pre-Test Battery
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -6,7 +6,6 @@ let assignedCondition = null;
 let microphoneAvailable = false;
 
 /* ========== MISSING CONSTANTS (ADDED) ========== */
-// Procedure steps for the recipe ordering task
 const PROCEDURE_STEPS = [
   'Crack eggs',
   'Mix flour and eggs',
@@ -15,7 +14,6 @@ const PROCEDURE_STEPS = [
   'Flip when ready'
 ];
 
-// Partial order constraints: [must_come_before, must_come_after]
 const PROC_CONSTRAINTS = [
   ['Crack eggs', 'Mix flour and eggs'],
   ['Mix flour and eggs', 'Pour batter on pan'],
@@ -34,7 +32,6 @@ const asset = (p) => {
 const have = (name) => typeof window[name] !== 'undefined';
 const T = (name) => window[name];
 
-// Check for microphone plugin availability
 const mic_plugins_available = () => {
   return have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 };
@@ -57,46 +54,68 @@ surveyHeaderStyle.textContent = `
   button[title="Clear"], button[aria-label="Clear"],
   .sd-item__control-label::after { display: none !important; }
   
-  /* Hide dropdown arrows for radio groups */
-  .sd-selectbase:not(select) { display: none !important; }
-  
-  /* Better radio button styling */
-  .sd-radio, .sd-item__control {
-    margin: 8px 12px 8px 0 !important;
+  /* Force radio buttons to show */
+  .sd-item, .sd-radio, .sd-radio__item {
+    display: block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
   }
   
+  .sd-selectbase { display: none !important; }
+  
+  /* Radio button container */
+  .sd-radiogroup {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+  
+  /* Individual radio items */
   .sd-item {
     display: inline-flex !important;
     align-items: center !important;
+    margin: 4px !important;
   }
   
+  /* Hide the actual radio input */
+  .sd-item__control {
+    position: absolute !important;
+    opacity: 0 !important;
+  }
+  
+  /* Style the label as a button */
   .sd-item__control-label {
-    padding: 6px 12px !important;
+    display: inline-block !important;
+    padding: 8px 16px !important;
     background: #f0f0f0 !important;
     border: 2px solid #ddd !important;
     border-radius: 6px !important;
     cursor: pointer !important;
     transition: all 0.2s !important;
+    font-size: 14px !important;
   }
   
+  /* Selected state */
+  .sd-radio__item--checked .sd-item__control-label,
   .sd-item--checked .sd-item__control-label {
     background: #4CAF50 !important;
     color: white !important;
     border-color: #4CAF50 !important;
   }
   
+  /* Hover state */
   .sd-item__control-label:hover {
     border-color: #4CAF50 !important;
     background: #f8f8f8 !important;
   }
   
-  /* Force radio groups to display properly */
-  .sd-radiogroup, .sd-question--radiogroup {
+  /* Make sure text inputs show */
+  .sd-input {
     display: block !important;
-  }
-  
-  .sd-radiogroup__item, .sd-item {
-    margin: 4px 0 !important;
+    width: 100% !important;
+    max-width: 400px !important;
+    padding: 8px !important;
+    font-size: 16px !important;
   }
 `;
 document.head.appendChild(surveyHeaderStyle);
@@ -106,7 +125,6 @@ function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
   });
-  // Also hide any lingering elements
   document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
     try { el.style.display = 'none'; } catch (e) {}
   });
@@ -118,9 +136,21 @@ if (!have('initJsPsych')) {
   throw new Error("jsPsych core not loaded.");
 }
 
+if (!have('jsPsychSurvey')) {
+  console.error('❌ jsPsychSurvey plugin not loaded! Surveys will not work.');
+  alert('Survey plugin failed to load. Please refresh the page.');
+}
+
+if (typeof window.Survey === 'undefined') {
+  console.error('❌ SurveyJS library not loaded!');
+  alert('SurveyJS library failed to load. Please refresh the page.');
+} else {
+  console.log('✅ SurveyJS library loaded successfully');
+}
+
 const jsPsych = T('initJsPsych')({
   display_element: "jspsych-target",
-  use_webaudio: true,
+  use_webaudio: false,
   show_progress_bar: true,
   message_progress_bar: "進捗 Progress",
   default_iti: 350,
@@ -154,7 +184,6 @@ const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/heat.mp3',   audio2: 'sounds/hit.mp3',    correct: 'different', contrast: 'vowel_length' },
 ];
 
-// FIXED: Removed bubbling.mp3 (spoken word), removed skip option
 const foley_stimuli = [
   { audio: 'sounds/high_tinkle.mp3',   options: ['small sugar granule', 'large mixing bowl'], correct: 0, mapping_type: 'size_pitch' },
   { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                              correct: 1, mapping_type: 'texture'   },
@@ -163,20 +192,19 @@ const foley_stimuli = [
   { audio: 'sounds/circular_whir.mp3', options: ['mixing', 'pouring'],                          correct: 0, mapping_type: 'action'    },
 ];
 
-// FIXED: Added action/verb images
 const picture_naming_stimuli = [
   // Objects
   { image: 'img/bowl.jpg',    target: 'bowl',    category: 'utensil'    },
   { image: 'img/egg.jpg',     target: 'egg',     category: 'ingredient' },
   { image: 'img/flour.jpg',   target: 'flour',   category: 'ingredient' },
   { image: 'img/spatula.jpg', target: 'spatula', category: 'utensil'    },
-  // Actions/Verbs
-  { image: 'img/mixing.jpg',   target: 'mixing',   category: 'action' },
-  { image: 'img/cracking.jpg', target: 'cracking', category: 'action' },
-  { image: 'img/pouring.jpg',  target: 'pouring',  category: 'action' },
-  { image: 'img/flipping.jpg', target: 'flipping', category: 'action' },
-  { image: 'img/heating.jpg',  target: 'heating',  category: 'action' },
-  { image: 'img/sizzling.jpg', target: 'sizzling', category: 'process' },
+  // Actions - CORRECTED FILE EXTENSIONS
+  { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action' },
+  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action' },
+  { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action' },
+  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action' },
+  { image: 'img/heating.jpeg',  target: 'heating',  category: 'action' },
+  { image: 'img/sizzling.jpeg', target: 'sizzling', category: 'process' },
 ];
 
 const visual_iconicity_stimuli = [
@@ -322,7 +350,7 @@ let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
-/* ========== SURVEYS (FIXED DROPDOWNS) ========== */
+/* ========== SURVEYS ========== */
 const participant_info = {
   type: T('jsPsychSurvey'),
   survey_json: {
@@ -330,6 +358,7 @@ const participant_info = {
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
     showCompletedPage: false,
+    completeText: 'Continue / 続行',
     pages: [{
       name: 'p1',
       elements: [
@@ -337,58 +366,70 @@ const participant_info = {
           type: 'text', 
           name: 'participant_id', 
           title: 'Participant ID', 
-          description:'参加者ID', 
+          description: '参加者ID', 
           isRequired: true, 
-          placeholder: 'Enter ID here' 
+          placeholder: 'Enter ID here'
         },
         { 
           type: 'radiogroup', 
           name: 'age', 
           title: 'Age', 
-          description:'年齢', 
-          isRequired: true, 
-          choices: ['18-25','26-35','36-45','46-55','56+'],
-          colCount: 5,
-          showClearButton: false
+          description: '年齢', 
+          isRequired: true,
+          choices: ['18-25', '26-35', '36-45', '46-55', '56+'],
+          colCount: 0
         },
         { 
           type: 'radiogroup', 
           name: 'native_language', 
           title: 'Native Language', 
-          description:'母語', 
-          isRequired: true, 
-          choices: ['Japanese / 日本語','Other / その他'],
-          showClearButton: false
+          description: '母語', 
+          isRequired: true,
+          choices: ['Japanese / 日本語', 'Other / その他']
         },
         { 
           type: 'radiogroup', 
           name: 'english_years', 
           title: 'English Learning Years', 
-          description:'英語学習年数', 
-          isRequired: true, 
-          choices: ['0-3','4-6','7-10','10+'],
-          colCount: 4,
-          showClearButton: false
+          description: '英語学習年数', 
+          isRequired: true,
+          choices: ['0-3', '4-6', '7-10', '10+'],
+          colCount: 0
         },
         { 
           type: 'radiogroup', 
           name: 'vr_experience', 
           title: 'VR Experience', 
-          description:'VR経験', 
-          isRequired: true, 
-          choices: ['None / なし','1–2 times / 1-2回','Several / 数回','Regular / 定期的'],
-          colCount: 2,
-          showClearButton: false
-        },
+          description: 'VR経験', 
+          isRequired: true,
+          choices: ['None / なし', '1–2 times / 1-2回', 'Several / 数回', 'Regular / 定期的']
+        }
       ]
-    }],
+    }]
   },
   data: { task: 'participant_info' },
+  on_load: function() {
+    console.log('Participant info survey loaded');
+    setTimeout(() => {
+      nukeSurveyArtifacts();
+      const radioGroups = document.querySelectorAll('.sd-radiogroup');
+      console.log(`Found ${radioGroups.length} radio groups`);
+      
+      const items = document.querySelectorAll('.sd-item');
+      console.log(`Found ${items.length} radio items`);
+      
+      if (items.length === 0) {
+        console.error('❌ No radio buttons rendered! Check SurveyJS version compatibility.');
+      }
+    }, 100);
+  },
   on_finish: (data) => {
     try {
       const resp = asObject(data.response);
       currentPID_value = resp.participant_id || 'unknown';
+      console.log('Participant ID set to:', currentPID_value);
     } catch (e) {
+      console.error('Error parsing participant info:', e);
       currentPID_value = 'unknown_parse_fail';
     }
     setTimeout(nukeSurveyArtifacts, 100);
@@ -411,11 +452,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick when reading in a car?',
           description: '車で読書をしている時に気分が悪くなりますか？',
           isRequired: true,
-          showClearButton: false,
-          choices: [
-            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
-            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
-          ]
+          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
         },
         {
           type: 'radiogroup',
@@ -423,11 +460,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick on boats?',
           description: '船に乗っている時に気分が悪くなりますか？',
           isRequired: true,
-          showClearButton: false,
-          choices: [
-            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
-            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
-          ]
+          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
         },
         {
           type: 'radiogroup',
@@ -435,11 +468,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel dizzy playing video games?',
           description: 'ゲームをしている時にめまいを感じますか？',
           isRequired: true,
-          showClearButton: false,
-          choices: [
-            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
-            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
-          ]
+          choices: ['Never', 'Rarely', 'Sometimes', 'Often', 'Always']
         },
         {
           type: 'radiogroup',
@@ -447,12 +476,7 @@ const motion_sickness_questionnaire = {
           title: 'How often do you feel sick in VR (if experienced)?',
           description: '（VR経験がある場合）VR中に気分が悪くなりますか？',
           isRequired: false,
-          showClearButton: false,
-          choices: [
-            { value: 0, text: 'No experience' },
-            { value: 1, text: 'Never' }, { value: 2, text: 'Rarely' }, { value: 3, text: 'Sometimes' },
-            { value: 4, text: 'Often' }, { value: 5, text: 'Always' }
-          ]
+          choices: ['No experience', 'Never', 'Rarely', 'Sometimes', 'Often', 'Always']
         }
       ]
     }]
@@ -836,7 +860,7 @@ const naming_record = {
   }
 };
 
-/* ========== FOLEY ICONICITY (FIXED - NO SKIP) ========== */
+/* ========== FOLEY ICONICITY ========== */
 const foley_intro = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2>
@@ -857,7 +881,7 @@ const foley_trial = {
       <p>What does this sound represent?</p>
       <p style="color:#666;margin-top:4px;">この音は何を表していますか？</p>
     </div>`,
-  choices: () => jsPsych.timelineVariable('options'),  // REMOVED skip option
+  choices: () => jsPsych.timelineVariable('options'),
   post_trial_gap: 250,
   data: () => ({
     task:'foley_iconicity',
@@ -949,7 +973,7 @@ const visual_trial = {
   on_finish: d => { d.correct = (d.response === d.correct_answer); }
 };
 
-/* ========== PROCEDURAL (FIXED - RANDOMIZED WITH ELIMINATION) ========== */
+/* ========== PROCEDURAL ========== */
 const procedural_instructions = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: `<h3>Quick Recipe Ordering</h3>
@@ -1082,8 +1106,20 @@ const ideophone_test = {
     pages:[{
       name:'ideo',
       elements:[
-        { type:'radiogroup', name:'frying_sound',  title:'Egg frying sound? / 卵を焼く音は？',    isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
-        { type:'radiogroup', name:'stirring_sound', title:'Stirring sound? / かき混ぜる音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
+        { 
+          type:'radiogroup', 
+          name:'frying_sound',  
+          title:'Egg frying sound? / 卵を焼く音は？',    
+          isRequired:true, 
+          choices:['ジュージュー','パラパラ','グルグル'] 
+        },
+        { 
+          type:'radiogroup', 
+          name:'stirring_sound', 
+          title:'Stirring sound? / かき混ぜる音は？', 
+          isRequired:true, 
+          choices:['ジュージュー','パラパラ','グルグル'] 
+        },
       ]
     }]
   },
