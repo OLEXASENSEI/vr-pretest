@@ -48,8 +48,27 @@ const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
   
-  /* Hide only specific SurveyJS controls, not all */
+  /* Hide only specific SurveyJS controls */
   .sd-action-bar, .sd-question__erbox-clear { display: none !important; }
+  
+  /* SHOW the complete button */
+  .sd-btn--action.sd-navigation__complete-btn {
+    display: inline-block !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+    background: #4CAF50 !important;
+    color: white !important;
+    padding: 10px 24px !important;
+    border: none !important;
+    border-radius: 4px !important;
+    font-size: 16px !important;
+    cursor: pointer !important;
+    margin-top: 20px !important;
+  }
+  
+  .sd-btn--action.sd-navigation__complete-btn:hover {
+    background: #45a049 !important;
+  }
   
   /* Make sure radio groups and items are visible */
   .sd-radiogroup, .sd-item, .sd-radio__item {
@@ -59,19 +78,46 @@ surveyHeaderStyle.textContent = `
     position: relative !important;
   }
   
-  /* Radio group container */
+  /* Radio group container - better layout */
   .sd-radiogroup {
-    margin: 10px 0 !important;
+    margin: 10px 0 20px 0 !important;
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    align-items: center !important;
   }
   
-  /* Individual radio button items - make them inline */
+  /* Individual radio button items */
   .sd-item {
-    display: inline-block !important;
-    margin: 6px 8px !important;
-    vertical-align: middle !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    margin: 0 !important;
+    padding: 8px 12px !important;
+    background: #f5f5f5 !important;
+    border: 2px solid transparent !important;
+    border-radius: 6px !important;
+    cursor: pointer !important;
+    transition: all 0.2s !important;
   }
   
-  /* The actual radio input circle */
+  /* Hover effect */
+  .sd-item:hover {
+    background: #e8f5e9 !important;
+    border-color: #4CAF50 !important;
+  }
+  
+  /* Selected state */
+  .sd-item--checked {
+    background: #4CAF50 !important;
+    border-color: #4CAF50 !important;
+  }
+  
+  .sd-item--checked .sd-item__control-label {
+    color: white !important;
+    font-weight: bold !important;
+  }
+  
+  /* The actual radio input circle - keep it visible */
   input[type="radio"].sd-visuallyhidden {
     position: relative !important;
     opacity: 1 !important;
@@ -84,45 +130,51 @@ surveyHeaderStyle.textContent = `
   .sd-item__control-label {
     display: inline !important;
     cursor: pointer !important;
-    padding: 4px 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
     background: transparent !important;
     border: none !important;
-  }
-  
-  /* Hover effect */
-  .sd-item:hover {
-    background: #f5f5f5 !important;
-    border-radius: 4px !important;
-  }
-  
-  /* Selected state */
-  .sd-item--checked {
-    background: #e8f5e9 !important;
-    border-radius: 4px !important;
   }
   
   /* Make sure text inputs show */
   .sd-input, input[type="text"] {
     display: block !important;
     width: 100% !important;
-    max-width: 400px !important;
-    padding: 8px !important;
+    max-width: 500px !important;
+    padding: 10px !important;
     font-size: 16px !important;
     border: 1px solid #ccc !important;
     border-radius: 4px !important;
+    margin-top: 8px !important;
+  }
+  
+  /* Question container */
+  .sd-question {
+    margin-bottom: 30px !important;
+    padding: 20px 0 !important;
+    border-bottom: 1px solid #eee !important;
   }
   
   /* Question titles */
   .sd-question__title {
     font-weight: bold !important;
+    font-size: 16px !important;
     margin-bottom: 8px !important;
+    color: #333 !important;
   }
   
   /* Descriptions */
   .sd-question__description {
     color: #666 !important;
     font-size: 14px !important;
-    margin-bottom: 10px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  /* Footer with button */
+  .sd-footer {
+    margin-top: 30px !important;
+    padding-top: 20px !important;
+    text-align: center !important;
   }
 `;
 document.head.appendChild(surveyHeaderStyle);
@@ -419,16 +471,31 @@ const participant_info = {
     console.log('Participant info survey loaded');
     setTimeout(() => {
       nukeSurveyArtifacts();
+      
+      // Debug: Check what's actually in the DOM
       const radioGroups = document.querySelectorAll('.sd-radiogroup');
       console.log(`Found ${radioGroups.length} radio groups`);
       
       const items = document.querySelectorAll('.sd-item');
       console.log(`Found ${items.length} radio items`);
       
+      const inputs = document.querySelectorAll('input[type="radio"]');
+      console.log(`Found ${inputs.length} actual radio inputs`);
+      
       if (items.length === 0) {
-        console.error('❌ No radio buttons rendered! Check SurveyJS version compatibility.');
+        console.error('❌ No radio buttons rendered!');
       }
-    }, 100);
+      
+      if (inputs.length === 0) {
+        console.error('❌ No radio inputs found in DOM!');
+      } else {
+        console.log('✅ Radio inputs exist, checking visibility...');
+        inputs.forEach((input, i) => {
+          const computed = window.getComputedStyle(input);
+          console.log(`Radio ${i}: display=${computed.display}, visibility=${computed.visibility}, opacity=${computed.opacity}`);
+        });
+      }
+    }, 200);
   },
   on_finish: (data) => {
     try {
