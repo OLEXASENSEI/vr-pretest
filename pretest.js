@@ -1,4 +1,4 @@
-// Version 4.4 (Final Complete) — Pre-Test Battery
+// Version 4.5 (Fixed “first page won’t continue”) — Pre-Test Battery
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -36,7 +36,7 @@ const mic_plugins_available = () => {
   return have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 };
 
-/* ========== GLOBAL CSS ========== */
+/* ========== GLOBAL CSS (FIXED) ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
   .sv-root, .sv_main, .sv-container { position: static !important; }
@@ -47,12 +47,16 @@ document.head.appendChild(baseStyle);
 const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
-  
-  /* Hide only specific SurveyJS controls */
-  .sd-action-bar, .sd-question__erbox-clear { display: none !important; }
-  
-  /* SHOW the complete button */
-  .sd-btn--action.sd-navigation__complete-btn {
+
+  /* DO NOT hide the action bar anymore — it contains the Continue/Complete buttons */
+  /* .sd-action-bar { display: none !important; } */
+
+  /* Keep only the error 'clear' icon hidden if you want */
+  .sd-question__erbox-clear { display: none !important; }
+
+  /* Make sure the complete/continue buttons are visible */
+  .sd-btn--action.sd-navigation__complete-btn,
+  .sd-btn--action.sd-navigation__next-btn {
     display: inline-block !important;
     visibility: visible !important;
     opacity: 1 !important;
@@ -65,20 +69,19 @@ surveyHeaderStyle.textContent = `
     cursor: pointer !important;
     margin-top: 20px !important;
   }
-  
-  .sd-btn--action.sd-navigation__complete-btn:hover {
+
+  .sd-btn--action.sd-navigation__complete-btn:hover,
+  .sd-btn--action.sd-navigation__next-btn:hover {
     background: #45a049 !important;
   }
-  
-  /* Make sure radio groups and items are visible */
+
   .sd-radiogroup, .sd-item, .sd-radio__item {
     display: block !important;
     visibility: visible !important;
     opacity: 1 !important;
     position: relative !important;
   }
-  
-  /* Radio group container - better layout */
+
   .sd-radiogroup {
     margin: 10px 0 20px 0 !important;
     display: flex !important;
@@ -86,8 +89,7 @@ surveyHeaderStyle.textContent = `
     gap: 10px !important;
     align-items: center !important;
   }
-  
-  /* Individual radio button items */
+
   .sd-item {
     display: inline-flex !important;
     align-items: center !important;
@@ -99,25 +101,11 @@ surveyHeaderStyle.textContent = `
     cursor: pointer !important;
     transition: all 0.2s !important;
   }
-  
-  /* Hover effect */
-  .sd-item:hover {
-    background: #e8f5e9 !important;
-    border-color: #4CAF50 !important;
-  }
-  
-  /* Selected state */
-  .sd-item--checked {
-    background: #4CAF50 !important;
-    border-color: #4CAF50 !important;
-  }
-  
-  .sd-item--checked .sd-item__control-label {
-    color: white !important;
-    font-weight: bold !important;
-  }
-  
-  /* The actual radio input circle - keep it visible */
+
+  .sd-item:hover { background: #e8f5e9 !important; border-color: #4CAF50 !important; }
+  .sd-item--checked { background: #4CAF50 !important; border-color: #4CAF50 !important; }
+  .sd-item--checked .sd-item__control-label { color: white !important; font-weight: bold !important; }
+
   input[type="radio"].sd-visuallyhidden {
     position: relative !important;
     opacity: 1 !important;
@@ -125,8 +113,7 @@ surveyHeaderStyle.textContent = `
     height: auto !important;
     margin-right: 6px !important;
   }
-  
-  /* Label text next to radio */
+
   .sd-item__control-label {
     display: inline !important;
     cursor: pointer !important;
@@ -135,8 +122,7 @@ surveyHeaderStyle.textContent = `
     background: transparent !important;
     border: none !important;
   }
-  
-  /* Make sure text inputs show */
+
   .sd-input, input[type="text"] {
     display: block !important;
     width: 100% !important;
@@ -147,46 +133,37 @@ surveyHeaderStyle.textContent = `
     border-radius: 4px !important;
     margin-top: 8px !important;
   }
-  
-  /* Question container */
-  .sd-question {
-    margin-bottom: 30px !important;
-    padding: 20px 0 !important;
-    border-bottom: 1px solid #eee !important;
-  }
-  
-  /* Question titles */
-  .sd-question__title {
-    font-weight: bold !important;
-    font-size: 16px !important;
-    margin-bottom: 8px !important;
-    color: #333 !important;
-  }
-  
-  /* Descriptions */
-  .sd-question__description {
-    color: #666 !important;
-    font-size: 14px !important;
-    margin-bottom: 12px !important;
-  }
-  
-  /* Footer with button */
-  .sd-footer {
-    margin-top: 30px !important;
-    padding-top: 20px !important;
-    text-align: center !important;
-  }
+
+  .sd-question { margin-bottom: 30px !important; padding: 20px 0 !important; border-bottom: 1px solid #eee !important; }
+  .sd-question__title { font-weight: bold !important; font-size: 16px !important; margin-bottom: 8px !important; color: #333 !important; }
+  .sd-question__description { color: #666 !important; font-size: 14px !important; margin-bottom: 12px !important; }
+  .sd-footer { margin-top: 30px !important; padding-top: 20px !important; text-align: center !important; }
 `;
 document.head.appendChild(surveyHeaderStyle);
+
+/* Safety: unhide action bar/buttons if some other CSS wins specificity */
+function ensureSurveyButtonsVisible() {
+  try {
+    document.querySelectorAll('.sd-action-bar').forEach(el => {
+      el.style.display = 'block';
+      el.style.visibility = 'visible';
+      el.style.opacity = '1';
+    });
+    document.querySelectorAll('.sd-navigation__complete-btn, .sd-navigation__next-btn').forEach(btn => {
+      btn.style.display = 'inline-block';
+      btn.style.visibility = 'visible';
+      btn.style.opacity = '1';
+    });
+  } catch(e) {}
+}
 
 /* Enhanced cleanup */
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
   });
-  document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
-    try { el.style.display = 'none'; } catch (e) {}
-  });
+  // Do NOT hide/remove .sd-action-bar anymore
+  ensureSurveyButtonsVisible();
 }
 
 /* ========== INIT jsPsych ========== */
@@ -470,8 +447,9 @@ const participant_info = {
   on_load: function() {
     console.log('Participant info survey loaded');
     setTimeout(() => {
+      ensureSurveyButtonsVisible();   // <— keep the button visible
       nukeSurveyArtifacts();
-      
+
       // Debug: Check what's actually in the DOM
       const radioGroups = document.querySelectorAll('.sd-radiogroup');
       console.log(`Found ${radioGroups.length} radio groups`);
@@ -517,6 +495,7 @@ const motion_sickness_questionnaire = {
     showQuestionNumbers: 'off',
     focusFirstQuestionAutomatic: false,
     showCompletedPage: false,
+    completeText: 'Continue / 続行',
     pages: [{
       name: 'mssq',
       elements: [
@@ -1177,6 +1156,7 @@ const ideophone_test = {
     showQuestionNumbers:'off',
     focusFirstQuestionAutomatic:false,
     showCompletedPage:false,
+    completeText:'Continue / 続行',
     pages:[{
       name:'ideo',
       elements:[
@@ -1312,7 +1292,9 @@ async function initializeExperiment(){
       choices:['Finish / 完了'],
       stimulus:function(){
         if(!assignedCondition) assignCondition();
-        const saved = asObject(localStorage.getItem('pretest_latest') ? JSON.parse(localStorage.getItem('pretest_latest')) : {});
+        const latestRaw = localStorage.getItem('pretest_latest');
+        let saved = {};
+        try { saved = latestRaw ? JSON.parse(latestRaw) : {}; } catch {}
         return `<div style="text-align:center;padding:40px;">
           <h2>✅ Complete! / 完了！</h2>
           <p><strong>Your assigned condition:</strong> <span style="color:#2196F3">${assignedCondition||'—'}</span></p>
