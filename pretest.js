@@ -1,4 +1,4 @@
-// Version 4.6 — Pre-Test Battery (asset() fix + cleaner SurveyJS look)
+// Version 4.7 — Pre-Test Battery (audio fix: asset() no path strip + centering)
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -21,20 +21,14 @@ const PROC_CONSTRAINTS = [
   ['Pour batter on pan', 'Flip when ready']
 ];
 
-/* ========== ASSET HELPER (robust) ========== */
+/* ========== ASSET HELPER (do NOT strip leading slash) ========== */
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 const asset = (p) => {
-  try {
-    if (!p) return '';
-    // Accept strings, URL objects, elements with src/href, etc.
-    const s = (typeof p === 'string') ? p : (p?.href || p?.src || String(p));
-    if (typeof s !== 'string') return '';
-    const clean = s.replace(/^(\.\/|\/)/, "");
-    return clean + (clean.includes("?") ? "&" : "?") + "v=" + ASSET_BUST;
-  } catch (e) {
-    console.warn('asset() failed for', p, e);
-    return typeof p === 'string' ? p : '';
-  }
+  if (!p && p !== 0) return '';
+  const s = (typeof p === 'string') ? p : (p?.href || p?.src || String(p));
+  if (typeof s !== 'string') return '';
+  const sep = s.includes('?') ? '&' : '?';
+  return `${s}${sep}v=${ASSET_BUST}`;
 };
 
 /* ========== PLUGIN/GLOBAL ACCESS HELPERS ========== */
@@ -45,97 +39,33 @@ const mic_plugins_available = () => {
   return have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 };
 
-/* ========== GLOBAL CSS (simplified, centered headings) ========== */
+/* ========== GLOBAL CSS (center; no boxes) ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
-  .sv-root, .sv_main, .sv-container { position: static !important; }
-  .jspsych-content { position: relative !important; }
+  .jspsych-content { position: relative !important; text-align: center !important; }
   .jspsych-content h1, .jspsych-content h2, .jspsych-content h3 { text-align: center !important; }
+  .jspsych-content .jspsych-btn { margin: 6px 8px !important; }
 `;
 document.head.appendChild(baseStyle);
 
 const surveyHeaderStyle = document.createElement("style");
 surveyHeaderStyle.textContent = `
-  /* Hide survey headers */
   .sd-header, .sv-title, .sd-page__title { display: none !important; }
-
-  /* Keep action bar visible so Complete button is usable */
   .sd-action-bar { display: flex !important; gap: 8px !important; justify-content: center !important; }
-
-  /* Hide Prev/Next/Start when single-page */
-  .sd-navigation__prev-btn,
-  .sd-navigation__start-btn,
-  .sd-navigation__next-btn { display: none !important; }
-
-  /* Complete button (keep, but simple) */
+  .sd-navigation__prev-btn, .sd-navigation__start-btn, .sd-navigation__next-btn { display: none !important; }
   .sd-btn--action.sd-navigation__complete-btn {
-    display: inline-block !important;
-    visibility: visible !important;
-    opacity: 1 !important;
-    background: #4CAF50 !important;
-    color: white !important;
-    padding: 10px 24px !important;
-    border: none !important;
-    border-radius: 4px !important;
-    font-size: 16px !important;
-    cursor: pointer !important;
+    display: inline-block !important; visibility: visible !important; opacity: 1 !important;
+    background: #4CAF50 !important; color: white !important; padding: 10px 24px !important;
+    border: none !important; border-radius: 4px !important; font-size: 16px !important; cursor: pointer !important;
     margin-top: 20px !important;
   }
-  .sd-btn--action.sd-navigation__complete-btn:hover { background: #45a049 !important; }
-
-  /* Clean question layout — remove boxes */
-  .sd-question {
-    margin: 24px 0 !important;
-    padding: 0 !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-  }
-
-  /* Titles left or centered? User asked to center: */
-  .sd-question__title { 
-    font-weight: 600 !important; 
-    font-size: 16px !important; 
-    margin-bottom: 8px !important; 
-    color: #1a1a1a !important;
-    text-align: center !important;
-  }
-  .sd-question__description {
-    color: #666 !important;
-    font-size: 14px !important;
-    margin-bottom: 10px !important;
-    text-align: center !important;
-  }
-
-  /* Radios: remove pill boxes; use default look with better spacing */
+  .sd-question { margin: 24px 0 !important; padding: 0 !important; background: transparent !important; border: none !important; box-shadow: none !important; }
+  .sd-question__title, .sd-question__description { text-align: center !important; }
   .sd-radiogroup { display: flex !important; flex-wrap: wrap !important; gap: 12px !important; justify-content: center !important; }
-  .sd-item { padding: 0 !important; background: transparent !important; border: none !important; border-radius: 0 !important; }
-  .sd-item--checked { background: transparent !important; border: none !important; box-shadow: none !important; }
-  .sd-item__control-label { font-size: 14px !important; }
-
-  /* Keep actual radio inputs visible for reliable clicks */
-  input[type="radio"].sd-visuallyhidden {
-    position: relative !important;
-    opacity: 1 !important;
-    width: auto !important;
-    height: auto !important;
-    margin-right: 6px !important;
-  }
-
-  /* Text inputs */
-  .sd-input, input[type="text"] {
-    display: block !important;
-    width: 100% !important;
-    max-width: 500px !important;
-    padding: 10px !important;
-    font-size: 16px !important;
-    border: 1px solid #ccc !important;
-    border-radius: 4px !important;
-    margin: 8px auto 0 auto !important;
-  }
-
-  /* Footer centered */
-  .sd-footer { margin-top: 24px !important; text-align: center !important; }
+  .sd-item { padding: 0 !important; background: transparent !important; border: none !important; }
+  input[type="radio"].sd-visuallyhidden { position: relative !important; opacity: 1 !important; margin-right: 6px !important; }
+  .sd-input, input[type="text"] { display: block !important; width: 100% !important; max-width: 500px !important; margin: 8px auto 0 auto !important; }
+  .sd-footer { text-align: center !important; }
 `;
 document.head.appendChild(surveyHeaderStyle);
 
@@ -143,9 +73,6 @@ document.head.appendChild(surveyHeaderStyle);
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
-  });
-  document.querySelectorAll(".sd-header, .sv-title").forEach(el => {
-    try { el.style.display = 'none'; } catch (e) {}
   });
 }
 
@@ -155,38 +82,21 @@ if (!have('initJsPsych')) {
   throw new Error("jsPsych core not loaded.");
 }
 
-if (!have('jsPsychSurvey')) {
-  console.warn('⚠️ jsPsychSurvey plugin not loaded! Surveys will be skipped.');
-}
-
-if (typeof window.Survey === 'undefined') {
-  console.warn('⚠️ SurveyJS library not loaded (styling may differ).');
-} else {
-  console.log('✅ SurveyJS library loaded successfully');
-}
-
 const jsPsych = T('initJsPsych')({
   display_element: "jspsych-target",
   use_webaudio: false,
   show_progress_bar: true,
   message_progress_bar: "進捗 Progress",
   default_iti: 350,
-  on_trial_start: () => { 
-    try { window.scrollTo(0, 0); } catch (e) {} 
-    nukeSurveyArtifacts(); 
-  },
-  on_trial_finish: () => {
-    setTimeout(nukeSurveyArtifacts, 50);
-  },
+  on_trial_start: () => { try { window.scrollTo(0, 0); } catch (e) {} nukeSurveyArtifacts(); },
+  on_trial_finish: () => setTimeout(nukeSurveyArtifacts, 50),
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
 
-/* ========== SMALL UTIL: SAFE JSON/OBJECT READ ========== */
+/* ========== UTIL ========== */
 function asObject(maybeJsonOrObj) {
   if (!maybeJsonOrObj) return {};
-  if (typeof maybeJsonOrObj === 'string') {
-    try { return JSON.parse(maybeJsonOrObj); } catch { return {}; }
-  }
+  if (typeof maybeJsonOrObj === 'string') { try { return JSON.parse(maybeJsonOrObj); } catch { return {}; } }
   if (typeof maybeJsonOrObj === 'object') return maybeJsonOrObj;
   return {};
 }
@@ -210,12 +120,10 @@ const foley_stimuli = [
 ];
 
 const picture_naming_stimuli = [
-  // Objects
   { image: 'img/bowl.jpg',    target: 'bowl',    category: 'utensil'    },
   { image: 'img/egg.jpg',     target: 'egg',     category: 'ingredient' },
   { image: 'img/flour.jpg',   target: 'flour',   category: 'ingredient' },
   { image: 'img/spatula.jpg', target: 'spatula', category: 'utensil'    },
-  // Actions - CORRECTED FILE EXTENSIONS
   { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action' },
   { image: 'img/cracking.jpeg', target: 'cracking', category: 'action' },
   { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action' },
@@ -230,30 +138,21 @@ const visual_iconicity_stimuli = [
   { shape: 'img/bowl_shape.svg',  words: ['container','cutter'], expected: 0, shape_type: 'container' },
 ];
 
-/* ========== PID/PHASE HELPERS ========== */
+/* ========== PHASE HELPERS ========== */
 let currentPID_value = 'unknown'; 
 function currentPID() { return currentPID_value; }
-function namingPhase() {
-  const p = new URLSearchParams(location.search).get('phase');
-  return (p === 'post') ? 'post' : 'pre';
-}
+function namingPhase() { const p = new URLSearchParams(location.search).get('phase'); return (p === 'post') ? 'post' : 'pre'; }
 
-/* ========== HELPER FUNCTIONS ========== */
+/* ========== SAVE ========== */
 function saveDataToServer(data) {
   try {
     const filename = `pretest_${currentPID()}_${Date.now()}.json`;
-    const json = JSON.stringify(data, null, 2);
-    localStorage.setItem('pretest_latest', JSON.stringify({ filename, timestamp: new Date().toISOString() }));
-    const blob = new Blob([json], { type: 'application/json' });
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-    console.log('Data saved:', filename);
-  } catch (e) {
-    console.error('Failed to save data:', e);
-  }
+    const a = document.createElement('a'); a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    localStorage.setItem('pretest_latest', JSON.stringify({ filename, timestamp: new Date().toISOString() }));
+  } catch (e) { console.error('Failed to save data:', e); }
 }
 
 function assignCondition() {
@@ -263,34 +162,8 @@ function assignCondition() {
   return assignedCondition;
 }
 
-function calculateAccuracy(data, taskName) {
-  const trials = data.filter(d => d.task === taskName);
-  if (trials.length === 0) return null;
-  const correct = trials.filter(d => d.correct === true).length;
-  return correct / trials.length;
-}
-
-function getSummaryMetrics(data) {
-  return {
-    phoneme_accuracy: calculateAccuracy(data, 'phoneme_discrimination'),
-    ldt_accuracy: calculateAccuracy(data, 'lexical_decision'),
-    foley_accuracy: calculateAccuracy(data, 'foley_iconicity'),
-    visual_accuracy: calculateAccuracy(data, 'visual_iconicity'),
-    participant_id: currentPID(),
-    condition: assignedCondition,
-    timestamp: new Date().toISOString()
-  };
-}
-
-/* ========== PRELOAD DEFINITION ========== */
-const preload = {
-  type: T('jsPsychPreload'),
-  audio: [],
-  images: [],
-  show_progress_bar: true,
-  message: 'Loading resources...',
-  error_message: 'Some resources failed to load. The experiment will continue with available resources.'
-};
+/* ========== PRELOAD ========== */
+const preload = { type: T('jsPsychPreload'), audio: [], images: [], show_progress_bar: true, message: 'Loading resources...', error_message: 'Some resources failed to load.' };
 
 /* ========== ASSET CHECKS ========== */
 async function checkAudioExists(url) {
@@ -319,33 +192,27 @@ async function checkImageExists(url) {
 
 async function filterExistingStimuli() {
   console.log("Validating assets (with cache-buster)…");
-
   const phoneme = [];
   for (const s of phoneme_discrimination_stimuli) {
     const ok1 = await checkAudioExists(asset(s.audio1));
     const ok2 = await checkAudioExists(asset(s.audio2));
-    if (ok1 && ok2) phoneme.push(s);
-    else console.warn("Skipping phoneme:", s.audio1, ok1, "/", s.audio2, ok2);
+    if (ok1 && ok2) phoneme.push(s); else console.warn("Skipping phoneme:", s.audio1, ok1, "/", s.audio2, ok2);
   }
-
   const foley = [];
   for (const s of foley_stimuli) {
     const ok = await checkAudioExists(asset(s.audio));
     if (ok) foley.push(s); else console.warn("Skipping foley:", s.audio);
   }
-
   const picture = [];
   for (const s of picture_naming_stimuli) {
     const ok = await checkImageExists(asset(s.image));
     if (ok) picture.push(s); else console.warn("Skipping picture:", s.image);
   }
-
   const visual = [];
   for (const s of visual_iconicity_stimuli) {
     const ok = await checkImageExists(asset(s.shape));
     if (ok) visual.push(s); else console.warn("Skipping visual:", s.shape);
   }
-
   console.log(`Final counts — Phoneme:${phoneme.length} Foley:${foley.length} Picture:${picture.length} Visual:${visual.length}`);
   return { phoneme, foley, picture, visual };
 }
@@ -354,7 +221,7 @@ let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
-/* ========== SURVEYS ========== */
+/* ========== SURVEYS (kept minimal) ========== */
 const participant_info = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
@@ -367,24 +234,15 @@ const participant_info = have('jsPsychSurvey') ? {
       name: 'p1',
       elements: [
         { type: 'text', name: 'participant_id', title: 'Participant ID', description: '参加者ID', isRequired: true, placeholder: 'Enter ID here' },
-        { type: 'radiogroup', name: 'age', title: 'Age', description: '年齢', isRequired: true, choices: ['18-25', '26-35', '36-45', '46-55', '56+'], colCount: 0 },
+        { type: 'radiogroup', name: 'age', title: 'Age', description: '年齢', isRequired: true, choices: ['18-25', '26-35', '36-45', '46-55', '56+'] },
         { type: 'radiogroup', name: 'native_language', title: 'Native Language', description: '母語', isRequired: true, choices: ['Japanese / 日本語', 'Other / その他'] },
-        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description: '英語学習年数', isRequired: true, choices: ['0-3', '4-6', '7-10', '10+'], colCount: 0 },
+        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description: '英語学習年数', isRequired: true, choices: ['0-3', '4-6', '7-10', '10+'] },
         { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description: 'VR経験', isRequired: true, choices: ['None / なし', '1–2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] }
       ]
     }]
   },
   data: { task: 'participant_info' },
-  on_load: function() { setTimeout(nukeSurveyArtifacts, 200); },
-  on_finish: (data) => {
-    try {
-      const resp = asObject(data.response);
-      currentPID_value = resp.participant_id || 'unknown';
-    } catch (e) {
-      currentPID_value = 'unknown_parse_fail';
-    }
-    setTimeout(nukeSurveyArtifacts, 100);
-  }
+  on_finish: (data) => { const resp = asObject(data.response); currentPID_value = resp.participant_id || 'unknown'; }
 } : null;
 
 const motion_sickness_questionnaire = have('jsPsychSurvey') ? {
@@ -405,70 +263,33 @@ const motion_sickness_questionnaire = have('jsPsychSurvey') ? {
       ]
     }]
   },
-  data: { task: 'motion_sickness' },
-  on_finish: () => setTimeout(nukeSurveyArtifacts, 100)
+  data: { task: 'motion_sickness' }
 } : null;
 
 /* ========== DIGIT & SPATIAL SPAN ========== */
-const digit_span_forward_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: `
-    <h2>Number Memory Test / 数字記憶テスト</h2>
-    <p>You will see a sequence of numbers.</p>
-    <p>数字の列が表示されます。順番通りに覚えてください。</p>`,
-  choices: ['Begin / 開始'],
-};
+const digit_span_forward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>`, choices: ['Begin / 開始'] };
 
 function generateOptimizedDigitSpanTrials(forward = true) {
-  const trials = [];
-  let failCount = 0;
+  const trials = []; let failCount = 0;
   for (let length = 3; length <= 8; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random()*10));
-    trials.push({
-      type: T('jsPsychHtmlKeyboardResponse'),
-      stimulus: `<div style="font-size:48px;padding:20px 24px;">${digits.join(' ')}</div>`,
-      choices: 'NO_KEYS',
-      trial_duration: 800*length,
-      data: { task:'digit_span_presentation', digits:digits.join(''), length, direction:forward?'forward':'backward' }
-    });
+    trials.push({ type: T('jsPsychHtmlKeyboardResponse'), stimulus: `<div style="font-size:48px;padding:20px 24px;">${digits.join(' ')}</div>`, choices: 'NO_KEYS', trial_duration: 800*length, data: { task:'digit_span_presentation', digits:digits.join(''), length, direction:forward?'forward':'backward' } });
     trials.push({
       type: T('jsPsychSurveyText'),
       questions:[{ prompt: forward?'Enter SAME order / 同じ順番':'Enter REVERSE order / 逆順', name:'response', required:true }],
       post_trial_gap: 250,
       data:{ task:'digit_span_response', correct_answer: forward?digits.join(''):digits.slice().reverse().join(''), length, direction:forward?'forward':'backward' },
-      on_finish: d => {
-        const rraw = d.response?.response ?? d.response;
-        const r = String(rraw ?? '').replace(/\s/g,'');
-        d.entered_response=r;
-        d.correct = r===d.correct_answer;
-        if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline();
-      }
+      on_finish: d => { const r = String(d.response?.response ?? d.response ?? '').replace(/\s/g,''); d.entered_response=r; d.correct = r===d.correct_answer; if (!d.correct && ++failCount>=2) jsPsych.abortCurrentTimeline(); }
     });
   }
   return trials;
 }
 
-const digit_span_backward_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: `
-    <h2>Reverse Number Memory / 逆順数字記憶</h2>
-    <p>Now enter the numbers in <b>reverse</b> order. 例: 1 2 3 → 3 2 1</p>`,
-  choices: ['Begin / 開始'],
-};
-
-const spatial_span_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: `
-    <h2>Spatial Memory Test / 空間記憶テスト</h2>
-    <p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>`,
-  choices: ['Begin / 開始'],
-};
+const digit_span_backward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. 例: 1 2 3 → 3 2 1</p>`, choices: ['Begin / 開始'] };
+const spatial_span_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h2>Spatial Memory Test / 空間記憶テスト</h2><p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>`, choices: ['Begin / 開始'] };
 
 function generateOptimizedSpatialSpanTrials(){
-  const trials=[];
-  window.spatialSpanFailCount=0;
-  const totalSquares=9;
-
+  const trials=[]; window.spatialSpanFailCount=0; const totalSquares=9;
   function makeTrial(seq,len){
     return {
       type: T('jsPsychHtmlKeyboardResponse'),
@@ -486,76 +307,35 @@ function generateOptimizedSpatialSpanTrials(){
       },
       data:{ task:'spatial_span', correct_answer: seq.join(','), length: len },
       on_load: function(){
-        const squares=[...document.querySelectorAll('.spatial-square')];
-        const ins=document.getElementById('spatial-instruction');
-        const hi=500, gap=220;
-        const resp=[];
-        let enabled=false, start=null;
-
+        const squares=[...document.querySelectorAll('.spatial-square')]; const ins=document.getElementById('spatial-instruction'); const hi=500, gap=220; const resp=[]; let enabled=false, start=null;
         squares.forEach(s=>s.classList.remove('clickable'));
-
         const show=(i)=>{
           if(i>=seq.length){
-            jsPsych.pluginAPI.setTimeout(()=>{
-              ins.textContent='Click the squares in order. / 同じ順番でクリック';
-              squares.forEach(s=>s.classList.add('clickable'));
-              enabled=true;
-              start=performance.now();
-            },300);
+            jsPsych.pluginAPI.setTimeout(()=>{ ins.textContent='Click the squares in order. / 同じ順番でクリック'; squares.forEach(s=>s.classList.add('clickable')); enabled=true; start=performance.now(); },300);
             return;
           }
-          const s=squares[seq[i]];
-          s.classList.add('active');
-          jsPsych.pluginAPI.setTimeout(()=>{
-            s.classList.remove('active');
-            jsPsych.pluginAPI.setTimeout(()=>show(i+1),gap);
-          },hi);
+          const s=squares[seq[i]]; s.classList.add('active');
+          jsPsych.pluginAPI.setTimeout(()=>{ s.classList.remove('active'); jsPsych.pluginAPI.setTimeout(()=>show(i+1),gap); },hi);
         };
-
         const end=()=>{
-          enabled=false;
-          squares.forEach(s=>{
-            s.classList.remove('clickable');
-            s.removeEventListener('click',click);
-          });
-          jsPsych.pluginAPI.clearAllTimeouts();
-          const rt=start?Math.round(performance.now()-start):null;
-          const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]);
-          if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.abortCurrentTimeline();
+          enabled=false; squares.forEach(s=>{ s.classList.remove('clickable'); s.removeEventListener('click',click); });
+          jsPsych.pluginAPI.clearAllTimeouts(); const rt=start?Math.round(performance.now()-start):null;
+          const ok=resp.length===seq.length && resp.every((v,i)=>v===seq[i]); if(!ok && ++window.spatialSpanFailCount>=2) jsPsych.abortCurrentTimeline();
           jsPsych.finishTrial({response:resp, click_sequence:resp.join(','), rt, correct:ok});
         };
-
-        const click=e=>{
-          if(!enabled) return;
-          const idx=+e.currentTarget.dataset.index;
-          resp.push(idx);
-          e.currentTarget.classList.add('selected');
-          if(resp.length>=seq.length) jsPsych.pluginAPI.setTimeout(end,160);
-        };
-
+        const click=e=>{ if(!enabled) return; const idx=+e.currentTarget.dataset.index; resp.push(idx); e.currentTarget.classList.add('selected'); if(resp.length>=seq.length) jsPsych.pluginAPI.setTimeout(end,160); };
         squares.forEach(s=>s.addEventListener('click',click));
         show(0);
       }
     };
   }
-
-  for(let len=3; len<=6; len++){
-    const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len);
-    trials.push(makeTrial(seq,len));
-  }
+  for(let len=3; len<=6; len++){ const seq=jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len); trials.push(makeTrial(seq,len)); }
   return trials;
 }
-
 const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? generateOptimizedSpatialSpanTrials() : [];
 
 /* ========== PHONOLOGICAL AWARENESS ========== */
-const phoneme_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus:()=>`<h2>Sound Discrimination / 音の識別</h2>
-    <p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p>
-    <p style="color:#666">Trials: ${FILTERED_STIMULI.phoneme?.length||0}</p>`,
-  choices:['Begin / 開始'],
-};
+const phoneme_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus:()=>`<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ${FILTERED_STIMULI.phoneme?.length||0}</p>`, choices:['Begin / 開始'] };
 
 const phoneme_trial = {
   type: T('jsPsychHtmlKeyboardResponse'),
@@ -570,13 +350,20 @@ const phoneme_trial = {
         <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same</button>
         <button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different</button>
       </div>
+      <p id="dbg" style="font-size:12px;color:#888;"></p>
     </div>`,
   data:{ task:'phoneme_discrimination', correct_answer:jsPsych.timelineVariable('correct'), contrast_type:jsPsych.timelineVariable('contrast') },
   on_load:function(){
-    const a1src = asset(jsPsych.timelineVariable('audio1'));
-    const a2src = asset(jsPsych.timelineVariable('audio2'));
-    const a1=new Audio(a1src);
-    const a2=new Audio(a2src);
+    const srcA = asset(jsPsych.timelineVariable('audio1'));
+    const srcB = asset(jsPsych.timelineVariable('audio2'));
+    const a1=new Audio(srcA);
+    const a2=new Audio(srcB);
+
+    const dbg = document.getElementById('dbg');
+    if (dbg) dbg.textContent = `A: ${srcA} | B: ${srcB}`;
+
+    a1.addEventListener('canplaythrough', ()=>{ /* ready */ });
+    a2.addEventListener('canplaythrough', ()=>{ /* ready */ });
 
     a1.addEventListener('error', ()=>{ const b=document.getElementById('playA'); if(b){ b.textContent='❌ Audio A unavailable'; b.disabled=true; }});
     a2.addEventListener('error', ()=>{ const b=document.getElementById('playB'); if(b){ b.textContent='❌ Audio B unavailable'; b.disabled=true; }});
@@ -635,68 +422,17 @@ const ldt_stimuli = [
   { stimulus:'PANKET',  correct_response:'n', word_type:'nonword'          },
 ];
 
-const ldt_instructions = {
-  type: T('jsPsychHtmlKeyboardResponse'),
-  choices:[' '],
-  stimulus: `
-    <h2>Word Recognition / 単語認識</h2>
-    <div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;">
-      <p><b>W</b> = word / <b>N</b> = not a word</p>
-    </div>
-    <p><b>Press SPACE to begin</b></p>`
-};
-
+const ldt_instructions = { type: T('jsPsychHtmlKeyboardResponse'), choices:[' '], stimulus: `<h2>Word Recognition / 単語認識</h2><div style="border:2px solid #4CAF50;padding:15px;border-radius:8px;max-width:500px;margin:20px auto;"><p><b>W</b> = word / <b>N</b> = not a word</p></div><p><b>Press SPACE to begin</b></p>` };
 const ldt_fixation = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:'<div style="font-size:60px;">+</div>', choices:'NO_KEYS', trial_duration:500 };
-
-const ldt_trial = {
-  type: T('jsPsychHtmlKeyboardResponse'),
-  stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
-  stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250,
-  data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') },
-  on_finish:d=>d.correct=(d.response===d.correct_response)
-};
-
+const ldt_trial = { type: T('jsPsychHtmlKeyboardResponse'), stimulus:()=>`<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`, stimulus_duration:1000, choices:['w','n'], trial_duration:2500, post_trial_gap:250, data:{ task:'lexical_decision', correct_response:jsPsych.timelineVariable('correct_response'), word_type:jsPsych.timelineVariable('word_type') }, on_finish:d=>d.correct=(d.response===d.correct_response) };
 const ldt_procedure = { timeline:[ldt_fixation, ldt_trial], timeline_variables: ldt_stimuli, randomize_order:true };
 
-/* ========== SPOKEN PICTURE NAMING ========== */
-function modelPronAudioFor(target) {
-  return `pron/${(target||'').toLowerCase()}.mp3`;
-}
+/* ========== NAMING ========== */
+function modelPronAudioFor(target) { return `pron/${(target||'').toLowerCase()}.mp3`; }
+const naming_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: () => `<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：（1）モデル音声（任意）、（2）4秒録音。</p><p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>`, choices: ['Begin / 開始'], post_trial_gap: 500 };
+const mic_request = { type: T('jsPsychInitializeMicrophone'), data: { task: 'microphone_initialization' }, on_finish: async function () { microphoneAvailable = true; } };
 
-const naming_intro = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: () => `<h2>Picture Naming / 絵の命名</h2>
-    <p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p>
-    <p>各絵：（1）モデル音声（任意）、（2）4秒録音。</p>
-    <p style="color:#666">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>`,
-  choices: ['Begin / 開始'],
-  post_trial_gap: 500,
-};
-
-const mic_request = {
-  type: T('jsPsychInitializeMicrophone'),
-  data: { task: 'microphone_initialization' },
-  on_finish: async function () {
-    microphoneAvailable = true; 
-    console.log('Microphone init requested. Status will be known on check trial.');
-  }
-};
-
-const naming_mic_check = {
-  type: T('jsPsychHtmlAudioResponse'),
-  stimulus: `<div style="max-width:640px;margin:0 auto;text-align:left">
-      <h3>Microphone check / マイク確認</h3>
-      <p>Say "test" for about 2 seconds.</p>
-    </div>`,
-  recording_duration: 2000,
-  show_done_button: true,
-  allow_playback: true,
-  accept_button_text: 'Sounds OK / 続行',
-  data: { task: 'mic_check' },
-  on_finish: (data) => {
-    if (data.recorded_data_url) microphoneAvailable = true;
-  }
-};
+const naming_mic_check = { type: T('jsPsychHtmlAudioResponse'), stimulus: `<div style="max-width:640px;margin:0 auto;text-align:left"><h3>Microphone check / マイク確認</h3><p>Say "test" for about 2 seconds.</p></div>`, recording_duration: 2000, show_done_button: true, allow_playback: true, accept_button_text: 'Sounds OK / 続行', data: { task: 'mic_check' }, on_finish: (data) => { if (data.recorded_data_url) microphoneAvailable = true; } };
 
 const naming_prepare = {
   type: T('jsPsychHtmlButtonResponse'),
@@ -704,48 +440,23 @@ const naming_prepare = {
     const img   = jsPsych.timelineVariable('image');
     const tgt   = jsPsych.timelineVariable('target') || '';
     const imgHTML = img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>';
-    return `
-      <div style="text-align:center;">
-        ${imgHTML}
-        <div style="margin-top:12px;">
-          <button id="play-model" class="jspsych-btn" style="margin-right:8px;">▶️ Model</button>
-          <span id="model-status" style="font-size:13px;color:#666">Optional</span>
-        </div>
-        <p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p>
-      </div>`;
+    return `<div style="text-align:center;">${imgHTML}<div style="margin-top:12px;"><button id="play-model" class="jspsych-btn" style="margin-right:8px;">▶️ Model</button><span id="model-status" style="font-size:13px;color:#666">Optional</span></div><p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.</p></div>`;
   },
   choices: ['Start recording / 録音開始'],
   post_trial_gap: 200,
-  data: () => ({
-    task: 'picture_naming_prepare',
-    target: jsPsych.timelineVariable('target') || 'unknown',
-    category: jsPsych.timelineVariable('category') || 'unknown',
-    image_file: jsPsych.timelineVariable('image') || 'none'
-  }),
+  data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none' }),
   on_load: () => {
     const tgt   = jsPsych.timelineVariable('target') || '';
     const model = modelPronAudioFor(tgt);
     const btn   = document.getElementById('play-model');
     const stat  = document.getElementById('model-status');
-
     let a = null, ready = false;
     const onCan = () => { ready = true; stat.textContent = 'Ready'; };
     const onErr = () => { ready = false; stat.textContent = 'Not available'; if (btn) btn.disabled = true; };
-
-    // Guard: if model is empty like 'pron/.mp3', still try; else disable
     const src = asset(model);
     if (!src) { onErr(); return; }
-
-    a = new Audio();
-    a.preload = 'auto';
-    a.addEventListener('canplaythrough', onCan);
-    a.addEventListener('error', onErr);
-    a.src = src;
-
-    btn?.addEventListener('click', () => {
-      if (!ready) return;
-      try { a.currentTime = 0; a.play(); stat.textContent = 'Playing…'; } catch (e) {}
-    });
+    a = new Audio(); a.preload = 'auto'; a.addEventListener('canplaythrough', onCan); a.addEventListener('error', onErr); a.src = src;
+    btn?.addEventListener('click', () => { if (!ready) return; try { a.currentTime = 0; a.play(); stat.textContent = 'Playing…'; } catch (e) {} });
   }
 };
 
@@ -753,51 +464,27 @@ const naming_record = {
   type: T('jsPsychHtmlAudioResponse'),
   stimulus: () => {
     const img = jsPsych.timelineVariable('image');
-    return `
-      <div style="text-align:center;">
-        ${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}
-        <p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p>
-      </div>`;
+    return `<div style="text-align:center;">${img ? `<img src="${asset(img)}" style="width:350px;border-radius:8px;" />` : '<p style="color:#c00">Missing image.</p>'}<p style="margin-top:16px; color:#d32f2f; font-weight:bold;">🔴 Recording… speak now!</p></div>`;
   },
   recording_duration: 4000,
   show_done_button: false,
   allow_playback: false,
-  data: () => ({
-    task: 'picture_naming_audio',
-    target: jsPsych.timelineVariable('target') || 'unknown',
-    category: jsPsych.timelineVariable('category') || 'unknown',
-    image_file: jsPsych.timelineVariable('image') || 'none',
-    phase: namingPhase(),
-    pid_snapshot: currentPID()
-  }),
+  data: () => ({ task: 'picture_naming_audio', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', phase: namingPhase(), pid_snapshot: currentPID() }),
   on_finish: (d) => {
     const pid   = d.pid_snapshot || currentPID();
     const tgt   = (d.target || 'unknown').toLowerCase();
     const idx   = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x';
     const phase = d.phase || namingPhase();
-    const base  = `${phase}_${pid}_${tgt}_${idx}.wav`;
-    d.audio_filename = base;
-
+    d.audio_filename = `${phase}_${pid}_${tgt}_${idx}.wav`;
     try {
-      const blob = (d.response && d.response instanceof Blob) ? d.response
-                : (d.response?.recording && d.response.recording instanceof Blob) ? d.response.recording
-                : null;
-      if (blob) {
-        d.audio_blob_url = URL.createObjectURL(blob);
-      }
+      const blob = (d.response && d.response instanceof Blob) ? d.response : (d.response?.recording && d.response.recording instanceof Blob) ? d.response.recording : null;
+      if (blob) d.audio_blob_url = URL.createObjectURL(blob);
     } catch (e) {}
   }
 };
 
 /* ========== FOLEY ICONICITY ========== */
-const foley_intro = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2>
-    <p>Play the sound and choose what it represents.</p>
-    <p style="color:#666">Sounds: ${FILTERED_STIMULI.foley?.length||0}</p>
-    <p><b>NOTE: Please ensure your volume is adequate for this task.</b></p>`,
-  choices:['Begin / 開始'],
-};
+const foley_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: ()=>`<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p style="color:#666">Sounds: ${FILTERED_STIMULI.foley?.length||0}</p>`, choices:['Begin / 開始'] };
 
 const foley_trial = {
   type: T('jsPsychHtmlButtonResponse'),
@@ -812,139 +499,48 @@ const foley_trial = {
     </div>`,
   choices: () => jsPsych.timelineVariable('options'),
   post_trial_gap: 250,
-  data: () => ({
-    task:'foley_iconicity',
-    correct_answer: jsPsych.timelineVariable('correct'),
-    mapping_type: jsPsych.timelineVariable('mapping_type'),
-    audio_file: jsPsych.timelineVariable('audio')
-  }),
+  data: () => ({ task:'foley_iconicity', correct_answer: jsPsych.timelineVariable('correct'), mapping_type: jsPsych.timelineVariable('mapping_type'), audio_file: jsPsych.timelineVariable('audio') }),
   on_load: function(){
     const url = asset(jsPsych.timelineVariable('audio'));
     const btn = document.getElementById('foley-play');
     const status = document.getElementById('foley-status');
-
-    let audio = new Audio();
-    audio.preload = 'auto';
-    audio.src = url;
-
+    let audio = new Audio(); audio.preload = 'auto'; audio.src = url;
     let audioLoaded = false;
-
-    const onCanPlay = () => {
-      audioLoaded = true;
-      if (status) status.textContent = 'Audio ready - click to play';
-      if (btn) btn.disabled = false;
-    };
-    const onError = () => {
-      if (btn) { btn.textContent = '❌ Audio unavailable'; btn.disabled = true; }
-      if (status) status.textContent = 'Audio failed to load - you can still answer';
-    };
-    const playHandler = () => {
-      if (!audioLoaded) return;
-      try {
-        audio.currentTime = 0;
-        audio.play().then(() => {
-          if (status) status.textContent = 'Playing audio...';
-        }).catch(() => {
-          if (status) status.textContent = 'Playback failed';
-        });
-      } catch (e) {}
-    };
-
+    const onCanPlay = () => { audioLoaded = true; if (status) status.textContent = 'Audio ready - click to play'; if (btn) btn.disabled = false; };
+    const onError = () => { if (btn) { btn.textContent = '❌ Audio unavailable'; btn.disabled = true; } if (status) status.textContent = 'Audio failed to load - you can still answer'; };
+    const playHandler = () => { if (!audioLoaded) return; try { audio.currentTime = 0; audio.play(); if (status) status.textContent = 'Playing audio...'; } catch (e) {} };
     audio.addEventListener('canplaythrough', onCanPlay);
     audio.addEventListener('error', onError);
     if (btn) btn.addEventListener('click', playHandler);
-
-    window.__foleyCleanup = () => {
-      try {
-        if (btn) btn.removeEventListener('click', playHandler);
-        if (audio) {
-          audio.pause();
-          audio.removeEventListener('canplaythrough', onCanPlay);
-          audio.removeEventListener('error', onError);
-          audio.src = '';
-          audio.load();
-        }
-      } catch (e) {}
-      audio = null;
-    };
+    window.__foleyCleanup = () => { try { if (btn) btn.removeEventListener('click', playHandler); if (audio) { audio.pause(); audio.removeEventListener('canplaythrough', onCanPlay); audio.removeEventListener('error', onError); audio.src = ''; audio.load(); } } catch (e) {} audio = null; };
   },
-  on_finish: function(d){
-    d.skipped = false;
-    d.correct = (d.response === d.correct_answer);
-    try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch (e) {}
-    window.__foleyCleanup = null;
-  }
+  on_finish: function(d){ d.skipped = false; d.correct = (d.response === d.correct_answer); try { if (window.__foleyCleanup) window.__foleyCleanup(); } catch (e) {} window.__foleyCleanup = null; }
 };
 
 /* ========== VISUAL ICONICITY ========== */
-const visual_intro = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: ()=>`<h2>Shape–Word Matching / 形と単語のマッチング</h2>
-    <p>Choose the word that best matches the shape.</p>
-    <p style="color:#666">Shapes: ${FILTERED_STIMULI.visual?.length||0}</p>`,
-  choices:['Begin / 開始'],
-};
+const visual_intro = { type: T('jsPsychHtmlButtonResponse'), stimulus: ()=>`<h2>Shape–Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p style="color:#666">Shapes: ${FILTERED_STIMULI.visual?.length||0}</p>`, choices:['Begin / 開始'] };
 
 const visual_trial = {
   type: T('jsPsychHtmlButtonResponse'),
-  stimulus: () => `
-    <div style="text-align:center;">
-      <img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" />
-      <p style="margin-top:20px;">Which word matches this shape?</p>
-    </div>`,
+  stimulus: () => `<div style="text-align:center;"><img src="${asset(jsPsych.timelineVariable('shape'))}" style="width:200px;height:200px;" /><p style="margin-top:20px;">Which word matches this shape?</p></div>`,
   choices: () => jsPsych.timelineVariable('words') || [],
   post_trial_gap: 250,
-  data: {
-    task: 'visual_iconicity',
-    correct_answer: jsPsych.timelineVariable('expected'),
-    shape_type: jsPsych.timelineVariable('shape_type')
-  },
+  data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
   on_finish: d => { d.correct = (d.response === d.correct_answer); }
 };
 
 /* ========== PROCEDURAL ========== */
-const procedural_instructions = {
-  type: T('jsPsychHtmlButtonResponse'),
-  stimulus: `<h3>Quick Recipe Ordering</h3>
-    <p>Number the actions 1–5. <b>Multiple valid orders</b> exist, but some steps must precede others (e.g., whisk before pour).</p>
-    <p>番号（1–5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>`,
-  choices: ['OK']
-};
+const procedural_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: `<h3>Quick Recipe Ordering</h3><p>Number the actions 1–5. <b>Multiple valid orders</b> exist, but some steps must precede others (e.g., whisk before pour).</p><p>番号（1–5）を入力してください。正解は1通りではありませんが、いくつかの順序制約があります。</p>`, choices: ['OK'] };
 
 const procedural_test = {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: function() {
     const randomizedSteps = jsPsych.randomization.shuffle([...PROCEDURE_STEPS]);
-    
-    let html = `
-      <div style="max-width: 600px; margin: 0 auto; text-align: left;">
-        <h3>Assign a step number (1–5) to each action.</h3>
-        <p>各アクションに番号を割り当ててください (1–5)</p>
-        <div style="margin-top: 20px;">
-    `;
-    
+    let html = `<div style="max-width: 600px; margin: 0 auto; text-align: left;"><h3>Assign a step number (1–5) to each action.</h3><p>各アクションに番号を割り当ててください (1–5)</p><div style="margin-top: 20px;">`;
     randomizedSteps.forEach((step, index) => {
-      html += `
-        <div style="margin: 15px 0;">
-          <label style="display: block; margin-bottom: 5px;"><b>${step}</b></label>
-          <select id="step_${index}" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;">
-            <option value="">Select order / 選択...</option>
-            <option value="1">1 (First / 最初)</option>
-            <option value="2">2</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5 (Last / 最後)</option>
-          </select>
-        </div>
-      `;
+      html += `<div style="margin: 15px 0;"><label style="display: block; margin-bottom: 5px;"><b>${step}</b></label><select id="step_${index}" class="step-selector" style="width: 100%; padding: 8px; font-size: 16px;"><option value="">Select order / 選択...</option><option value="1">1 (First / 最初)</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5">5 (Last / 最後)</option></select></div>`;
     });
-    
-    html += `
-        </div>
-        <p id="validation-msg" style="color: red; display: none;">Please assign each number only once / 各番号は1回のみ使用してください</p>
-      </div>
-    `;
-    
+    html += `</div><p id="validation-msg" style="color: red; display: none;">Please assign each number only once / 各番号は1回のみ使用してください</p></div>`;
     window._randomizedSteps = randomizedSteps;
     return html;
   },
@@ -953,41 +549,23 @@ const procedural_test = {
     const selectors = document.querySelectorAll('.step-selector');
     const submitBtn = document.querySelector('.jspsych-btn');
     const validationMsg = document.getElementById('validation-msg');
-    
-    submitBtn.disabled = true;
-    submitBtn.style.opacity = '0.5';
-    
+    submitBtn.disabled = true; submitBtn.style.opacity = '0.5';
     const validateSelections = () => {
       const values = Array.from(selectors).map(s => s.value).filter(v => v !== '');
       const allFilled = values.length === 5;
       const allUnique = new Set(values).size === values.length;
-      
-      if (allFilled && allUnique) {
-        submitBtn.disabled = false;
-        submitBtn.style.opacity = '1';
-        validationMsg.style.display = 'none';
-      } else {
-        submitBtn.disabled = true;
-        submitBtn.style.opacity = '0.5';
-        if (allFilled && !allUnique) {
-          validationMsg.style.display = 'block';
-        }
-      }
+      if (allFilled && allUnique) { submitBtn.disabled = false; submitBtn.style.opacity = '1'; validationMsg.style.display = 'none'; }
+      else { submitBtn.disabled = true; submitBtn.style.opacity = '0.5'; if (allFilled && !allUnique) validationMsg.style.display = 'block'; }
     };
-    
     selectors.forEach((selector) => {
       selector.addEventListener('change', function() {
         const selectedValues = Array.from(selectors).map(s => s.value).filter(v => v !== '');
-        
         selectors.forEach(s => {
           const currentValue = s.value;
           Array.from(s.options).forEach(opt => {
-            if (opt.value !== '') {
-              opt.disabled = selectedValues.includes(opt.value) && opt.value !== currentValue;
-            }
+            if (opt.value !== '') opt.disabled = selectedValues.includes(opt.value) && opt.value !== currentValue;
           });
         });
-        
         validateSelections();
       });
     });
@@ -996,30 +574,16 @@ const procedural_test = {
   on_finish: (data) => {
     const selectors = document.querySelectorAll('.step-selector');
     const randomizedSteps = window._randomizedSteps;
-    
     const pos = {};
-    randomizedSteps.forEach((label, i) => {
-      const selector = selectors[i];
-      const v = parseInt(selector.value, 10);
-      pos[label] = Number.isFinite(v) ? v : null;
-    });
-
+    randomizedSteps.forEach((label, i) => { const v = parseInt(selectors[i].value, 10); pos[label] = Number.isFinite(v) ? v : null; });
     let tot = 0, ok = 0, violations = [];
-    PROC_CONSTRAINTS.forEach(([a, b]) => {
-      if (pos[a] && pos[b]) {
-        tot++;
-        if (pos[a] < pos[b]) ok++;
-        else violations.push(`${a} → ${b}`);
-      }
-    });
-
+    PROC_CONSTRAINTS.forEach(([a, b]) => { if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(`${a} → ${b}`); } });
     data.responses_positions   = pos;
     data.constraints_total     = tot;
     data.constraints_satisfied = ok;
     data.partial_order_score   = (tot > 0) ? ok / tot : null;
     data.violations            = violations;
     data.randomized_order      = randomizedSteps;
-    
     delete window._randomizedSteps;
   }
 };
@@ -1033,28 +597,12 @@ const ideophone_test = have('jsPsychSurvey') ? {
     focusFirstQuestionAutomatic:false,
     showCompletedPage:false,
     completeText: 'Continue / 続行',
-    pages:[{
-      name:'ideo',
-      elements:[
-        { 
-          type:'radiogroup', 
-          name:'frying_sound',  
-          title:'Egg frying sound? / 卵を焼く音は？',    
-          isRequired:true, 
-          choices:['ジュージュー','パラパラ','グルグル'] 
-        },
-        { 
-          type:'radiogroup', 
-          name:'stirring_sound', 
-          title:'Stirring sound? / かき混ぜる音は？', 
-          isRequired:true, 
-          choices:['ジュージュー','パラパラ','グルグル'] 
-        },
-      ]
-    }]
+    pages:[{ name:'ideo', elements:[
+      { type:'radiogroup', name:'frying_sound',  title:'Egg frying sound? / 卵を焼く音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
+      { type:'radiogroup', name:'stirring_sound', title:'Stirring sound? / かき混ぜる音は？', isRequired:true, choices:['ジュージュー','パラパラ','グルグル'] },
+    ]}]
   },
-  data:{ task:'ideophone_mapping' },
-  on_finish:()=>setTimeout(nukeSurveyArtifacts, 100)
+  data:{ task:'ideophone_mapping' }
 } : null;
 
 /* ========== FINAL TIMELINE BUILD ========== */
@@ -1190,4 +738,8 @@ if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', initializeExperiment);
 } else {
   initializeExperiment();
-}
+}"""
+open_path = "/mnt/data/pretest_v4_7_audio_centered.js"
+with open(open_path,"w") as f:
+    f.write(code)
+print(open_path)
