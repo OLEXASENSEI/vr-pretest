@@ -57,45 +57,117 @@ function asObject(maybeJsonOrObj) {
 /* ========== GLOBAL CSS ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
-  .jspsych-content { position: relative !important; text-align: center !important; }
-  .jspsych-content h1, .jspsych-content h2, .jspsych-content h3 { text-align: center !important; }
-  .jspsych-content .jspsych-btn { margin: 6px 8px !important; }
-  
-  .sd-header, .sv-title, .sd-page__title { display: none !important; }
-  .sd-question { margin: 24px auto !important; padding: 0 !important; max-width: 600px !important; text-align: left !important; }
-  .sd-question__title { text-align: left !important; font-weight: bold; }
-  .sd-question__description { color: #666; font-size: 14px; margin-top: 4px; }
-  
-  .sd-action-bar { display: flex !important; justify-content: flex-end !important; padding: 15px 0; }
-  .sd-footer { text-align: right !important; margin-top: 30px !important; }
-  .sd-btn { visibility: visible !important; opacity: 1 !important; }
-  
-  .sd-radiogroup {
-    display: flex !important; 
-    flex-wrap: wrap !important; 
-    gap: 15px 30px !important; 
-    align-items: center !important;
-    margin: 10px 0 20px 0 !important;
+  /* Center all content */
+  .jspsych-content { 
+    position: relative !important; 
+    text-align: center !important;
+    max-width: 800px !important;
+    margin: 0 auto !important;
+    padding: 20px !important;
   }
   
+  .jspsych-content h1, .jspsych-content h2, .jspsych-content h3 { 
+    text-align: center !important; 
+  }
+  
+  .jspsych-content .jspsych-btn { 
+    margin: 6px 8px !important; 
+  }
+  
+  /* Hide SurveyJS default headers */
+  .sd-header, .sv-title, .sd-page__title { 
+    display: none !important; 
+  }
+  
+  /* Survey container centering */
+  .sd-root-modern {
+    max-width: 700px !important;
+    margin: 0 auto !important;
+  }
+  
+  /* Question styling with better spacing */
+  .sd-question { 
+    margin: 32px auto !important; 
+    padding: 0 20px !important; 
+    max-width: 600px !important; 
+    text-align: left !important; 
+  }
+  
+  .sd-question__title { 
+    text-align: left !important; 
+    font-weight: bold !important;
+    font-size: 16px !important;
+    margin-bottom: 8px !important;
+  }
+  
+  .sd-question__description { 
+    color: #666 !important; 
+    font-size: 14px !important; 
+    margin-top: 4px !important;
+    margin-bottom: 12px !important;
+  }
+  
+  /* Radio button group - vertical layout with spacing */
+  .sd-radiogroup {
+    display: flex !important; 
+    flex-direction: column !important;
+    gap: 12px !important;
+    margin: 16px 0 24px 0 !important;
+  }
+  
+  /* Individual radio items with proper spacing */
   .sd-item {
-    padding: 0 !important;
+    padding: 8px 0 !important;
     background: transparent !important;
     border: none !important;
     display: flex !important;
     align-items: center !important;
+    gap: 10px !important;
   }
   
+  .sd-item__control {
+    margin-right: 8px !important;
+  }
+  
+  .sd-item__control-label {
+    font-size: 15px !important;
+    line-height: 1.5 !important;
+  }
+  
+  /* Highlight selected item */
   .sd-item--checked .sd-item__control-label {
     font-weight: bold !important;
     color: #4CAF50 !important;
   }
   
+  /* Text input styling */
   .sd-input, input[type="text"] { 
     display: block !important; 
     width: 100% !important; 
     max-width: 500px !important; 
     margin: 8px 0 0 0 !important;
+    padding: 8px 12px !important;
+    font-size: 14px !important;
+  }
+  
+  /* Navigation buttons */
+  .sd-action-bar { 
+    display: flex !important; 
+    justify-content: center !important; 
+    padding: 20px 0 !important;
+    margin-top: 30px !important;
+  }
+  
+  .sd-footer { 
+    text-align: center !important; 
+    margin-top: 30px !important; 
+  }
+  
+  .sd-btn { 
+    visibility: visible !important; 
+    opacity: 1 !important;
+    padding: 10px 24px !important;
+    font-size: 16px !important;
   }
 `;
 document.head.appendChild(baseStyle);
@@ -581,6 +653,226 @@ function generateOptimizedSpatialSpanTrials() {
 const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? 
   generateOptimizedSpatialSpanTrials() : [];
 
+/* ========== TASK BUILDERS ========== */
+function buildPhonemeDiscriminationTask() {
+  const trials = [];
+  
+  if (FILTERED_STIMULI.phoneme.length === 0) {
+    console.warn('No phoneme stimuli available');
+    return trials;
+  }
+
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Phoneme Discrimination / 音素弁別</h2><p>Listen to two sounds. Are they the same or different?</p><p>2つの音を聞いて、同じか違うか答えてください。</p>',
+    choices: ['Begin / 開始']
+  });
+
+  FILTERED_STIMULI.phoneme.forEach((stim, idx) => {
+    trials.push({
+      type: T('jsPsychAudioButtonResponse'),
+      stimulus: stim.audio1Url,
+      choices: ['Continue'],
+      prompt: '<p>First sound / 最初の音</p>',
+      data: { task: 'phoneme_first', trial: idx }
+    });
+
+    trials.push({
+      type: T('jsPsychAudioButtonResponse'),
+      stimulus: stim.audio2Url,
+      choices: ['Same / 同じ', 'Different / 違う'],
+      prompt: '<p>Second sound - Are they the same or different?</p>',
+      data: {
+        task: 'phoneme_discrimination',
+        correct_answer: stim.correct,
+        contrast: stim.contrast,
+        trial: idx
+      },
+      on_finish: (d) => {
+        const resp = d.response === 0 ? 'same' : 'different';
+        d.response_label = resp;
+        d.correct = resp === d.correct_answer;
+      }
+    });
+  });
+
+  return trials;
+}
+
+function buildFoleyTask() {
+  const trials = [];
+  
+  if (FILTERED_STIMULI.foley.length === 0) {
+    console.warn('No foley stimuli available');
+    return trials;
+  }
+
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Sound Recognition / 音の認識</h2><p>Listen to each sound and choose what it represents.</p>',
+    choices: ['Begin / 開始']
+  });
+
+  FILTERED_STIMULI.foley.forEach((stim, idx) => {
+    trials.push({
+      type: T('jsPsychAudioButtonResponse'),
+      stimulus: stim.audioUrl,
+      choices: stim.options,
+      prompt: '<p>What does this sound represent?</p><p>この音は何を表していますか？</p>',
+      data: {
+        task: 'foley_recognition',
+        correct_answer: stim.correct,
+        mapping_type: stim.mapping_type,
+        trial: idx
+      },
+      on_finish: (d) => {
+        d.correct = d.response === d.correct_answer;
+      }
+    });
+  });
+
+  return trials;
+}
+
+function buildPictureNamingTask() {
+  const trials = [];
+  
+  if (!mic_plugins_available()) {
+    console.warn('Microphone plugins not available');
+    return trials;
+  }
+
+  if (FILTERED_STIMULI.picture.length === 0) {
+    console.warn('No picture stimuli available');
+    return trials;
+  }
+
+  trials.push({
+    type: T('jsPsychInitializeMicrophone'),
+    data: { task: 'mic_init' },
+    on_finish: () => {
+      microphoneAvailable = true;
+      console.log('Microphone initialized');
+    }
+  });
+
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Picture Naming / 絵の命名</h2><p>Name each picture in English as accurately as possible.</p><p>各絵を英語でできるだけ正確に名付けてください。</p>',
+    choices: ['Begin / 開始']
+  });
+
+  trials.push({
+    type: T('jsPsychHtmlAudioResponse'),
+    stimulus: '<p>Microphone test - say "testing" for 2 seconds</p>',
+    recording_duration: 2000,
+    show_done_button: true,
+    data: { task: 'mic_check' }
+  });
+
+  FILTERED_STIMULI.picture.forEach((stim, idx) => {
+    trials.push({
+      type: T('jsPsychImageButtonResponse'),
+      stimulus: stim.imageUrl,
+      stimulus_height: 400,
+      choices: ['Ready to Record / 録音準備完了'],
+      prompt: '<p>Look at the image. Click when ready to record.</p>',
+      data: { task: 'picture_naming_prep', target: stim.target }
+    });
+
+    trials.push({
+      type: T('jsPsychHtmlAudioResponse'),
+      stimulus: `<img src="${stim.imageUrl}" style="max-width:400px;border-radius:8px"><p style="margin-top:15px;"><b>🔴 Recording...</b> Name the picture</p>`,
+      recording_duration: 3000,
+      show_done_button: false,
+      data: {
+        task: 'picture_naming_audio',
+        target: stim.target,
+        category: stim.category,
+        phase: namingPhase(),
+        pid: currentPID()
+      },
+      on_finish: (d) => {
+        d.audio_filename = `pre_${currentPID()}_${d.target}_${idx}.wav`;
+      }
+    });
+  });
+
+  return trials;
+}
+
+function buildVisualIconicityTask() {
+  const trials = [];
+  
+  if (FILTERED_STIMULI.visual.length === 0) {
+    console.warn('No visual iconicity stimuli available');
+    return trials;
+  }
+
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Visual-Word Matching / 視覚と単語のマッチング</h2><p>Which word better matches the shape?</p><p>どちらの単語が形により合っていますか？</p>',
+    choices: ['Begin / 開始']
+  });
+
+  FILTERED_STIMULI.visual.forEach((stim, idx) => {
+    trials.push({
+      type: T('jsPsychImageButtonResponse'),
+      stimulus: stim.shapeUrl,
+      stimulus_height: 300,
+      choices: stim.words,
+      prompt: '<p>Which word matches this shape better?</p>',
+      data: {
+        task: 'visual_iconicity',
+        expected_answer: stim.expected,
+        shape_type: stim.shape_type,
+        trial: idx
+      },
+      on_finish: (d) => {
+        d.correct = d.response === d.expected_answer;
+      }
+    });
+  });
+
+  return trials;
+}
+
+function buildProceduralRecallTask() {
+  if (!have('jsPsychSurveyText')) {
+    return [];
+  }
+
+  return [{
+    type: T('jsPsychSurveyText'),
+    preamble: `
+      <h2>Procedural Memory / 手順記憶</h2>
+      <p>List the steps to make pancakes in order (from memory).</p>
+      <p>パンケーキを作る手順を順番に書いてください（記憶から）。</p>
+    `,
+    questions: [
+      { prompt: 'Step 1:', name: 'step_1', required: false, rows: 2 },
+      { prompt: 'Step 2:', name: 'step_2', required: false, rows: 2 },
+      { prompt: 'Step 3:', name: 'step_3', required: false, rows: 2 },
+      { prompt: 'Step 4:', name: 'step_4', required: false, rows: 2 },
+      { prompt: 'Step 5:', name: 'step_5', required: false, rows: 2 }
+    ],
+    data: {
+      task: 'procedural_recall',
+      correct_steps: PROCEDURE_STEPS
+    },
+    on_finish: (d) => {
+      const r = asObject(d.response);
+      d.recalled_steps = [
+        r.step_1 || '',
+        r.step_2 || '',
+        r.step_3 || '',
+        r.step_4 || '',
+        r.step_5 || ''
+      ];
+    }
+  }];
+}
+
 /* ========== INITIALIZATION FUNCTION ========== */
 async function initializeExperiment() {
   console.log('Initializing Pre-Test Battery...');
@@ -626,6 +918,26 @@ async function initializeExperiment() {
     timeline.push(...spatial_span_trials);
   }
 
+  // Phoneme discrimination
+  timeline.push(...buildPhonemeDiscriminationTask());
+  console.log('✓ Added phoneme discrimination task');
+
+  // Foley recognition
+  timeline.push(...buildFoleyTask());
+  console.log('✓ Added foley recognition task');
+
+  // Visual iconicity
+  timeline.push(...buildVisualIconicityTask());
+  console.log('✓ Added visual iconicity task');
+
+  // Picture naming (with microphone)
+  timeline.push(...buildPictureNamingTask());
+  console.log('✓ Added picture naming task');
+
+  // Procedural recall
+  timeline.push(...buildProceduralRecallTask());
+  console.log('✓ Added procedural recall task');
+
   // Assign condition
   timeline.push({
     type: T('jsPsychHtmlButtonResponse'),
@@ -639,7 +951,7 @@ async function initializeExperiment() {
   // Completion
   timeline.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: '<h2>Pre-Test Complete!</h2><p>Thank you for completing the pre-test.</p>',
+    stimulus: '<h2>Pre-Test Complete!</h2><p>Thank you for completing the pre-test.</p><p>Your data has been saved.</p>',
     choices: ['Finish']
   });
 
