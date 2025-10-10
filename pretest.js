@@ -1,6 +1,6 @@
-// Version 4.8 (FINAL FIX FOR INITIALIZATION ERROR) — Pre-Test Battery
+// Version 4.8 (COMPLETE FIX) — Pre-Test Battery
 // - Fixes the Uncaught ReferenceError: initializeExperiment is not defined.
-// - Re-verifies all previous syntax, UI, and logic fixes.
+// - Complete with all trial definitions and initialization function
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -23,7 +23,7 @@ const PROC_CONSTRAINTS = [
   ['Pour batter on pan', 'Flip when ready']
 ];
 
-/* ========== ASSET HELPER (hardened and FIXED) ========== */
+/* ========== ASSET HELPER ========== */
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 let __assetWarnedOnce = false;
 
@@ -54,28 +54,22 @@ function asObject(maybeJsonOrObj) {
   return {};
 }
 
-/* ========== GLOBAL CSS (UI Fixes) ========== */
+/* ========== GLOBAL CSS ========== */
 const baseStyle = document.createElement("style");
 baseStyle.textContent = `
-  /* General Layout */
   .jspsych-content { position: relative !important; text-align: center !important; }
   .jspsych-content h1, .jspsych-content h2, .jspsych-content h3 { text-align: center !important; }
   .jspsych-content .jspsych-btn { margin: 6px 8px !important; }
   
-  /* SurveyJS Layout Overrides */
-  .sd-header, .sv-title, .sd-page__title { display: none !important; } /* Hide titles/headers */
+  .sd-header, .sv-title, .sd-page__title { display: none !important; }
   .sd-question { margin: 24px auto !important; padding: 0 !important; max-width: 600px !important; text-align: left !important; }
   .sd-question__title { text-align: left !important; font-weight: bold; }
   .sd-question__description { color: #666; font-size: 14px; margin-top: 4px; }
   
-  /* Navigation Fix: Ensure the bar and buttons are always visible */
   .sd-action-bar { display: flex !important; justify-content: flex-end !important; padding: 15px 0; }
   .sd-footer { text-align: right !important; margin-top: 30px !important; }
-  
-  /* Button Visibility Fix */
   .sd-btn { visibility: visible !important; opacity: 1 !important; }
   
-  /* Radio Group Layout (for better alignment) */
   .sd-radiogroup {
     display: flex !important; 
     flex-wrap: wrap !important; 
@@ -84,7 +78,6 @@ baseStyle.textContent = `
     margin: 10px 0 20px 0 !important;
   }
   
-  /* Radio Item Styling (minimalist) */
   .sd-item {
     padding: 0 !important;
     background: transparent !important;
@@ -93,13 +86,11 @@ baseStyle.textContent = `
     align-items: center !important;
   }
   
-  /* Highlight selected item */
   .sd-item--checked .sd-item__control-label {
     font-weight: bold !important;
     color: #4CAF50 !important;
   }
   
-  /* Text Input Styling */
   .sd-input, input[type="text"] { 
     display: block !important; 
     width: 100% !important; 
@@ -109,7 +100,6 @@ baseStyle.textContent = `
 `;
 document.head.appendChild(baseStyle);
 
-/* Cleanup */
 function nukeSurveyArtifacts() {
   document.querySelectorAll(".sd-header, .sv-title, .sd-page__title, .sv_main .sv-title").forEach(el => {
     try { el.remove(); } catch (e) {}
@@ -136,7 +126,7 @@ const jsPsych = T('initJsPsych')({
   on_finish: () => saveDataToServer(jsPsych.data.get().values()),
 });
 
-/* ========== STIMULI (raw) ========== */
+/* ========== STIMULI ========== */
 const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'l_r' },
   { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'control' },
@@ -179,10 +169,21 @@ function saveDataToServer(data) {
     const filename = 'pretest_' + currentPID() + '_' + Date.now() + '.json';
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
-    const a = document.createElement('a'); a.href = url; a.download = filename;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
-    localStorage.setItem('pretest_latest', JSON.stringify({ filename, timestamp: new Date().toISOString() }));
-  } catch (e) { console.error('Failed to save data:', e); }
+    const a = document.createElement('a'); 
+    a.href = url; 
+    a.download = filename;
+    document.body.appendChild(a); 
+    a.click(); 
+    document.body.removeChild(a); 
+    URL.revokeObjectURL(url);
+    localStorage.setItem('pretest_latest', JSON.stringify({ 
+      filename, 
+      timestamp: new Date().toISOString() 
+    }));
+    console.log('Data saved:', filename);
+  } catch (e) { 
+    console.error('Failed to save data:', e); 
+  }
 }
 
 function assignCondition() {
@@ -199,148 +200,454 @@ function namingPhase() {
   const p = new URLSearchParams(location.search).get('phase');
   return (p === 'post') ? 'post' : 'pre';
 }
-function modelPronAudioFor(target) { return 'pron/' + (target || '').toLowerCase() + '.mp3'; }
 
-/* ========== EXISTENCE CHECKS & VALIDATION (UNCHANGED) ========== */
+function modelPronAudioFor(target) { 
+  return 'pron/' + (target || '').toLowerCase() + '.mp3'; 
+}
+
+/* ========== ASSET VALIDATION ========== */
 async function checkAudioExists(url) {
   return new Promise((resolve) => {
-    if (!url) return resolve(false); const a = new Audio(); let done = false; const finish = ok => { if (!done) { done = true; resolve(ok); } }; a.oncanplaythrough = () => finish(true); a.onerror = () => finish(false); a.src = url; setTimeout(() => finish(false), 10000);
+    if (!url) return resolve(false);
+    const a = new Audio();
+    let done = false;
+    const finish = ok => {
+      if (!done) {
+        done = true;
+        resolve(ok);
+      }
+    };
+    a.oncanplaythrough = () => finish(true);
+    a.onerror = () => finish(false);
+    a.src = url;
+    setTimeout(() => finish(false), 10000);
   });
 }
 
 async function checkImageExists(url) {
   return new Promise((resolve) => {
-    if (!url) return resolve(false); const img = new Image(); let done = false; const finish = ok => { if (!done) { done = true; resolve(ok); } }; img.onload = () => finish(true); img.onerror = () => finish(false); img.src = url; setTimeout(() => finish(false), 10000);
+    if (!url) return resolve(false);
+    const img = new Image();
+    let done = false;
+    const finish = ok => {
+      if (!done) {
+        done = true;
+        resolve(ok);
+      }
+    };
+    img.onload = () => finish(true);
+    img.onerror = () => finish(false);
+    img.src = url;
+    setTimeout(() => finish(false), 10000);
   });
 }
 
-let PRELOAD_AUDIO = []; let PRELOAD_IMAGES = []; let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
+let PRELOAD_AUDIO = [];
+let PRELOAD_IMAGES = [];
+let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
 async function filterExistingStimuli() {
   console.log('Validating assets (cache-buster = %s)...', ASSET_BUST);
 
   const phonemeChecks = phoneme_discrimination_stimuli.map(async (s) => {
-    const u1 = asset(s.audio1); const u2 = asset(s.audio2);
-    const [ok1, ok2] = await Promise.all([checkAudioExists(u1), checkAudioExists(u2)]);
+    const u1 = asset(s.audio1);
+    const u2 = asset(s.audio2);
+    const [ok1, ok2] = await Promise.all([
+      checkAudioExists(u1), 
+      checkAudioExists(u2)
+    ]);
     if (ok1 && ok2) return { ...s, audio1Url: u1, audio2Url: u2 };
-    console.warn('Skipping phoneme trial due to missing audio:', s.audio1); return null;
+    console.warn('Skipping phoneme trial due to missing audio:', s.audio1);
+    return null;
   });
 
   const foleyChecks = foley_stimuli.map(async (s) => {
-    const u = asset(s.audio); const ok = await checkAudioExists(u);
+    const u = asset(s.audio);
+    const ok = await checkAudioExists(u);
     if (ok) return { ...s, audioUrl: u };
-    console.warn('Skipping foley stimulus (missing audio):', s.audio); return null;
+    console.warn('Skipping foley stimulus (missing audio):', s.audio);
+    return null;
   });
 
   const pictureChecks = picture_naming_stimuli.map(async (s) => {
-    const u = asset(s.image); const ok = await checkImageExists(u);
+    const u = asset(s.image);
+    const ok = await checkImageExists(u);
     if (ok) return { ...s, imageUrl: u };
-    console.warn('Skipping picture (missing image):', s.image); return null;
+    console.warn('Skipping picture (missing image):', s.image);
+    return null;
   });
 
   const visualChecks = visual_iconicity_stimuli.map(async (s) => {
-    const u = asset(s.shape); const ok = await checkImageExists(u);
+    const u = asset(s.shape);
+    const ok = await checkImageExists(u);
     if (ok) return { ...s, shapeUrl: u };
-    console.warn('Skipping visual stimulus (missing svg):', s.shape); return null;
+    console.warn('Skipping visual stimulus (missing svg):', s.shape);
+    return null;
   });
 
   const [phoneme, foley, picture, visual] = await Promise.all([
-    Promise.all(phonemeChecks), Promise.all(foleyChecks), Promise.all(pictureChecks), Promise.all(visualChecks)
+    Promise.all(phonemeChecks),
+    Promise.all(foleyChecks),
+    Promise.all(pictureChecks),
+    Promise.all(visualChecks)
   ]);
 
   const filtered = {
-    phoneme: phoneme.filter(Boolean), foley: foley.filter(Boolean), picture: picture.filter(Boolean), visual: visual.filter(Boolean)
+    phoneme: phoneme.filter(Boolean),
+    foley: foley.filter(Boolean),
+    picture: picture.filter(Boolean),
+    visual: visual.filter(Boolean)
   };
 
-  console.log('Asset validation complete — phoneme:%d, foley:%d, picture:%d, visual:%d', filtered.phoneme.length, filtered.foley.length, filtered.picture.length, filtered.visual.length);
+  console.log('Asset validation complete — phoneme:%d, foley:%d, picture:%d, visual:%d',
+    filtered.phoneme.length, filtered.foley.length, 
+    filtered.picture.length, filtered.visual.length);
+  
   return filtered;
 }
 
-/* ========== SURVEYS (UI FIXES APPLIED) ========== */
+/* ========== SURVEYS ========== */
 const participant_info = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
-    title: 'Participant Info / 参加者情報', showQuestionNumbers: 'off', focusFirstQuestionAutomatic: false, showCompletedPage: false,
+    title: 'Participant Info / 参加者情報',
+    showQuestionNumbers: 'off',
+    focusFirstQuestionAutomatic: false,
+    showCompletedPage: false,
     completeText: 'Continue / 続行',
     pages: [{
-      name: 'p1', elements: [
-        { type: 'text', name: 'participant_id', title: 'Participant ID', description: '参加者ID', isRequired: true, placeholder: 'Enter ID here' },
-        { type: 'radiogroup', name: 'age', title: 'Age', description: '年齢', isRequired: true, choices: ['18-25', '26-35', '36-45', '46-55', '56+'] },
-        { type: 'radiogroup', name: 'native_language', title: 'Native Language', description: '母語', isRequired: true, choices: ['Japanese / 日本語', 'Other / その他'] },
-        { type: 'radiogroup', name: 'english_years', title: 'English Learning Years', description: '英語学習年数', isRequired: true, choices: ['0-3', '4-6', '7-10', '10+'] },
-        { type: 'radiogroup', name: 'vr_experience', title: 'VR Experience', description: 'VR経験', isRequired: true, choices: ['None / なし', '1-2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] }
+      name: 'p1',
+      elements: [
+        { 
+          type: 'text', 
+          name: 'participant_id', 
+          title: 'Participant ID', 
+          description: '参加者ID', 
+          isRequired: true, 
+          placeholder: 'Enter ID here' 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'age', 
+          title: 'Age', 
+          description: '年齢', 
+          isRequired: true, 
+          choices: ['18-25', '26-35', '36-45', '46-55', '56+'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'native_language', 
+          title: 'Native Language', 
+          description: '母語', 
+          isRequired: true, 
+          choices: ['Japanese / 日本語', 'Other / その他'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'english_years', 
+          title: 'English Learning Years', 
+          description: '英語学習年数', 
+          isRequired: true, 
+          choices: ['0-3', '4-6', '7-10', '10+'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'vr_experience', 
+          title: 'VR Experience', 
+          description: 'VR経験', 
+          isRequired: true, 
+          choices: ['None / なし', '1-2 times / 1-2回', 'Several / 数回', 'Regular / 定期的'] 
+        }
       ]
     }]
   },
   data: { task: 'participant_info' },
-  on_finish: (data) => { const resp = asObject(data.response); currentPID_value = resp.participant_id || 'unknown'; }
+  on_finish: (data) => {
+    const resp = asObject(data.response);
+    currentPID_value = resp.participant_id || 'unknown';
+  }
 } : null;
 
 const motion_sickness_questionnaire = have('jsPsychSurvey') ? {
   type: T('jsPsychSurvey'),
   survey_json: {
-    title: 'Motion Sickness Susceptibility / 乗り物酔い傾向', showQuestionNumbers: 'off', focusFirstQuestionAutomatic: false, showCompletedPage: false,
+    title: 'Motion Sickness Susceptibility / 乗り物酔い傾向',
+    showQuestionNumbers: 'off',
+    focusFirstQuestionAutomatic: false,
+    showCompletedPage: false,
     completeText: 'Continue / 続行',
     pages: [{
-      name: 'mssq', elements: [
-        { type: 'radiogroup', name: 'mssq_car_reading', title: 'How often do you feel sick when reading in a car?', description: '車で読書をしている時に気分が悪くなりますか？', isRequired: true, choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] },
-        { type: 'radiogroup', name: 'mssq_boat', title: 'How often do you feel sick on boats?', description: '船に乗っている時に気分が悪くなりますか？', isRequired: true, choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] },
-        { type: 'radiogroup', name: 'mssq_games', title: 'How often do you feel dizzy playing video games?', description: 'ゲームをしている時にめまいを感じますか？', isRequired: true, choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] },
-        { type: 'radiogroup', name: 'mssq_vr', title: 'How often do you feel sick in VR (if experienced)?', description: '（VR経験がある場合）VR中に気分が悪くなりますか？', isRequired: false, choices: ['No experience / 経験なし', 'Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] }
+      name: 'mssq',
+      elements: [
+        { 
+          type: 'radiogroup', 
+          name: 'mssq_car_reading', 
+          title: 'How often do you feel sick when reading in a car?', 
+          description: '車で読書をしている時に気分が悪くなりますか？', 
+          isRequired: true, 
+          choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'mssq_boat', 
+          title: 'How often do you feel sick on boats?', 
+          description: '船に乗っている時に気分が悪くなりますか？', 
+          isRequired: true, 
+          choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'mssq_games', 
+          title: 'How often do you feel dizzy playing video games?', 
+          description: 'ゲームをしている時にめまいを感じますか？', 
+          isRequired: true, 
+          choices: ['Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] 
+        },
+        { 
+          type: 'radiogroup', 
+          name: 'mssq_vr', 
+          title: 'How often do you feel sick in VR (if experienced)?', 
+          description: '（VR経験がある場合）VR中に気分が悪くなりますか？', 
+          isRequired: false, 
+          choices: ['No experience / 経験なし', 'Never / 全くない', 'Rarely / まれに', 'Sometimes / 時々', 'Often / よく', 'Always / いつも'] 
+        }
       ]
     }]
   },
   data: { task: 'motion_sickness' }
 } : null;
 
-/* ========== DIGIT & SPATIAL SPAN (UNCHANGED) ========== */
-const digit_span_forward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>', choices: ['Begin / 開始'] };
+/* ========== DIGIT SPAN ========== */
+const digit_span_forward_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>',
+  choices: ['Begin / 開始']
+};
+
 function generateOptimizedDigitSpanTrials(forward = true) {
-  const trials = []; let failCount = 0;
+  const trials = [];
+  let failCount = 0;
+
   for (let length = 3; length <= 8; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
-    trials.push({ type: T('jsPsychHtmlKeyboardResponse'), stimulus: '<div style="font-size:48px;padding:20px 24px;">' + digits.join(' ') + '</div>', choices: 'NO_KEYS', trial_duration: 800 * length, data: { task: 'digit_span_presentation', digits: digits.join(''), length, direction: forward ? 'forward' : 'backward' } });
+
     trials.push({
-      type: T('jsPsychSurveyText'), questions: [{ prompt: forward ? 'Enter SAME order / 同じ順番' : 'Enter REVERSE order / 逆順', name: 'response', required: true }], post_trial_gap: 250, data: { task: 'digit_span_response', correct_answer: forward ? digits.join('') : digits.slice().reverse().join(''), length, direction: forward ? 'forward' : 'backward' },
-      on_finish: d => { const rraw = d.response?.response ?? d.response; const r = String(rraw ?? '').replace(/\s/g, ''); d.entered_response = r; d.correct = r === d.correct_answer; if (!d.correct && ++failCount >= 2) jsPsych.endCurrentTimeline(); }
+      type: T('jsPsychHtmlKeyboardResponse'),
+      stimulus: '<div style="font-size:48px;padding:20px 24px;">' + digits.join(' ') + '</div>',
+      choices: 'NO_KEYS',
+      trial_duration: 800 * length,
+      data: {
+        task: 'digit_span_presentation',
+        digits: digits.join(''),
+        length,
+        direction: forward ? 'forward' : 'backward'
+      }
+    });
+
+    trials.push({
+      type: T('jsPsychSurveyText'),
+      questions: [{
+        prompt: forward ? 'Enter SAME order / 同じ順番' : 'Enter REVERSE order / 逆順',
+        name: 'response',
+        required: true
+      }],
+      post_trial_gap: 250,
+      data: {
+        task: 'digit_span_response',
+        correct_answer: forward ? digits.join('') : digits.slice().reverse().join(''),
+        length,
+        direction: forward ? 'forward' : 'backward'
+      },
+      on_finish: d => {
+        const rraw = d.response?.response ?? d.response;
+        const r = String(rraw ?? '').replace(/\s/g, '');
+        d.entered_response = r;
+        d.correct = r === d.correct_answer;
+        if (!d.correct && ++failCount >= 2) jsPsych.endCurrentTimeline();
+      }
     });
   }
   return trials;
 }
-const digit_span_backward_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. Example: 1 2 3 -> 3 2 1</p>', choices: ['Begin / 開始'] };
-const spatial_span_instructions = { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h2>Spatial Memory Test / 空間記憶テスト</h2><p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>', choices: ['Begin / 開始'] };
+
+const digit_span_backward_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. Example: 1 2 3 -> 3 2 1</p>',
+  choices: ['Begin / 開始']
+};
+
+/* ========== SPATIAL SPAN ========== */
+const spatial_span_instructions = {
+  type: T('jsPsychHtmlButtonResponse'),
+  stimulus: '<h2>Spatial Memory Test / 空間記憶テスト</h2><p>Squares will light up. Click them in the same order. / 同じ順番でクリック</p>',
+  choices: ['Begin / 開始']
+};
 
 function generateOptimizedSpatialSpanTrials() {
-  const trials = []; window.spatialSpanFailCount = 0; const totalSquares = 9;
+  const trials = [];
+  window.spatialSpanFailCount = 0;
+  const totalSquares = 9;
+
   function makeTrial(seq, len) {
     return {
-      type: T('jsPsychHtmlKeyboardResponse'), choices: 'NO_KEYS', stimulus: () => {
-        let h = '<style>\n' + '.spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}\n' + '.spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}\n' + '.spatial-square.active{background:#ffd966;}\n' + '.spatial-square.selected{background:#8ecae6;}\n' + '.spatial-square.clickable{cursor:pointer;}\n' + '</style><div class="spatial-grid">';
-        for (let i = 0; i < 9; i++) h += '<div class="spatial-square" data-index="' + i + '"></div>';
+      type: T('jsPsychHtmlKeyboardResponse'),
+      choices: 'NO_KEYS',
+      stimulus: () => {
+        let h = '<style>\n' +
+          '.spatial-grid{display:grid;grid-template-columns:repeat(3,110px);gap:12px;justify-content:center;margin:20px auto;}\n' +
+          '.spatial-square{width:110px;height:110px;background:#ddd;border:2px solid #333;border-radius:12px;transition:background-color .2s;}\n' +
+          '.spatial-square.active{background:#ffd966;}\n' +
+          '.spatial-square.selected{background:#8ecae6;}\n' +
+          '.spatial-square.clickable{cursor:pointer;}\n' +
+          '</style><div class="spatial-grid">';
+        for (let i = 0; i < 9; i++) {
+          h += '<div class="spatial-square" data-index="' + i + '"></div>';
+        }
         return h + '</div><p id="spatial-instruction">Watch the sequence. / 覚えてください。</p>';
       },
-      data: { task: 'spatial_span', correct_answer: seq.join(','), length: len }, on_load: function () {
-        const squares = [...document.querySelectorAll('.spatial-square')]; const ins = document.getElementById('spatial-instruction'); const hi = 500, gap = 220; const resp = []; let enabled = false, start = null; squares.forEach(s => s.classList.remove('clickable'));
+      data: {
+        task: 'spatial_span',
+        correct_answer: seq.join(','),
+        length: len
+      },
+      on_load: function() {
+        const squares = [...document.querySelectorAll('.spatial-square')];
+        const ins = document.getElementById('spatial-instruction');
+        const hi = 500, gap = 220;
+        const resp = [];
+        let enabled = false, start = null;
+        squares.forEach(s => s.classList.remove('clickable'));
+
         const show = (i) => {
-          if (i >= seq.length) { jsPsych.pluginAPI.setTimeout(() => { ins.textContent = 'Click the squares in order. / 同じ順番でクリック'; squares.forEach(s => s.classList.add('clickable')); enabled = true; start = performance.now(); }, 300); return; }
-          const s = squares[seq[i]]; s.classList.add('active'); jsPsych.pluginAPI.setTimeout(() => { s.classList.remove('active'); jsPsych.pluginAPI.setTimeout(() => show(i + 1), gap); }, hi);
+          if (i >= seq.length) {
+            jsPsych.pluginAPI.setTimeout(() => {
+              ins.textContent = 'Click the squares in order. / 同じ順番でクリック';
+              squares.forEach(s => s.classList.add('clickable'));
+              enabled = true;
+              start = performance.now();
+            }, 300);
+            return;
+          }
+          const s = squares[seq[i]];
+          s.classList.add('active');
+          jsPsych.pluginAPI.setTimeout(() => {
+            s.classList.remove('active');
+            jsPsych.pluginAPI.setTimeout(() => show(i + 1), gap);
+          }, hi);
         };
+
         const end = () => {
-          enabled = false; squares.forEach(s => { s.classList.remove('clickable'); s.removeEventListener('click', click); }); jsPsych.pluginAPI.clearAllTimeouts();
-          const rt = start ? Math.round(performance.now() - start) : null; const ok = resp.length === seq.length && resp.every((v, i) => v === seq[i]);
+          enabled = false;
+          squares.forEach(s => {
+            s.classList.remove('clickable');
+            s.removeEventListener('click', click);
+          });
+          jsPsych.pluginAPI.clearAllTimeouts();
+          const rt = start ? Math.round(performance.now() - start) : null;
+          const ok = resp.length === seq.length && resp.every((v, i) => v === seq[i]);
           if (!ok && ++window.spatialSpanFailCount >= 2) jsPsych.endCurrentTimeline();
-          jsPsych.finishTrial({ response: resp, click_sequence: resp.join(','), rt, correct: ok });
+          jsPsych.finishTrial({
+            response: resp,
+            click_sequence: resp.join(','),
+            rt,
+            correct: ok
+          });
         };
-        const click = (e) => { if (!enabled) return; const idx = +e.currentTarget.dataset.index; resp.push(idx); e.currentTarget.classList.add('selected'); if (resp.length >= seq.length) jsPsych.pluginAPI.setTimeout(end, 160); };
-        squares.forEach(s => s.addEventListener('click', click)); show(0);
+
+        const click = (e) => {
+          if (!enabled) return;
+          const idx = +e.currentTarget.dataset.index;
+          resp.push(idx);
+          e.currentTarget.classList.add('selected');
+          if (resp.length >= seq.length) jsPsych.pluginAPI.setTimeout(end, 160);
+        };
+
+        squares.forEach(s => s.addEventListener('click', click));
+        show(0);
       }
     };
   }
-  for (let len = 3; len <= 6; len++) { const seq = jsPsych.randomization.sampleWithoutReplacement([...Array(totalSquares).keys()], len); trials.push(makeTrial(seq, len)); } return trials;
-}
-const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? generateOptimizedSpatialSpanTrials() : [];
 
-// ... (Rest of the trial definitions are unchanged) ...
+  for (let len = 3; len <= 6; len++) {
+    const seq = jsPsych.randomization.sampleWithoutReplacement(
+      [...Array(totalSquares).keys()],
+      len
+    );
+    trials.push(makeTrial(seq, len));
+  }
+  return trials;
+}
+
+const spatial_span_trials = have('jsPsychHtmlKeyboardResponse') ? 
+  generateOptimizedSpatialSpanTrials() : [];
+
+/* ========== INITIALIZATION FUNCTION ========== */
+async function initializeExperiment() {
+  console.log('Initializing Pre-Test Battery...');
+
+  // Filter existing stimuli
+  FILTERED_STIMULI = await filterExistingStimuli();
+
+  // Build timeline
+  const timeline = [];
+
+  // Welcome
+  timeline.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h1>Pre-Test Battery</h1><p>Welcome! This will take approximately 30-40 minutes.</p>',
+    choices: ['Begin']
+  });
+
+  // Participant info
+  if (participant_info) {
+    timeline.push(participant_info);
+  }
+
+  // Motion sickness questionnaire
+  if (motion_sickness_questionnaire) {
+    timeline.push(motion_sickness_questionnaire);
+  }
+
+  // Digit span forward
+  if (have('jsPsychSurveyText')) {
+    timeline.push(digit_span_forward_instructions);
+    timeline.push(...generateOptimizedDigitSpanTrials(true));
+  }
+
+  // Digit span backward
+  if (have('jsPsychSurveyText')) {
+    timeline.push(digit_span_backward_instructions);
+    timeline.push(...generateOptimizedDigitSpanTrials(false));
+  }
+
+  // Spatial span
+  if (spatial_span_trials.length > 0) {
+    timeline.push(spatial_span_instructions);
+    timeline.push(...spatial_span_trials);
+  }
+
+  // Assign condition
+  timeline.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => {
+      const cond = assignCondition();
+      return `<h2>Condition Assignment</h2><p>You have been assigned to: <strong>${cond}</strong></p>`;
+    },
+    choices: ['Continue']
+  });
+
+  // Completion
+  timeline.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Pre-Test Complete!</h2><p>Thank you for completing the pre-test.</p>',
+    choices: ['Finish']
+  });
+
+  console.log('Timeline built with', timeline.length, 'trials');
+  
+  // Run the experiment
+  jsPsych.run(timeline);
+}
 
 /* ========== BOOTSTRAP ========== */
 if (document.readyState === 'loading') {
@@ -348,3 +655,5 @@ if (document.readyState === 'loading') {
 } else {
   initializeExperiment();
 }
+
+console.log('Pre-Test Battery v4.8 loaded successfully');
