@@ -3,6 +3,7 @@
 // • Replaced deprecated/non-existent jsPsych.abortCurrentTimeline() with endCurrentTimeline()
 // • Added parallel asset validation for faster startup
 // • Extra defensive checks & clearer console reporting
+// hope this works!
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
