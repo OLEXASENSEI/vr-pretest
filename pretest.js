@@ -1,4 +1,4 @@
-// Version 5.7 — Pre-Test Battery (FINAL - ALL FIXES APPLIED + Survey bridge patch)
+// Version 5.8 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
@@ -65,97 +65,6 @@ function nukeSurveyArtifacts() {
     try { el.remove(); } catch {}
   });
 }
-
-/* ========== SURVEY BRIDGE PATCH (robust rendering) ========== */
-/**
- * Defines/replaces window.jsPsychSurvey so that it:
- *  - Renders a single SurveyJS instance
- *  - Uses Survey.Survey when available, else Survey.Model (+ SurveyNG or model.render)
- *  - Wires onComplete to jsPsych.finishTrial with ordered question names
- */
-(function patchSurveyBridge() {
-  // If a previous definition exists, we’ll replace it with a minimal, robust version.
-  class JsPsychSurveyPatched {
-    constructor(jsPsych) {
-      this.jsPsych = jsPsych;
-    }
-    static get info() {
-      return {
-        name: 'survey',
-        parameters: {
-          survey_json: { type: 'complex', default: {} },
-          survey_function: { type: 'function', default: function() { return {}; } }
-        }
-      };
-    }
-    trial(display_element, trial) {
-      try {
-        if (!have('Survey')) {
-          throw new Error('SurveyJS not initialized');
-        }
-
-        // Resolve survey JSON from trial params or function
-        let survey_json = trial.survey_json && Object.keys(trial.survey_json).length
-          ? trial.survey_json
-          : (typeof trial.survey_function === 'function' ? trial.survey_function() : {});
-        survey_json = survey_json || {};
-
-        console.log('[jsPsychSurvey] Rendering survey...');
-        display_element.innerHTML =
-          '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
-
-        // Create ONE survey instance and attach the jsPsych finish handler to it
-        const finish = (sender) => {
-          console.log('[jsPsychSurvey] Survey completed');
-          const trial_data = {
-            response: sender.data,
-            rt: null,
-            question_order:
-              survey_json.pages?.[0]?.elements?.map(e => e.name) || []
-          };
-          display_element.innerHTML = '';
-          this.jsPsych.finishTrial(trial_data);
-        };
-
-        let surveyInstance = null;
-
-        if (typeof Survey.Survey === 'function') {
-          console.log('[jsPsychSurvey] Using Survey.Survey');
-          surveyInstance = new Survey.Survey(survey_json);
-          surveyInstance.onComplete.add(finish);
-          surveyInstance.render('surveyContainer');
-        } else if (typeof Survey.Model === 'function') {
-          console.log('[jsPsychSurvey] Falling back to Survey.Model');
-          surveyInstance = new Survey.Model(survey_json);
-          surveyInstance.onComplete.add(finish);
-
-          if (Survey.SurveyNG?.render) {
-            Survey.SurveyNG.render('surveyContainer', { model: surveyInstance });
-          } else if (typeof surveyInstance.render === 'function') {
-            surveyInstance.render('surveyContainer');
-          } else {
-            throw new Error('SurveyJS render API not available');
-          }
-        } else {
-          throw new Error('SurveyJS not initialized');
-        }
-
-        window.currentSurvey = surveyInstance;
-        console.log('[jsPsychSurvey] Survey rendered successfully');
-      } catch (err) {
-        console.error('[jsPsychSurvey] Error:', err);
-        try {
-          display_element.innerHTML = '<div style="color:#c00">Survey error: ' + (err?.message || err) + '</div>';
-        } catch {}
-        this.jsPsych.finishTrial({ error: String(err?.message || err) });
-      }
-    }
-  }
-
-  // Install our patched plugin definition
-  window.jsPsychSurvey = JsPsychSurveyPatched;
-  console.log('[pretest] Installed patched jsPsychSurvey bridge');
-})();
 
 /* ========== STIMULI (SHORTENED) ========== */
 const phoneme_discrimination_stimuli = [
@@ -294,7 +203,7 @@ function createMotionSicknessQuestionnaire() {
 function createDigitSpanInstructions(forward = true) {
   return {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: forward 
+    stimulus: forward
       ? '<h2>Number Memory Test / 数字記憶テスト</h2><p>You will see a sequence of numbers.</p><p>数字の列が表示されます。順番通りに覚えてください。</p>'
       : '<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Now enter the numbers in <b>reverse</b> order. Example: 1 2 3 -> 3 2 1</p>',
     choices: ['Begin / 開始']
@@ -333,7 +242,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
 function createPhonemeInstructions() {
   return {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => '<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ' + (FILTERED_STIMULI.phoneme?.length || 0) + '</p>',
+    stimulus: () => '<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ' + (FILTERED_STIMULI.phonеме?.length || 0) + '</p>',
     choices: ['Begin / 開始']
   };
 }
@@ -417,20 +326,22 @@ function createNamingTimeline() {
     stimulus: () => '<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：(1) モデル音声（任意）、(2) 4秒録音。</p><p style="color:#666">Pictures available: ' + (FILTERED_STIMULI.picture?.length || 0) + '</p>',
     choices: ['Begin / 開始'], post_trial_gap: 500
   };
-  
-  const mic_request = { 
-    type: T('jsPsychInitializeMicrophone'), 
-    data: { task: 'microphone_initialization' }, 
-    on_finish: async () => { microphoneAvailable = true; } 
-  };
-  
-  const mic_check = { 
-    type: T('jsPsychHtmlAudioResponse'), 
-    stimulus: '<div style="max-width:640px;margin:0 auto;text-align:left"><h3>Microphone check / マイク確認</h3><p>Say "test" for about 2 seconds.</p></div>', 
-    recording_duration: 2000, show_done_button: true, allow_playback: true, accept_button_text: 'OK', 
-    data: { task: 'mic_check' }, 
-    on_finish: (d) => { if (d.recorded_data_url) microphoneAvailable = true; } 
-  };
+
+  const mic_request =
+    have('jsPsychInitializeMicrophone')
+      ? { type: T('jsPsychInitializeMicrophone'), data: { task: 'microphone_initialization' }, on_finish: () => { microphoneAvailable = true; } }
+      : null;
+
+  const mic_check =
+    (have('jsPsychHtmlAudioResponse') && have('jsPsychInitializeMicrophone'))
+      ? {
+          type: T('jsPsychHtmlAudioResponse'),
+          stimulus: '<div style="max-width:640px;margin:0 auto;text-align:left"><h3>Microphone check / マイク確認</h3><p>Say "test" for about 2 seconds.</p></div>',
+          recording_duration: 2000, show_done_button: true, allow_playback: true, accept_button_text: 'OK',
+          data: { task: 'mic_check' },
+          on_finish: (d) => { if (d.recorded_data_url) microphoneAvailable = true; }
+        }
+      : null;
 
   const prepare = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -458,8 +369,8 @@ function createNamingTimeline() {
       btn?.addEventListener('click', () => { if (!ready) return; try { a.currentTime=0; a.play(); stat.textContent='Playing... / 再生中...'; } catch {} });
     }
   };
-  
-  const record = {
+
+  const record = have('jsPsychHtmlAudioResponse') ? {
     type: T('jsPsychHtmlAudioResponse'),
     stimulus: () => {
       const imgURL = jsPsych.timelineVariable('imageUrl');
@@ -480,20 +391,25 @@ function createNamingTimeline() {
         if (blob) d.audio_blob_url = URL.createObjectURL(blob);
       } catch {}
     }
-  };
+  } : null;
 
   const pictureTV = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
-  return [intro, mic_request, mic_check, { timeline: [prepare, record], timeline_variables: pictureTV, randomize_order: true }];
+
+  const timeline = [intro];
+  if (mic_request) timeline.push(mic_request);
+  if (mic_check) timeline.push(mic_check);
+  timeline.push({ timeline: [prepare, record].filter(Boolean), timeline_variables: pictureTV, randomize_order: true });
+  return timeline;
 }
 
 /* ========== FOLEY & VISUAL ========== */
 function createFoleyTimeline() {
-  const intro = { 
-    type: T('jsPsychHtmlButtonResponse'), 
-    stimulus: () => '<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p style="color:#666">Sounds: ' + (FILTERED_STIMULI.foley?.length || 0) + '</p>', 
-    choices: ['Begin / 開始'] 
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => '<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p style="color:#666">Sounds: ' + (FILTERED_STIMULI.foley?.length || 0) + '</p>',
+    choices: ['Begin / 開始']
   };
-  
+
   const trial = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => `<div style="text-align:center;">
@@ -526,17 +442,17 @@ function createFoleyTimeline() {
     },
     on_finish: (d) => { d.correct = (d.response === d.correct_answer); }
   };
-  
-  return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.foley.map(s => ({...s})), randomize_order: true }];
+
+  return [intro, { timeline: [trial], timeline_variables: FILTERED_STимули.foley.map(s => ({...s})), randomize_order: true }];
 }
 
 function createVisualTimeline() {
-  const intro = { 
-    type: T('jsPsychHtmlButtonResponse'), 
-    stimulus: () => '<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p style="color:#666">Shapes: ' + (FILTERED_STIMULI.visual?.length || 0) + '</p>', 
-    choices: ['Begin / 開始'] 
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => '<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p style="color:#666">Shapes: ' + (FILTERED_STIMULI.visual?.length || 0) + '</p>',
+    choices: ['Begin / 開始']
   };
-  
+
   const trial = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => {
@@ -554,18 +470,18 @@ function createVisualTimeline() {
     data: () => ({ task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') }),
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
   };
-  
+
   return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.visual.map(s => ({...s, shapeUrl: asset(s.shape)})), randomize_order: true }];
 }
 
 /* ========== PROCEDURAL & IDEOPHONE ========== */
 function createProceduralTimeline() {
-  const instructions = { 
-    type: T('jsPsychHtmlButtonResponse'), 
-    stimulus: '<h3>Quick Recipe Ordering / レシピの順序</h3><p>Number the actions 1-5. Some steps must precede others.</p>', 
-    choices: ['OK'] 
+  const instructions = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h3>Quick Recipe Ordering / レシピの順序</h3><p>Number the actions 1-5. Some steps must precede others.</p>',
+    choices: ['OK']
   };
-  
+
   const test = {
     type: T('jsPsychSurveyText'),
     preamble: '<h3>Assign a step number (1–5) to each action.</h3>',
@@ -581,7 +497,7 @@ function createProceduralTimeline() {
       data.partial_order_score = (tot > 0) ? ok / tot : null; data.violations = violations;
     }
   };
-  
+
   return [instructions, test];
 }
 
@@ -637,7 +553,7 @@ async function initializeExperiment() {
       return;
     }
     console.log('[pretest] Survey object available:', typeof window.Survey, window.Survey);
-    
+
     if (!have('jsPsychSurvey')) {
       alert('jsPsych-Survey bridge not loaded. Check your script tags.');
       return;
@@ -651,12 +567,12 @@ async function initializeExperiment() {
       show_progress_bar: true,
       message_progress_bar: "Progress",
       default_iti: 350,
-      on_trial_start: (trial) => { 
+      on_trial_start: (trial) => {
         console.log('[pretest] Starting trial:', trial.type?.info?.name || trial.type?.name || 'unknown');
-        try { window.scrollTo(0, 0); } catch {} 
-        nukeSurveyArtifacts(); 
+        try { window.scrollTo(0, 0); } catch {}
+        nukeSurveyArtifacts();
       },
-      on_trial_finish: (data) => { 
+      on_trial_finish: (data) => {
         console.log('[pretest] Finished trial:', data.task || data.trial_type || 'unknown');
         setTimeout(nukeSurveyArtifacts, 50);
       },
@@ -720,7 +636,7 @@ async function initializeExperiment() {
 
     // Harden & run
     console.log('[pretest] Timeline built with', timeline.length, 'items. Running...');
-    
+
     // Verify display element exists
     const displayEl = document.getElementById('jspsych-target');
     if (!displayEl) {
@@ -729,9 +645,9 @@ async function initializeExperiment() {
       return;
     }
     console.log('[pretest] Display element found:', displayEl);
-    
+
     hardenButtons(timeline);
-    
+
     // Run with error handling
     try {
       jsPsych.run(timeline);

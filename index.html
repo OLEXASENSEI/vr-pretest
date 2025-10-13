@@ -1,81 +1,217 @@
-<script>
-(function () {
-  'use strict';
-  if (window.jsPsychSurvey) {
-    console.log('[HTML] jsPsychSurvey already defined; leaving as-is (pretest.js will handle it).');
-    return;
-  }
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <title>VR Pre-Test</title>
+  <meta name="description" content="VR Pre-Test Battery"/>
+  <link rel="icon" href="data:,">
 
-  class JsPsychSurveyPatched {
-    constructor(jsPsych) { this.jsPsych = jsPsych; }
-    static get info() {
-      return {
-        name: 'survey',
-        parameters: {
-          survey_json: { type: 'complex', default: {} },
-          survey_function: { type: 'function', default: function () { return {}; } }
-        }
-      };
+  <!-- jsPsych CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
+
+  <!-- SurveyJS CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/defaultV2.min.css">
+
+  <style>
+    /* Ensure survey is visible */
+    #surveyContainer {
+      display: block !important;
+      width: 100% !important;
+      min-height: 400px !important;
+      background: white !important;
     }
-    trial(display_element, trial) {
-      try {
-        if (!window.Survey) throw new Error('SurveyJS not initialized');
+    .sd-root-modern {
+      display: block !important;
+      visibility: visible !important;
+    }
+  </style>
 
-        // Resolve JSON
-        let survey_json = (trial.survey_json && Object.keys(trial.survey_json).length)
-          ? trial.survey_json
-          : (typeof trial.survey_function === 'function' ? trial.survey_function() : {}) || {};
+  <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
+    header h1 { font-size: 20px; margin: 0; }
+    #jspsych-target { min-height: 60vh; }
+    .precheck { font-size: 12px; color:#666; margin-bottom:12px; }
+    .warn { color:#c1272d; font-weight: 600; }
+    details { position: fixed; bottom: 10px; right: 10px; background: white; padding: 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 300px; z-index: 1000; }
+    details summary { cursor: pointer; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <h1>VR Pre-Test</h1>
+      <div class="precheck" id="lib-check">Loading libraries…</div>
+    </header>
 
-        console.log('[jsPsychSurvey] Rendering survey...');
-        display_element.innerHTML =
-          '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
+    <div id="jspsych-target"></div>
 
-        // One instance + shared finish handler
-        const finish = (sender) => {
-          console.log('[jsPsychSurvey] Survey completed');
-          const trial_data = {
-            response: sender.data,
-            rt: null,
-            question_order: survey_json.pages?.[0]?.elements?.map(e => e.name) || []
-          };
-          display_element.innerHTML = '';
-          this.jsPsych.finishTrial(trial_data);
+    <details>
+      <summary>Help / Requirements</summary>
+      <ul>
+        <li>Make sure your assets exist at the paths used in <code>pretest.js</code>:
+          <ul>
+            <li><code>sounds/*.mp3</code> for phoneme/foley</li>
+            <li><code>img/*.jpg|jpeg|svg</code> for picture/visual tasks</li>
+            <li><code>pron/*.mp3</code> if you use model pronunciations</li>
+          </ul>
+        </li>
+        <li>All libraries are loaded from CDN</li>
+        <li>Bridge plugin is embedded in this page</li>
+      </ul>
+    </details>
+  </div>
+
+  <!-- Load everything in correct order WITHOUT defer -->
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+
+  <!-- SurveyJS -->
+  <script src="https://unpkg.com/knockout@3.5.1/build/output/knockout-latest.js"></script>
+  <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
+  <script src="https://unpkg.com/survey-knockout-ui@1.11.7"></script>
+
+  <!-- Embedded jsPsych ↔ SurveyJS bridge -->
+  <script>
+    (function() {
+      'use strict';
+
+      const SurveyPlugin = (function() {
+        const info = {
+          name: 'survey',
+          parameters: {
+            survey_json: { type: 'complex', default: {} },
+            survey_function: { type: 'function', default: () => ({}) }
+          }
         };
 
-        let surveyInstance = null;
-
-        if (typeof Survey.Survey === 'function') {
-          console.log('[jsPsychSurvey] Using Survey.Survey');
-          surveyInstance = new Survey.Survey(survey_json);
-          surveyInstance.onComplete.add(finish);
-          surveyInstance.render('surveyContainer');
-        } else if (typeof Survey.Model === 'function') {
-          console.log('[jsPsychSurvey] Falling back to Survey.Model');
-          surveyInstance = new Survey.Model(survey_json);
-          surveyInstance.onComplete.add(finish);
-
-          if (Survey.SurveyNG?.render) {
-            Survey.SurveyNG.render('surveyContainer', { model: surveyInstance });
-          } else if (typeof surveyInstance.render === 'function') {
-            surveyInstance.render('surveyContainer');
-          } else {
-            throw new Error('SurveyJS render API not available');
+        class Plugin {
+          constructor(jsPsych) {
+            this.jsPsych = jsPsych;
           }
-        } else {
-          throw new Error('SurveyJS not initialized');
+
+          trial(display_element, trial) {
+            console.log('[jsPsychSurvey] trial() called');
+            console.log('[jsPsychSurvey] survey_json:', trial.survey_json);
+
+            if (!window.Survey) {
+              console.error('SurveyJS library not loaded');
+              this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
+              return;
+            }
+
+            let surveyJson = trial.survey_json;
+            if (!surveyJson || Object.keys(surveyJson).length === 0) {
+              if (typeof trial.survey_function === 'function') {
+                surveyJson = trial.survey_function();
+              }
+            }
+
+            console.log('[jsPsychSurvey] Creating survey model...');
+            display_element.innerHTML =
+              '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
+
+            const container = display_element.querySelector('#surveyContainer');
+            if (!container) {
+              console.error('[jsPsychSurvey] surveyContainer not found');
+              this.jsPsych.finishTrial({ error: 'Survey container missing' });
+              return;
+            }
+
+            const finish = (sender) => {
+              console.log('[jsPsychSurvey] Survey completed');
+              const trial_data = {
+                response: sender.data,
+                rt: null,
+                question_order:
+                  (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
+              };
+              display_element.innerHTML = '';
+              this.jsPsych.finishTrial(trial_data);
+            };
+
+            let surveyInstance = null;
+
+            try {
+              if (typeof Survey.Survey === 'function') {
+                console.log('[jsPsychSurvey] Using Survey.Survey');
+                surveyInstance = new Survey.Survey(surveyJson);
+                surveyInstance.onComplete.add(finish);
+                surveyInstance.render(container);
+              } else if (typeof Survey.Model === 'function') {
+                console.log('[jsPsychSurvey] Using Survey.Model fallback');
+                surveyInstance = new Survey.Model(surveyJson);
+                surveyInstance.onComplete.add(finish);
+
+                if (Survey.SurveyNG?.render) {
+                  Survey.SurveyNG.render(container, { model: surveyInstance });
+                } else if (typeof surveyInstance.render === 'function') {
+                  surveyInstance.render(container);
+                } else {
+                  throw new Error('SurveyJS render API not available');
+                }
+              } else {
+                throw new Error('SurveyJS not initialized');
+              }
+
+              window.currentSurvey = surveyInstance;
+              console.log('[jsPsychSurvey] Survey rendered successfully');
+
+              setTimeout(() => {
+                console.log('[jsPsychSurvey] Container children:',
+                  container.children.length);
+                console.log('[jsPsychSurvey] Container innerHTML length:',
+                  container.innerHTML.length);
+              }, 100);
+            } catch (error) {
+              console.error('[jsPsychSurvey] Error rendering survey:', error);
+              this.jsPsych.finishTrial({ error: error.message });
+            }
+          }
         }
 
-        window.currentSurvey = surveyInstance;
-        console.log('[jsPsychSurvey] Survey rendered successfully');
-      } catch (err) {
-        console.error('[jsPsychSurvey] Error:', err);
-        try { display_element.innerHTML = '<div style="color:#c00">Survey error: ' + (err?.message || err) + '</div>'; } catch {}
-        this.jsPsych.finishTrial({ error: String(err?.message || err) });
-      }
-    }
-  }
+        Plugin.info = info;
+        return Plugin;
+      })();
 
-  window.jsPsychSurvey = JsPsychSurveyPatched;
-  console.log('[HTML] Installed conditional jsPsychSurvey bridge');
-})();
-</script>
+      if (typeof window !== 'undefined') {
+        window.jsPsychSurvey = SurveyPlugin;
+      }
+    })();
+  </script>
+
+  <!-- Your pretest logic -->
+  <script src="pretest.js?v=2029"></script>
+
+  <!-- Runtime check -->
+  <script>
+    window.addEventListener('load', () => {
+      const el = document.getElementById('lib-check');
+      try {
+        const checks = [
+          ['initJsPsych', typeof window.initJsPsych === 'function'],
+          ['Survey', typeof window.Survey === 'object'],
+          ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function'],
+          ['jsPsychHtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function']
+        ];
+        const missing = checks.filter(([_, v]) => !v).map(([k]) => k);
+        if (missing.length) {
+          el.innerHTML = 'Missing: <span class="warn">' + missing.join(', ') + '</span>';
+        } else {
+          el.textContent = '✓ All components loaded';
+          el.style.color = '#2e7d32';
+        }
+      } catch (e) {
+        el.textContent = 'Check failed: ' + e.message;
+        el.className = 'warn';
+      }
+    });
+  </script>
+</body>
+</html>
