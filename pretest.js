@@ -1,4 +1,4 @@
-// Version 5.6 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
+// Version 5.7 — Pre-Test Battery (FINAL - ALL FIXES APPLIED + Survey bridge patch)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
@@ -65,6 +65,97 @@ function nukeSurveyArtifacts() {
     try { el.remove(); } catch {}
   });
 }
+
+/* ========== SURVEY BRIDGE PATCH (robust rendering) ========== */
+/**
+ * Defines/replaces window.jsPsychSurvey so that it:
+ *  - Renders a single SurveyJS instance
+ *  - Uses Survey.Survey when available, else Survey.Model (+ SurveyNG or model.render)
+ *  - Wires onComplete to jsPsych.finishTrial with ordered question names
+ */
+(function patchSurveyBridge() {
+  // If a previous definition exists, we’ll replace it with a minimal, robust version.
+  class JsPsychSurveyPatched {
+    constructor(jsPsych) {
+      this.jsPsych = jsPsych;
+    }
+    static get info() {
+      return {
+        name: 'survey',
+        parameters: {
+          survey_json: { type: 'complex', default: {} },
+          survey_function: { type: 'function', default: function() { return {}; } }
+        }
+      };
+    }
+    trial(display_element, trial) {
+      try {
+        if (!have('Survey')) {
+          throw new Error('SurveyJS not initialized');
+        }
+
+        // Resolve survey JSON from trial params or function
+        let survey_json = trial.survey_json && Object.keys(trial.survey_json).length
+          ? trial.survey_json
+          : (typeof trial.survey_function === 'function' ? trial.survey_function() : {});
+        survey_json = survey_json || {};
+
+        console.log('[jsPsychSurvey] Rendering survey...');
+        display_element.innerHTML =
+          '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
+
+        // Create ONE survey instance and attach the jsPsych finish handler to it
+        const finish = (sender) => {
+          console.log('[jsPsychSurvey] Survey completed');
+          const trial_data = {
+            response: sender.data,
+            rt: null,
+            question_order:
+              survey_json.pages?.[0]?.elements?.map(e => e.name) || []
+          };
+          display_element.innerHTML = '';
+          this.jsPsych.finishTrial(trial_data);
+        };
+
+        let surveyInstance = null;
+
+        if (typeof Survey.Survey === 'function') {
+          console.log('[jsPsychSurvey] Using Survey.Survey');
+          surveyInstance = new Survey.Survey(survey_json);
+          surveyInstance.onComplete.add(finish);
+          surveyInstance.render('surveyContainer');
+        } else if (typeof Survey.Model === 'function') {
+          console.log('[jsPsychSurvey] Falling back to Survey.Model');
+          surveyInstance = new Survey.Model(survey_json);
+          surveyInstance.onComplete.add(finish);
+
+          if (Survey.SurveyNG?.render) {
+            Survey.SurveyNG.render('surveyContainer', { model: surveyInstance });
+          } else if (typeof surveyInstance.render === 'function') {
+            surveyInstance.render('surveyContainer');
+          } else {
+            throw new Error('SurveyJS render API not available');
+          }
+        } else {
+          throw new Error('SurveyJS not initialized');
+        }
+
+        window.currentSurvey = surveyInstance;
+        console.log('[jsPsychSurvey] Survey rendered successfully');
+      } catch (err) {
+        console.error('[jsPsychSurvey] Error:', err);
+        try {
+          display_element.innerHTML = '<div style="color:#c00">Survey error: ' + (err?.message || err) + '</div>';
+        } catch {}
+        this.jsPsych.finishTrial({ error: String(err?.message || err) });
+      }
+    }
+  }
+
+  // Install our patched plugin definition
+  window.jsPsychSurvey = JsPsychSurveyPatched;
+  console.log('[pretest] Installed patched jsPsychSurvey bridge');
+})();
 
 /* ========== STIMULI (SHORTENED) ========== */
 const phoneme_discrimination_stimuli = [
