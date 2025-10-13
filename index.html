@@ -128,17 +128,31 @@
               return;
             }
 
-            console.log('[jsPsychSurvey] Rendering survey with Survey.Survey constructor');
+            console.log('[jsPsychSurvey] Rendering survey with Survey.Model + Knockout');
             
             // Create container
-            display_element.innerHTML = '<div id="surveyContainer"></div>';
-            const container = display_element.querySelector('#surveyContainer');
+            const containerId = 'surveyContainer-' + Date.now();
+            display_element.innerHTML = '<div id="' + containerId + '"></div>';
+            const container = display_element.querySelector('#' + containerId);
+            
+            if (!container) {
+              console.error('[jsPsychSurvey] Container element not found');
+              this.jsPsych.finishTrial({ error: 'Container creation failed' });
+              return;
+            }
+
+            // Check if Survey.Model exists
+            if (!window.Survey || !window.Survey.Model) {
+              console.error('[jsPsychSurvey] Survey.Model not available');
+              this.jsPsych.finishTrial({ error: 'Survey.Model not found' });
+              return;
+            }
 
             try {
-              // Use the all-in-one package approach
-              const survey = new window.Survey.Survey(surveyJson, container);
+              console.log('[jsPsychSurvey] Creating Survey.Model...');
+              const survey = new window.Survey.Model(surveyJson);
               
-              // Set up completion handler
+              // Set up completion handler BEFORE rendering
               survey.onComplete.add((sender) => {
                 console.log('[jsPsychSurvey] Survey completed');
                 const trial_data = {
@@ -146,9 +160,30 @@
                   rt: null,
                   question_order: (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
                 };
+                
+                // Clean up Knockout bindings
+                if (window.ko && container) {
+                  try {
+                    window.ko.cleanNode(container);
+                  } catch (e) {
+                    console.warn('[jsPsychSurvey] Knockout cleanup warning:', e);
+                  }
+                }
+                
                 display_element.innerHTML = '';
                 this.jsPsych.finishTrial(trial_data);
               });
+
+              // Render using Knockout bindings
+              console.log('[jsPsychSurvey] Applying Knockout bindings...');
+              container.innerHTML = '<div data-bind="survey: surveyModel"></div>';
+              
+              if (window.ko && typeof window.ko.applyBindings === 'function') {
+                window.ko.applyBindings({ surveyModel: survey }, container);
+                console.log('[jsPsychSurvey] ✓ Knockout bindings applied');
+              } else {
+                throw new Error('Knockout not available for binding');
+              }
 
               console.log('[jsPsychSurvey] ✓ Survey created successfully');
 
