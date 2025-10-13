@@ -557,9 +557,19 @@ async function initializeExperiment() {
       show_progress_bar: true,
       message_progress_bar: "Progress",
       default_iti: 350,
-      on_trial_start: () => { try { window.scrollTo(0, 0); } catch {} nukeSurveyArtifacts(); },
-      on_trial_finish: () => setTimeout(nukeSurveyArtifacts, 50),
-      on_finish: () => saveDataToServer(jsPsych.data.get().values()),
+      on_trial_start: (trial) => { 
+        console.log('[pretest] Starting trial:', trial.type?.info?.name || trial.type?.name || 'unknown');
+        try { window.scrollTo(0, 0); } catch {} 
+        nukeSurveyArtifacts(); 
+      },
+      on_trial_finish: (data) => { 
+        console.log('[pretest] Finished trial:', data.task || data.trial_type || 'unknown');
+        setTimeout(nukeSurveyArtifacts, 50);
+      },
+      on_finish: () => {
+        console.log('[pretest] Experiment complete');
+        saveDataToServer(jsPsych.data.get().values());
+      },
     });
 
     assignedCondition = assignCondition();
@@ -567,6 +577,14 @@ async function initializeExperiment() {
 
     console.log('[pretest] Building timeline...');
     const timeline = [];
+
+    // TEST: Add a simple trial first to verify jsPsych works
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: '<h2>Pre-Test Starting</h2><p>Click to begin the experiment.</p>',
+      choices: ['Start'],
+      on_finish: () => { console.log('[pretest] First trial completed successfully'); }
+    });
 
     // Surveys
     timeline.push(createParticipantInfo());
@@ -608,8 +626,26 @@ async function initializeExperiment() {
 
     // Harden & run
     console.log('[pretest] Timeline built with', timeline.length, 'items. Running...');
+    
+    // Verify display element exists
+    const displayEl = document.getElementById('jspsych-target');
+    if (!displayEl) {
+      console.error('[pretest] Display element #jspsych-target not found!');
+      alert('Error: Display element not found. Check your HTML.');
+      return;
+    }
+    console.log('[pretest] Display element found:', displayEl);
+    
     hardenButtons(timeline);
-    jsPsych.run(timeline);
+    
+    // Run with error handling
+    try {
+      jsPsych.run(timeline);
+      console.log('[pretest] jsPsych.run() called successfully');
+    } catch (runError) {
+      console.error('[pretest] Error calling jsPsych.run():', runError);
+      alert('Error starting experiment: ' + runError.message);
+    }
   } catch (error) {
     console.error('[pretest] Initialization error:', error);
     alert('Error initializing experiment: ' + error.message + '\n\nCheck console for details.');
