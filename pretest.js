@@ -135,22 +135,78 @@ function generateDigitSpanTrials({forward=true, startLen=3, endLen=8}){
 function createPhonemeInstructions(){ return { type:T('jsPsychHtmlButtonResponse'), stimulus: ()=>'<h2>Sound Discrimination / 音の識別</h2><p>Two words play. Choose SAME or DIFFERENT.</p><p style="color:#666">Trials: '+(FILTERED_STIMULI.phoneme?.length||0)+'</p>', choices:['Begin / 開始'] }; }
 function createPhonemeTrial(){
   return {
-    type:T('jsPsychHtmlKeyboardResponse'), choices:'NO_KEYS',
-    stimulus: ()=> '<div style="text-align:center;">\
-      <p id="status">Play both sounds, then choose.</p>\
-      <div style="margin:16px 0;">\
-        <button id="playA" class="jspsych-btn">Sound A</button>\
-        <button id="playB" class="jspsych-btn">Sound B</button>\
-      </div>\
-      <div>\
-        <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5">Same</button>\
-        <button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5">Different</button>\
-      </div></div>',
-    data: ()=>({ task:'phoneme_discrimination', correct_answer: jsPsych.timelineVariable('correct'), contrast_type: jsPsych.timelineVariable('contrast') }),
-    on_load(){ const a=new Audio(asset(jsPsych.timelineVariable('audio1'))); const b=new Audio(asset(jsPsych.timelineVariable('audio2'))); let pa=false,pb=false; const s=document.getElementById('status'); const sa=document.getElementById('btnSame'); const sd=document.getElementById('btnDiff'); const ena=()=>{ if(pa&&pb){ sa.disabled=sd.disabled=false; sa.style.opacity=sd.style.opacity='1'; s.textContent='Choose an answer.'; }}; document.getElementById('playA').onclick=()=>{ a.currentTime=0; a.play().catch(()=>{}); pa=true; ena(); }; document.getElementById('playB').onclick=()=>{ b.currentTime=0; b.play().catch(()=>{}); pb=true; ena(); }; sa.onclick=()=> jsPsych.finishTrial({ response_label:'same'}); sd.onclick=()=> jsPsych.finishTrial({ response_label:'different'}); },
-    on_finish: d=>{ const r=d.response_label||null; d.selected_option=r; d.correct= r? (r===d.correct_answer) : null; }
+    type: T('jsPsychHtmlKeyboardResponse'),
+    choices: 'NO_KEYS',
+    stimulus: () => `
+      <div style="text-align:center;">
+        <p id="status">Play both sounds, then choose.</p>
+        <div style="margin:16px 0;">
+          <button id="playA" class="jspsych-btn">Sound A</button>
+          <button id="playB" class="jspsych-btn">Sound B</button>
+        </div>
+        <div>
+          <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5">Same</button>
+          <button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5">Different</button>
+        </div>
+      </div>`,
+    data: () => ({
+      task: 'phoneme_discrimination',
+      correct_answer: jsPsych.timelineVariable('correct'),
+      contrast_type: jsPsych.timelineVariable('contrast')
+    }),
+    on_load: function () {
+      const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
+      const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
+
+      let aEnded = false, bEnded = false;
+      const btnA   = document.getElementById('playA');
+      const btnB   = document.getElementById('playB');
+      const btnSame= document.getElementById('btnSame');
+      const btnDiff= document.getElementById('btnDiff');
+      const status = document.getElementById('status');
+
+      function setAnswerLock(locked) {
+        btnSame.disabled = locked;
+        btnDiff.disabled = locked;
+        btnSame.style.opacity = locked ? '.5' : '1';
+        btnDiff.style.opacity = locked ? '.5' : '1';
+      }
+      function maybeEnable() {
+        if (aEnded && bEnded) {
+          setAnswerLock(false);
+          status.textContent = 'Choose an answer.';
+        }
+      }
+
+      // Require a full playthrough for each file before enabling answers
+      a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once:true });
+      b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once:true });
+
+      btnA.addEventListener('click', () => {
+        status.textContent = 'Playing A...';
+        a.currentTime = 0;
+        a.play().catch(()=>{});
+      });
+      btnB.addEventListener('click', () => {
+        status.textContent = 'Playing B...';
+        b.currentTime = 0;
+        b.play().catch(()=>{});
+      });
+
+      // start locked
+      setAnswerLock(true);
+
+      btnSame.addEventListener('click', () => jsPsych.finishTrial({ response_label: 'same' }));
+      btnDiff.addEventListener('click', () => jsPsych.finishTrial({ response_label: 'different' }));
+    },
+    on_finish: d => {
+      const r = d.response_label || null;
+      d.selected_option = r;
+      d.correct = r ? (r === d.correct_answer) : null;
+    }
   };
 }
+
 
 /* ======================== LDT ======================== */
 const ldt_stimuli=[
@@ -194,10 +250,106 @@ function createNamingTimeline(){
 
 /* ======================== FOLEY / VISUAL ======================== */
 function createFoleyTimeline(){
-  const intro={ type:T('jsPsychHtmlButtonResponse'), stimulus:()=>'<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.</p><p class="msg">Sounds: '+(FILTERED_STIMULI.foley?.length||0)+'</p>', choices:['Begin / 開始'] };
-  const trial={ type:T('jsPsychHtmlButtonResponse'), stimulus:()=>'<div><button id="play" class="jspsych-btn">Play / 再生</button><p id="status" class="msg">Listen, then choose.</p></div>', choices:()=>{ const o=jsPsych.timelineVariable('options'); return Array.isArray(o)&&o.length?o:['Option A','Option B']; }, button_html: ()=>{ const o=jsPsych.timelineVariable('options'); const safe=Array.isArray(o)&&o.length?o:['Option A','Option B']; return safe.map(()=>'<button class="jspsych-btn answer-btn">%choice%</button>'); }, post_trial_gap:250, data:()=>({ task:'foley_iconicity', correct_answer:jsPsych.timelineVariable('correct'), mapping_type:jsPsych.timelineVariable('mapping_type'), audio_file:jsPsych.timelineVariable('audio') }), on_load(){ const btn=document.getElementById('play'); const stat=document.getElementById('status'); const a=new Audio(); let ready=false; const onCan=()=>{ready=true; stat.textContent='Ready / 準備完了'; btn.disabled=false;}; const onErr=()=>{stat.textContent='Audio not available / 音声なし'; btn.disabled=true;}; const src=jsPsych.timelineVariable('audio'); if(!src){ onErr(); return; } a.addEventListener('canplaythrough', onCan, {once:true}); a.addEventListener('error', onErr, {once:true}); a.preload='auto'; a.src=asset(src); btn.disabled=true; btn.addEventListener('click', ()=>{ if(!ready) return; stat.textContent='Playing... / 再生中...'; a.currentTime=0; a.play().catch(()=>{}); }); }, on_finish:d=>{ d.correct=(d.response===d.correct_answer); } };
-  return [intro, { timeline:[trial], timeline_variables: FILTERED_STIMULI.foley.map(s=>({...s})), randomize_order:true }];
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () =>
+      '<h2>Sound Matching / 音のマッチング</h2>' +
+      '<p>Play the sound and choose what it represents.</p>' +
+      '<p class="msg">Sounds: ' + (FILTERED_STIMULI.foley?.length || 0) + '</p>',
+    choices: ['Begin / 開始']
+  };
+
+  const trial = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () =>
+      '<div>' +
+        '<button id="play" class="jspsych-btn">Play / 再生</button>' +
+        '<p id="status" class="msg">Listen, then choose.</p>' +
+      '</div>',
+    choices: () => {
+      const o = jsPsych.timelineVariable('options');
+      return Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
+    },
+    button_html: () => {
+      const o = jsPsych.timelineVariable('options');
+      const safe = Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
+      return safe.map(() => '<button class="jspsych-btn answer-btn">%choice%</button>');
+    },
+    post_trial_gap: 250,
+    data: () => ({
+      task: 'foley_iconicity',
+      correct_answer: jsPsych.timelineVariable('correct'),
+      mapping_type: jsPsych.timelineVariable('mapping_type'),
+      audio_file: jsPsych.timelineVariable('audio')
+    }),
+    on_load: function () {
+      const btn = document.getElementById('play');
+      const stat = document.getElementById('status');
+      const a = new Audio();
+      let ready = false;
+      let unlocked = false;
+
+      const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
+      function lockAnswers(lock = true) {
+        answerBtns.forEach(b => {
+          b.disabled = lock;
+          b.style.opacity = lock ? '.5' : '1';
+          b.style.pointerEvents = lock ? 'none' : 'auto';
+        });
+      }
+      lockAnswers(true); // start locked
+
+      const onCan = () => {
+        ready = true;
+        stat.textContent = 'Ready / 準備完了';
+        btn.disabled = false;
+      };
+      const onErr = () => {
+        stat.textContent = 'Audio not available / 音声なし';
+        btn.disabled = true;
+      };
+
+      const src = jsPsych.timelineVariable('audio');
+      if (!src) { onErr(); return; }
+
+      a.addEventListener('canplaythrough', onCan, { once: true });
+      a.addEventListener('error', onErr, { once: true });
+
+      // Unlock only after the first full playthrough completes
+      a.addEventListener('ended', () => {
+        if (!unlocked) {
+          unlocked = true;
+          lockAnswers(false);
+          stat.textContent = 'Choose an answer.';
+        }
+      }, { once: true });
+
+      a.preload = 'auto';
+      a.src = asset(src);
+      btn.disabled = true;
+
+      btn.addEventListener('click', () => {
+        if (!ready) return;
+        stat.textContent = 'Playing... / 再生中...';
+        a.currentTime = 0;
+        a.play().catch(() => {});
+      });
+    },
+    on_finish: d => {
+      d.correct = (d.response === d.correct_answer);
+    }
+  };
+
+  return [
+    intro,
+    {
+      timeline: [trial],
+      timeline_variables: FILTERED_STIMULI.foley.map(s => ({ ...s })),
+      randomize_order: true
+    }
+  ];
 }
+
 function createVisualTimeline(){
   const intro={ type:T('jsPsychHtmlButtonResponse'), stimulus:()=>'<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p class="msg">Shapes: '+(FILTERED_STIMULI.visual?.length||0)+'</p>', choices:['Begin / 開始'] };
   const trial={ type:T('jsPsychHtmlButtonResponse'), stimulus:()=>{ const u=jsPsych.timelineVariable('shapeUrl'); const img=u?`<img src="${u}" style="width:200px;height:200px;"/>`:'<p style="color:#c00">Missing shape.</p>'; return `<div>${img}<p class="msg">Which word matches this shape?</p></div>`; }, choices:()=>{ const w=jsPsych.timelineVariable('words'); return Array.isArray(w)&&w.length?w:['(missing)','(missing)']; }, post_trial_gap:250, data:()=>({ task:'visual_iconicity', correct_answer:jsPsych.timelineVariable('expected'), shape_type:jsPsych.timelineVariable('shape_type') }), on_finish: d=>{ d.correct=(d.response===d.correct_answer); } };
@@ -221,8 +373,20 @@ function createSpatialSpanTimeline(){
       const cells=[...document.querySelectorAll('.corsi-cell')];
       cells.forEach(c=>c.classList.add('playback'));
       const m=document.getElementById('corsi-msg'); if(m) m.textContent='Watch the sequence...';
-      let k=0; function step(){ if(k>=seq.length){ cells.forEach(c=>c.classList.remove('playback')); if(m) m.textContent='Now click the squares in order.'; return resolve(); }
-        const idx=seq[k]; const el=cells.find(c=>Number(c.dataset.i)===idx); if(el){ el.classList.add('lit'); setTimeout(()=>{ el.classList.remove('lit'); k++; setTimeout(step, 250); }, speed-250); } else { k++; setTimeout(step, speed); }
+      let k=0;
+      function step(){
+        if(k>=seq.length){
+          cells.forEach(c=>c.classList.remove('playback'));
+          if(m) m.textContent='Now click the squares in order.';
+          return resolve();
+        }
+        const idx=seq[k]; const el=cells.find(c=>Number(c.dataset.i)===idx);
+        if(el){
+          el.classList.add('lit');
+          setTimeout(()=>{ el.classList.remove('lit'); k++; setTimeout(step, 250); }, speed-250);
+        } else {
+          k++; setTimeout(step, speed);
+        }
       }
       step();
     });
@@ -232,10 +396,22 @@ function createSpatialSpanTimeline(){
     return new Promise(resolve=>{
       const chosen=[]; const cells=[...document.querySelectorAll('.corsi-cell')];
       const m=document.getElementById('corsi-msg'); if(m) m.textContent='Click the sequence.';
-      function clicker(e){ const i=Number(e.currentTarget.dataset.i); if(Number.isFinite(i)){ chosen.push(i); e.currentTarget.classList.add('lit'); setTimeout(()=>e.currentTarget.classList.remove('lit'), 150); if(chosen.length===seq.length){ cleanup(); const correct = chosen.every((v,j)=> v===seq[j]); resolve({chosen, correct}); } } }
+      function clicker(e){
+        const i=Number(e.currentTarget.dataset.i);
+        if(Number.isFinite(i)){
+          chosen.push(i);
+          e.currentTarget.classList.add('lit');
+          setTimeout(()=>e.currentTarget.classList.remove('lit'), 150);
+          if(chosen.length===seq.length){
+            cleanup();
+            const correct = chosen.every((v,j)=> v===seq[j]);
+            resolve({chosen, correct});
+          }
+        }
+      }
       function cleanup(){ cells.forEach(c=> c.removeEventListener('click', clicker)); }
       cells.forEach(c=> c.addEventListener('click', clicker));
-      setTimeout(()=>{ cleanup(); const correct=false; resolve({chosen, correct, timed_out:true}); }, timeout);
+      setTimeout(()=>{ cleanup(); resolve({chosen, correct:false, timed_out:true}); }, timeout);
     });
   }
 
@@ -243,15 +419,36 @@ function createSpatialSpanTimeline(){
   for(let len=3; len<=6; len++){
     trials.push({ type:T('jsPsychHtmlButtonResponse'), choices:['Ready'], stimulus:`<h3>Sequence length ${len}</h3><p class="msg">Press Ready, then watch carefully.</p>` });
     trials.push({
-      type:T('jsPsychHtmlKeyboardResponse'), choices:'NO_KEYS', trial_duration:null,
+      type:T('jsPsychHtmlKeyboardResponse'),
+      choices:'NO_KEYS',
+      trial_duration:null,
       stimulus: presentationHTML,
       data:{ task:'spatial_span_present', length: len },
-      on_load: async function(){ const seq= makeSequence(len); this.data().sequence = JSON.stringify(seq); await playback(seq); const res = await responseCollector(seq); this.data().chosen = JSON.stringify(res.chosen||[]); this.data().correct = !!res.correct; this.data().timed_out= !!res.timed_out; jsPsych.finishTrial(); },
-      on_finish: function(d){ if(!d.correct){ if(failAtLen===len){ jsPsych.endCurrentTimeline(); } else { failAtLen=len; } } else { if(failAtLen===len) failAtLen=0; } }
+      // ⬇️ FIXED HERE
+      on_load: async function(){
+        const seq = makeSequence(len);
+        await playback(seq);
+        const res = await responseCollector(seq);
+        jsPsych.finishTrial({
+          sequence: JSON.stringify(seq),
+          chosen: JSON.stringify(res.chosen || []),
+          correct: !!res.correct,
+          timed_out: !!res.timed_out
+        });
+      },
+      on_finish: function(d){
+        if(!d.correct){
+          if(failAtLen===len){ jsPsych.endCurrentTimeline(); }
+          else { failAtLen=len; }
+        } else {
+          if(failAtLen===len) failAtLen=0;
+        }
+      }
     });
   }
   return [instr, ...trials];
 }
+
 
 /* ======================== PROCEDURAL (Dropdown, unique) ======================== */
 const PROCEDURE_STEPS=['Crack eggs','Mix flour and eggs','Heat the pan','Pour batter on pan','Flip when ready'];
