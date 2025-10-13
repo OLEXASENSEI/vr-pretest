@@ -1,4 +1,4 @@
-// Version 5.6 — Pre-Test Battery (FIXED)
+// Version 5.6 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
@@ -311,7 +311,7 @@ function createLDTTimeline() {
     type: T('jsPsychHtmlKeyboardResponse'),
     stimulus: () => '<div style="font-size:48px;font-weight:bold;">' + jsPsych.timelineVariable('stimulus') + '</div>',
     stimulus_duration: 1000, choices: ['w', 'n'], trial_duration: 2500, post_trial_gap: 250,
-    data: { task: 'lexical_decision', correct_response: jsPsych.timelineVariable('correct_response'), word_type: jsPsych.timelineVariable('word_type') },
+    data: () => ({ task: 'lexical_decision', correct_response: jsPsych.timelineVariable('correct_response'), word_type: jsPsych.timelineVariable('word_type') }),
     on_finish: d => d.correct = (d.response === d.correct_response)
   };
   return [instructions, { timeline: [fixation, trial], timeline_variables: ldt_stimuli, randomize_order: true }];
@@ -458,7 +458,7 @@ function createVisualTimeline() {
       return Array.isArray(words) && words.length ? words : ['(missing)', '(missing)'];
     },
     post_trial_gap: 250,
-    data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
+    data: () => ({ task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') }),
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
   };
   

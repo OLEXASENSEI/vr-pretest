@@ -50,7 +50,7 @@
     </details>
   </div>
 
-  <!-- Load everything in correct order -->
+  <!-- Load everything in correct order WITHOUT defer -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
@@ -61,7 +61,7 @@
   <!-- SurveyJS -->
   <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
 
-  <!-- Embedded jsPsych-Survey Bridge Plugin -->
+  <!-- Embedded jsPsych ↔ SurveyJS bridge (jsPsychSurvey) -->
   <script>
     (function() {
       'use strict';
@@ -71,12 +71,12 @@
           name: 'survey',
           parameters: {
             survey_json: {
-              type: window.jsPsych?.plugins?.parameterType?.COMPLEX || 'complex',
-              default: undefined
+              type: 'complex',
+              default: {}
             },
             survey_function: {
-              type: window.jsPsych?.plugins?.parameterType?.FUNCTION || 'function',
-              default: undefined
+              type: 'function',
+              default: function() { return {}; }
             }
           }
         };
@@ -93,7 +93,14 @@
               return;
             }
 
-            const surveyJson = trial.survey_json || {};
+            // Prioritize survey_json, fallback to survey_function
+            let surveyJson = trial.survey_json;
+            if (!surveyJson || Object.keys(surveyJson).length === 0) {
+              if (typeof trial.survey_function === 'function') {
+                surveyJson = trial.survey_function();
+              }
+            }
+            
             const survey = new Survey.Model(surveyJson);
             
             survey.onComplete.add((sender) => {
@@ -115,7 +122,6 @@
         return SurveyPlugin;
       })();
 
-      // Register plugin
       if (typeof window !== 'undefined') {
         window.jsPsychSurvey = jsPsychSurvey;
       }
