@@ -1,4 +1,4 @@
-// Version 5.6.1 — Pre-Test Battery (FIXED)
+// Version 5.6.1.1 — Pre-Test Battery (FIXED)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
