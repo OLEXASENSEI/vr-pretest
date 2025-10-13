@@ -195,27 +195,38 @@
             });
 
             try {
-              if (typeof surveyInstance.render === 'function') {
-                console.log('[jsPsychSurvey] Rendering via surveyInstance.render');
+              // For Knockout-based SurveyJS, we need to use ko.applyBindings
+              if (window.ko && typeof window.ko.applyBindings === 'function') {
+                console.log('[jsPsychSurvey] Rendering via Knockout bindings');
+                
+                // Create the survey HTML structure that Knockout expects
+                container.innerHTML = '<div data-bind="survey: survey"></div>';
+                
+                // Apply Knockout bindings
+                window.ko.applyBindings({ survey: surveyInstance }, container);
+                
+              } else if (typeof surveyInstance.render === 'function') {
+                console.log('[jsPsychSurvey] Rendering via surveyInstance.render (fallback)');
                 surveyInstance.render(container);
-              } else if (SurveyNamespace.SurveyNG?.render) {
-                console.log('[jsPsychSurvey] Rendering via Survey.SurveyNG');
-                SurveyNamespace.SurveyNG.render(container, { model: surveyInstance });
               } else {
-                throw new Error('SurveyJS render API not available');
+                throw new Error('Neither Knockout nor Survey render API available');
               }
               
-              console.log('[jsPsychSurvey] Survey render complete; container child count:',
-                          container.children.length);
+              console.log('[jsPsychSurvey] Survey render initiated');
               
-              // Wait a moment and check again
+              // Wait a moment and check if it rendered
               setTimeout(() => {
+                const childCount = container.children.length;
+                const htmlLength = container.innerHTML.length;
                 console.log('[jsPsychSurvey] Container check after 100ms:',
-                  'children=' + container.children.length,
-                  'innerHTML length=' + container.innerHTML.length);
+                  'children=' + childCount,
+                  'innerHTML length=' + htmlLength);
                 
-                if (container.children.length === 0 && container.innerHTML.length < 50) {
-                  console.error('[jsPsychSurvey] Survey failed to render - container is empty');
+                if (childCount === 0 || htmlLength < 100) {
+                  console.error('[jsPsychSurvey] Survey failed to render properly');
+                  throw new Error('Survey rendered but produced no content');
+                } else {
+                  console.log('[jsPsychSurvey] ✓ Survey rendered successfully');
                 }
               }, 100);
 
@@ -290,6 +301,7 @@
         const el = document.getElementById('lib-check');
         const checks = [
           ['initJsPsych', typeof window.initJsPsych === 'function'],
+          ['Knockout (ko)', typeof window.ko === 'object' && typeof window.ko.applyBindings === 'function'],
           ['Survey', typeof (window.Survey?.default || window.Survey) === 'object'],
           ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function'],
           ['HtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function'],
