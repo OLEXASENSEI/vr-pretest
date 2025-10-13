@@ -87,34 +87,46 @@
           }
 
           trial(display_element, trial) {
+            console.log('[jsPsychSurvey] trial() called');
+            console.log('[jsPsychSurvey] survey_json:', trial.survey_json);
+            
             if (!window.Survey) {
               console.error('SurveyJS library not loaded');
               this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
               return;
             }
 
-            // Prioritize survey_json, fallback to survey_function
-            let surveyJson = trial.survey_json;
-            if (!surveyJson || Object.keys(surveyJson).length === 0) {
-              if (typeof trial.survey_function === 'function') {
-                surveyJson = trial.survey_function();
+            try {
+              // Prioritize survey_json, fallback to survey_function
+              let surveyJson = trial.survey_json;
+              if (!surveyJson || Object.keys(surveyJson).length === 0) {
+                if (typeof trial.survey_function === 'function') {
+                  surveyJson = trial.survey_function();
+                }
               }
-            }
-            
-            const survey = new Survey.Model(surveyJson);
-            
-            survey.onComplete.add((sender) => {
-              const trial_data = {
-                response: sender.data,
-                rt: null,
-                question_order: surveyJson.pages?.[0]?.elements?.map(e => e.name) || []
-              };
-              display_element.innerHTML = '';
-              this.jsPsych.finishTrial(trial_data);
-            });
+              
+              console.log('[jsPsychSurvey] Creating survey model...');
+              const survey = new Survey.Model(surveyJson);
+              
+              survey.onComplete.add((sender) => {
+                console.log('[jsPsychSurvey] Survey completed');
+                const trial_data = {
+                  response: sender.data,
+                  rt: null,
+                  question_order: surveyJson.pages?.[0]?.elements?.map(e => e.name) || []
+                };
+                display_element.innerHTML = '';
+                this.jsPsych.finishTrial(trial_data);
+              });
 
-            display_element.innerHTML = '<div id="surveyContainer"></div>';
-            survey.render('surveyContainer');
+              console.log('[jsPsychSurvey] Rendering survey...');
+              display_element.innerHTML = '<div id="surveyContainer"></div>';
+              survey.render('surveyContainer');
+              console.log('[jsPsychSurvey] Survey rendered successfully');
+            } catch (error) {
+              console.error('[jsPsychSurvey] Error in trial():', error);
+              this.jsPsych.finishTrial({ error: error.message });
+            }
           }
         }
 
@@ -129,7 +141,7 @@
   </script>
 
   <!-- Your pretest logic -->
-  <script src="pretest.js?v=2025"></script>
+  <script src="pretest.js?v=2026"></script>
 
   <!-- Runtime check -->
   <script>

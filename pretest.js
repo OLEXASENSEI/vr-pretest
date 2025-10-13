@@ -545,10 +545,13 @@ async function initializeExperiment() {
       alert('SurveyJS not loaded. Check your script tags.');
       return;
     }
+    console.log('[pretest] Survey object available:', typeof window.Survey, window.Survey);
+    
     if (!have('jsPsychSurvey')) {
       alert('jsPsych-Survey bridge not loaded. Check your script tags.');
       return;
     }
+    console.log('[pretest] jsPsychSurvey available:', typeof window.jsPsychSurvey);
 
     // Initialize jsPsych
     jsPsych = T('initJsPsych')({
