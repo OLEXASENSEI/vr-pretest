@@ -247,44 +247,46 @@ function createPhonemeInstructions() {
   };
 }
 
-const phoneme_trial = {
-  type: T('jsPsychHtmlKeyboardResponse'),
-  choices: 'NO_KEYS',
-  stimulus: () =>
-    '<div style="text-align:center;">' +
-    '<p id="status">Play both sounds, then choose. / 両方の音を再生してから選択</p>' +
-    '<div style="margin:16px 0;">' +
-    '<button id="playA" class="jspsych-btn" style="margin:0 8px;">Sound A / 音A</button>' +
-    '<button id="playB" class="jspsych-btn" style="margin:0 8px;">Sound B / 音B</button>' +
-    '</div>' +
-    '<div>' +
-    '<button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same / 同じ</button>' +
-    '<button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different / 違う</button>' +
-    '</div></div>',
-  data: () => ({ task: 'phoneme_discrimination', correct_answer: jsPsych.timelineVariable('correct'), contrast_type: jsPsych.timelineVariable('contrast') }),
-  on_load: function () {
-    const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
-    const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
-    let playedA = false, playedB = false;
-    const btnA = document.getElementById('playA');
-    const btnB = document.getElementById('playB');
-    const btnSame = document.getElementById('btnSame');
-    const btnDiff = document.getElementById('btnDiff');
-    const status = document.getElementById('status');
-    function maybeEnable() {
-      if (playedA && playedB) {
-        btnSame.disabled = false; btnDiff.disabled = false;
-        btnSame.style.opacity = '1'; btnDiff.style.opacity = '1';
-        status.textContent = 'Choose an answer.';
+function createPhonemeTrial() {
+  return {
+    type: T('jsPsychHtmlKeyboardResponse'),
+    choices: 'NO_KEYS',
+    stimulus: () =>
+      '<div style="text-align:center;">' +
+      '<p id="status">Play both sounds, then choose. / 両方の音を再生してから選択</p>' +
+      '<div style="margin:16px 0;">' +
+      '<button id="playA" class="jspsych-btn" style="margin:0 8px;">Sound A / 音A</button>' +
+      '<button id="playB" class="jspsych-btn" style="margin:0 8px;">Sound B / 音B</button>' +
+      '</div>' +
+      '<div>' +
+      '<button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same / 同じ</button>' +
+      '<button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different / 違う</button>' +
+      '</div></div>',
+    data: () => ({ task: 'phoneme_discrimination', correct_answer: jsPsych.timelineVariable('correct'), contrast_type: jsPsych.timelineVariable('contrast') }),
+    on_load: function () {
+      const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
+      const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
+      let playedA = false, playedB = false;
+      const btnA = document.getElementById('playA');
+      const btnB = document.getElementById('playB');
+      const btnSame = document.getElementById('btnSame');
+      const btnDiff = document.getElementById('btnDiff');
+      const status = document.getElementById('status');
+      function maybeEnable() {
+        if (playedA && playedB) {
+          btnSame.disabled = false; btnDiff.disabled = false;
+          btnSame.style.opacity = '1'; btnDiff.style.opacity = '1';
+          status.textContent = 'Choose an answer.';
+        }
       }
-    }
-    btnA.addEventListener('click', () => { a.currentTime = 0; a.play().catch(()=>{}); playedA = true; maybeEnable(); });
-    btnB.addEventListener('click', () => { b.currentTime = 0; b.play().catch(()=>{}); playedB = true; maybeEnable(); });
-    btnSame.addEventListener('click', () => { jsPsych.finishTrial({ response_label: 'same' }); });
-    btnDiff.addEventListener('click', () => { jsPsych.finishTrial({ response_label: 'different' }); });
-  },
-  on_finish: d => { const r = d.response_label || null; d.selected_option = r; d.correct = r ? (r === d.correct_answer) : null; }
-};
+      btnA.addEventListener('click', () => { a.currentTime = 0; a.play().catch(()=>{}); playedA = true; maybeEnable(); });
+      btnB.addEventListener('click', () => { b.currentTime = 0; b.play().catch(()=>{}); playedB = true; maybeEnable(); });
+      btnSame.addEventListener('click', () => { jsPsych.finishTrial({ response_label: 'same' }); });
+      btnDiff.addEventListener('click', () => { jsPsych.finishTrial({ response_label: 'different' }); });
+    },
+    on_finish: d => { const r = d.response_label || null; d.selected_option = r; d.correct = r ? (r === d.correct_answer) : null; }
+  };
+}
 
 /* ========== LDT ========== */
 const ldt_stimuli = [
@@ -533,78 +535,85 @@ function hardenButtons(nodes) {
 
 /* ========== INITIALIZATION & RUN ========== */
 async function initializeExperiment() {
-  // Check for required libraries
-  if (!have('initJsPsych')) {
-    alert('jsPsych core not loaded. Check your script tags.');
-    return;
+  try {
+    // Check for required libraries
+    if (!have('initJsPsych')) {
+      alert('jsPsych core not loaded. Check your script tags.');
+      return;
+    }
+    if (!have('Survey')) {
+      alert('SurveyJS not loaded. Check your script tags.');
+      return;
+    }
+    if (!have('jsPsychSurvey')) {
+      alert('jsPsych-Survey bridge not loaded. Check your script tags.');
+      return;
+    }
+
+    // Initialize jsPsych
+    jsPsych = T('initJsPsych')({
+      display_element: "jspsych-target",
+      use_webaudio: false,
+      show_progress_bar: true,
+      message_progress_bar: "Progress",
+      default_iti: 350,
+      on_trial_start: () => { try { window.scrollTo(0, 0); } catch {} nukeSurveyArtifacts(); },
+      on_trial_finish: () => setTimeout(nukeSurveyArtifacts, 50),
+      on_finish: () => saveDataToServer(jsPsych.data.get().values()),
+    });
+
+    assignedCondition = assignCondition();
+    FILTERED_STIMULI = await filterExistingStimuli();
+
+    console.log('[pretest] Building timeline...');
+    const timeline = [];
+
+    // Surveys
+    timeline.push(createParticipantInfo());
+    timeline.push(createMotionSicknessQuestionnaire());
+
+    // Digit span
+    timeline.push(createDigitSpanInstructions(true));
+    timeline.push({ timeline: generateOptimizedDigitSpanTrials(true),  randomize_order: false });
+    timeline.push(createDigitSpanInstructions(false));
+    timeline.push({ timeline: generateOptimizedDigitSpanTrials(false), randomize_order: false });
+
+    // Phoneme
+    if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
+      timeline.push(createPhonemeInstructions());
+      timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme.map(s => ({...s})), randomize_order: true });
+    }
+
+    // LDT
+    timeline.push(...createLDTTimeline());
+
+    // Picture naming (mic required)
+    if ((FILTERED_STIMULI.picture?.length || 0) > 0 && have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse')) {
+      timeline.push(...createNamingTimeline());
+    }
+
+    // Foley
+    if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
+      timeline.push(...createFoleyTimeline());
+    }
+
+    // Visual
+    if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
+      timeline.push(...createVisualTimeline());
+    }
+
+    // Procedural + Ideophone
+    timeline.push(...createProceduralTimeline());
+    timeline.push(createIdeophoneTest());
+
+    // Harden & run
+    console.log('[pretest] Timeline built with', timeline.length, 'items. Running...');
+    hardenButtons(timeline);
+    jsPsych.run(timeline);
+  } catch (error) {
+    console.error('[pretest] Initialization error:', error);
+    alert('Error initializing experiment: ' + error.message + '\n\nCheck console for details.');
   }
-  if (!have('Survey')) {
-    alert('SurveyJS not loaded. Check your script tags.');
-    return;
-  }
-  if (!have('jsPsychSurvey')) {
-    alert('jsPsych-Survey bridge not loaded. Check your script tags.');
-    return;
-  }
-
-  // Initialize jsPsych
-  jsPsych = T('initJsPsych')({
-    display_element: "jspsych-target",
-    use_webaudio: false,
-    show_progress_bar: true,
-    message_progress_bar: "Progress",
-    default_iti: 350,
-    on_trial_start: () => { try { window.scrollTo(0, 0); } catch {} nukeSurveyArtifacts(); },
-    on_trial_finish: () => setTimeout(nukeSurveyArtifacts, 50),
-    on_finish: () => saveDataToServer(jsPsych.data.get().values()),
-  });
-
-  assignedCondition = assignCondition();
-  FILTERED_STIMULI = await filterExistingStimuli();
-
-  const timeline = [];
-
-  // Surveys
-  timeline.push(createParticipantInfo());
-  timeline.push(createMotionSicknessQuestionnaire());
-
-  // Digit span
-  timeline.push(createDigitSpanInstructions(true));
-  timeline.push({ timeline: generateOptimizedDigitSpanTrials(true),  randomize_order: false });
-  timeline.push(createDigitSpanInstructions(false));
-  timeline.push({ timeline: generateOptimizedDigitSpanTrials(false), randomize_order: false });
-
-  // Phoneme
-  if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
-    timeline.push(createPhonemeInstructions());
-    timeline.push({ timeline: [phoneme_trial], timeline_variables: FILTERED_STIMULI.phoneme.map(s => ({...s})), randomize_order: true });
-  }
-
-  // LDT
-  timeline.push(...createLDTTimeline());
-
-  // Picture naming (mic required)
-  if ((FILTERED_STIMULI.picture?.length || 0) > 0 && have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse')) {
-    timeline.push(...createNamingTimeline());
-  }
-
-  // Foley
-  if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
-    timeline.push(...createFoleyTimeline());
-  }
-
-  // Visual
-  if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
-    timeline.push(...createVisualTimeline());
-  }
-
-  // Procedural + Ideophone
-  timeline.push(...createProceduralTimeline());
-  timeline.push(createIdeophoneTest());
-
-  // Harden & run
-  hardenButtons(timeline);
-  jsPsych.run(timeline);
 }
 
 /* ========== BOOTSTRAP ========== */
