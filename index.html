@@ -14,6 +14,47 @@
   <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/defaultV2.min.css">
 
   <style>
+    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
+    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
+    header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
+    header h1 { font-size: 20px; margin: 0; }
+    #jspsych-target { min-height: 60vh; }
+    .precheck { font-size: 12px; color:#666; margin-bottom:12px; }
+    .warn { color:#c1272d; font-weight: 600; }
+    .success { color:#2e7d32; font-weight: 600; }
+    
+    /* Loading indicator */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(255,255,255,0.95);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+      flex-direction: column;
+      gap: 20px;
+    }
+    .loading-spinner {
+      border: 4px solid #f3f3f3;
+      border-top: 4px solid #2196F3;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      animation: spin 1s linear infinite;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .loading-text {
+      font-size: 16px;
+      color: #666;
+    }
+    
     /* Ensure survey is visible */
     #surveyContainer {
       display: block !important;
@@ -25,25 +66,33 @@
       display: block !important;
       visibility: visible !important;
     }
-  </style>
-
-  <style>
-    body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
-    .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
-    header { display:flex; align-items:center; justify-content:space-between; margin-bottom: 12px; }
-    header h1 { font-size: 20px; margin: 0; }
-    #jspsych-target { min-height: 60vh; }
-    .precheck { font-size: 12px; color:#666; margin-bottom:12px; }
-    .warn { color:#c1272d; font-weight: 600; }
-    details { position: fixed; bottom: 10px; right: 10px; background: white; padding: 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 300px; z-index: 1000; }
+    
+    details { 
+      position: fixed; 
+      bottom: 10px; 
+      right: 10px; 
+      background: white; 
+      padding: 10px; 
+      border: 1px solid #ccc; 
+      border-radius: 6px; 
+      max-width: 300px; 
+      z-index: 1000; 
+    }
     details summary { cursor: pointer; font-weight: 600; }
   </style>
 </head>
 <body>
+  <!-- Loading overlay -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="loading-spinner"></div>
+    <div class="loading-text">Initializing experiment...</div>
+    <div id="loading-status" style="font-size: 12px; color: #999;"></div>
+  </div>
+
   <div class="wrap">
     <header>
       <h1>VR Pre-Test</h1>
-      <div class="precheck" id="lib-check">Loading libraries…</div>
+      <div class="precheck" id="lib-check">Checking libraries…</div>
     </header>
 
     <div id="jspsych-target"></div>
@@ -51,20 +100,20 @@
     <details>
       <summary>Help / Requirements</summary>
       <ul>
-        <li>Make sure your assets exist at the paths used in <code>pretest.js</code>:
+        <li>Assets required:
           <ul>
             <li><code>sounds/*.mp3</code> for phoneme/foley</li>
             <li><code>img/*.jpg|jpeg|svg</code> for picture/visual tasks</li>
-            <li><code>pron/*.mp3</code> if you use model pronunciations</li>
+            <li><code>pron/*.mp3</code> for model pronunciations</li>
           </ul>
         </li>
-        <li>All libraries are loaded from CDN</li>
-        <li>Bridge plugin is embedded in this page</li>
+        <li>All libraries loaded from CDN</li>
+        <li>Open browser console (F12) for detailed logs</li>
       </ul>
     </details>
   </div>
 
-  <!-- Load everything in correct order WITHOUT defer -->
+  <!-- Load libraries in order -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
@@ -97,11 +146,14 @@
           }
 
           trial(display_element, trial) {
-            console.log('[jsPsychSurvey] trial() called');
-            console.log('[jsPsychSurvey] survey_json:', trial.survey_json);
+            console.log('[jsPsychSurvey] Starting survey trial');
 
-            if (!window.Survey) {
-              console.error('SurveyJS library not loaded');
+            const SurveyNamespace = (window.Survey && window.Survey.default)
+              ? window.Survey.default
+              : window.Survey;
+
+            if (!SurveyNamespace) {
+              console.error('[jsPsychSurvey] SurveyJS not loaded');
               this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
               return;
             }
@@ -113,13 +165,12 @@
               }
             }
 
-            console.log('[jsPsychSurvey] Creating survey model...');
             display_element.innerHTML =
               '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
 
             const container = display_element.querySelector('#surveyContainer');
             if (!container) {
-              console.error('[jsPsychSurvey] surveyContainer not found');
+              console.error('[jsPsychSurvey] Container not found');
               this.jsPsych.finishTrial({ error: 'Survey container missing' });
               return;
             }
@@ -129,49 +180,43 @@
               const trial_data = {
                 response: sender.data,
                 rt: null,
-                question_order:
-                  (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
+                question_order: (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
               };
               display_element.innerHTML = '';
               this.jsPsych.finishTrial(trial_data);
             };
 
-            let surveyInstance = null;
-
             try {
-              if (typeof Survey.Survey === 'function') {
-                console.log('[jsPsychSurvey] Using Survey.Survey');
-                surveyInstance = new Survey.Survey(surveyJson);
-                surveyInstance.onComplete.add(finish);
-                surveyInstance.render(container);
-              } else if (typeof Survey.Model === 'function') {
-                console.log('[jsPsychSurvey] Using Survey.Model fallback');
-                surveyInstance = new Survey.Model(surveyJson);
-                surveyInstance.onComplete.add(finish);
+              let surveyInstance = null;
 
-                if (Survey.SurveyNG?.render) {
-                  Survey.SurveyNG.render(container, { model: surveyInstance });
-                } else if (typeof surveyInstance.render === 'function') {
-                  surveyInstance.render(container);
-                } else {
-                  throw new Error('SurveyJS render API not available');
-                }
+              if (typeof SurveyNamespace.Survey === 'function') {
+                surveyInstance = new SurveyNamespace.Survey(surveyJson);
+              } else if (typeof SurveyNamespace.Model === 'function') {
+                surveyInstance = new SurveyNamespace.Model(surveyJson);
               } else {
-                throw new Error('SurveyJS not initialized');
+                throw new Error('SurveyJS API not available');
+              }
+
+              surveyInstance.onComplete.add(finish);
+
+              if (typeof surveyInstance.render === 'function') {
+                surveyInstance.render(container);
+              } else if (SurveyNamespace.SurveyNG?.render) {
+                SurveyNamespace.SurveyNG.render(container, { model: surveyInstance });
+              } else {
+                throw new Error('Survey render method not found');
               }
 
               window.currentSurvey = surveyInstance;
               console.log('[jsPsychSurvey] Survey rendered successfully');
 
-              setTimeout(() => {
-                console.log('[jsPsychSurvey] Container children:',
-                  container.children.length);
-                console.log('[jsPsychSurvey] Container innerHTML length:',
-                  container.innerHTML.length);
-              }, 100);
             } catch (error) {
-              console.error('[jsPsychSurvey] Error rendering survey:', error);
-              this.jsPsych.finishTrial({ error: error.message });
+              console.error('[jsPsychSurvey] Render error:', error);
+              display_element.innerHTML = 
+                '<div style="padding:20px;color:#c00;">Survey failed to load. Check console.</div>';
+              setTimeout(() => {
+                this.jsPsych.finishTrial({ error: error?.message || String(error) });
+              }, 2000);
             }
           }
         }
@@ -187,31 +232,118 @@
   </script>
 
   <!-- Your pretest logic -->
-  <script src="pretest.js?v=2029"></script>
+  <script src="pretest.js"></script>
 
-  <!-- Runtime check -->
+  <!-- Enhanced initialization wrapper -->
   <script>
-    window.addEventListener('load', () => {
-      const el = document.getElementById('lib-check');
-      try {
+    (function() {
+      const updateLoadingStatus = (message) => {
+        const statusEl = document.getElementById('loading-status');
+        if (statusEl) statusEl.textContent = message;
+        console.log('[Init]', message);
+      };
+
+      const hideLoading = () => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.style.opacity = '0';
+          overlay.style.transition = 'opacity 0.3s';
+          setTimeout(() => overlay.remove(), 300);
+        }
+      };
+
+      const showError = (message) => {
+        const overlay = document.getElementById('loading-overlay');
+        if (overlay) {
+          overlay.innerHTML = `
+            <div style="text-align:center; padding:40px;">
+              <div style="font-size:48px;color:#c1272d;">⚠️</div>
+              <h2 style="color:#c1272d;">Initialization Error</h2>
+              <p style="max-width:500px;">${message}</p>
+              <button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;">
+                Reload Page
+              </button>
+            </div>`;
+        }
+      };
+
+      window.addEventListener('load', () => {
+        updateLoadingStatus('Checking libraries...');
+
+        // Check all required libraries
+        const el = document.getElementById('lib-check');
         const checks = [
           ['initJsPsych', typeof window.initJsPsych === 'function'],
-          ['Survey', typeof window.Survey === 'object'],
+          ['Survey', typeof (window.Survey?.default || window.Survey) === 'object'],
           ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function'],
-          ['jsPsychHtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function']
+          ['HtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function'],
+          ['HtmlKeyboardResponse', typeof window.jsPsychHtmlKeyboardResponse === 'function'],
+          ['SurveyText', typeof window.jsPsychSurveyText === 'function'],
+          ['InitializeMicrophone', typeof window.jsPsychInitializeMicrophone === 'function'],
+          ['HtmlAudioResponse', typeof window.jsPsychHtmlAudioResponse === 'function']
         ];
+
         const missing = checks.filter(([_, v]) => !v).map(([k]) => k);
+        
         if (missing.length) {
-          el.innerHTML = 'Missing: <span class="warn">' + missing.join(', ') + '</span>';
-        } else {
-          el.textContent = '✓ All components loaded';
-          el.style.color = '#2e7d32';
+          const msg = 'Missing libraries: ' + missing.join(', ');
+          el.innerHTML = '<span class="warn">' + msg + '</span>';
+          showError(msg + '<br><br>Please check your internet connection and reload.');
+          return;
         }
-      } catch (e) {
-        el.textContent = 'Check failed: ' + e.message;
-        el.className = 'warn';
-      }
-    });
+
+        el.innerHTML = '<span class="success">✓ All libraries loaded</span>';
+        updateLoadingStatus('Starting experiment...');
+
+        // Wait a moment for everything to settle
+        setTimeout(() => {
+          // Check if the pretest initialization function exists
+          if (typeof window.initializeExperiment === 'function') {
+            console.log('[Init] Calling initializeExperiment()...');
+            
+            // The pretest.js should handle its own initialization
+            // Just hide loading when ready
+            const originalInit = window.initializeExperiment;
+            window.initializeExperiment = async function() {
+              try {
+                updateLoadingStatus('Validating assets...');
+                await originalInit();
+                hideLoading();
+              } catch (error) {
+                console.error('[Init] Error:', error);
+                showError('Initialization failed: ' + (error?.message || error));
+              }
+            };
+            
+            // Trigger if not already running
+            if (!window.jsPsych) {
+              window.initializeExperiment();
+            } else {
+              hideLoading();
+            }
+          } else {
+            // The pretest.js auto-initializes
+            console.log('[Init] Waiting for auto-initialization...');
+            
+            // Hide loading after a delay if jsPsych starts
+            const checkInterval = setInterval(() => {
+              if (window.jsPsych) {
+                clearInterval(checkInterval);
+                hideLoading();
+              }
+            }, 100);
+            
+            // Timeout after 5 seconds
+            setTimeout(() => {
+              clearInterval(checkInterval);
+              if (!window.jsPsych) {
+                showError('Experiment failed to start. Check console for errors.');
+              }
+            }, 5000);
+          }
+        }, 100);
+      });
+    })();
   </script>
 </body>
 </html>

@@ -1,4 +1,4 @@
-// Version 5.8 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
+// Version 5.9 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
@@ -212,7 +212,7 @@ function createDigitSpanInstructions(forward = true) {
 
 function generateOptimizedDigitSpanTrials(forward = true) {
   const trials = []; let failCount = 0;
-  for (let length = 4; length <= 7; length++) {
+    for (let length = 4; length <= 7; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
     trials.push({
       type: T('jsPsychHtmlKeyboardResponse'),
@@ -242,7 +242,7 @@ function generateOptimizedDigitSpanTrials(forward = true) {
 function createPhonemeInstructions() {
   return {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => '<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ' + (FILTERED_STIMULI.phonеме?.length || 0) + '</p>',
+    stimulus: () => '<h2>Sound Discrimination / 音の識別</h2><p>Two words will play. Decide SAME or DIFFERENT. / 同じか違うか</p><p style="color:#666">Trials: ' + (FILTERED_STIMULI.phoneme?.length || 0) + '</p>',
     choices: ['Begin / 開始']
   };
 }
@@ -422,7 +422,7 @@ function createFoleyTimeline() {
     button_html: () => {
       const opts = jsPsych.timelineVariable('options');
       const safe = Array.isArray(opts) && opts.length ? opts : ['Option A', 'Option B'];
-      return safe.map(() => `<button class="jspsych-btn answer-btn">%s</button>`);
+      return safe.map(() => `<button class="jspsych-btn answer-btn">%choice%</button>`);
     },
     post_trial_gap: 250,
     data: () => ({ task: 'foley_iconicity', correct_answer: jsPsych.timelineVariable('correct'), mapping_type: jsPsych.timelineVariable('mapping_type'), audio_file: jsPsych.timelineVariable('audio') }),
@@ -443,7 +443,7 @@ function createFoleyTimeline() {
     on_finish: (d) => { d.correct = (d.response === d.correct_answer); }
   };
 
-  return [intro, { timeline: [trial], timeline_variables: FILTERED_STимули.foley.map(s => ({...s})), randomize_order: true }];
+  return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.foley.map(s => ({...s})), randomize_order: true }];
 }
 
 function createVisualTimeline() {
@@ -521,21 +521,25 @@ function hardenButtons(nodes) {
   for (const n of nodes) {
     if (!n || typeof n !== 'object') continue;
     if (Array.isArray(n.timeline)) hardenButtons(n.timeline);
-    const t = n.type && n.type.info && n.type.info.name;
-    if (t !== 'html-button-response') continue;
-    let choices = (typeof n.choices === 'function') ? n.choices() : n.choices;
+    const typeName = n.type && n.type.info && n.type.info.name;
+    if (typeName !== 'html-button-response') continue;
+
+    if (typeof n.choices === 'function') {
+      if (Array.isArray(n.button_html)) {
+        n.button_html = '<button class="jspsych-btn">%choice%</button>';
+      }
+      continue;
+    }
+
+    let choices = n.choices;
     if (!Array.isArray(choices) || choices.length === 0) {
       console.warn('[pretest] Missing/empty choices; inserting default ["Continue"] for trial:', n);
-      n.choices = ['Continue']; choices = n.choices;
+      choices = ['Continue'];
+      n.choices = choices;
     }
+
     if (Array.isArray(n.button_html) && n.button_html.length !== choices.length) {
-      n.button_html = choices.map(() => '<button class="jspsych-btn">%s</button>');
-    }
-    if (typeof n.button_html === 'function') {
-      const bh = n.button_html();
-      if (Array.isArray(bh) && bh.length !== choices.length) {
-        n.button_html = choices.map(() => '<button class="jspsych-btn">%s</button>');
-      }
+      n.button_html = choices.map(() => '<button class="jspsych-btn">%choice%</button>');
     }
   }
 }
@@ -543,16 +547,18 @@ function hardenButtons(nodes) {
 /* ========== INITIALIZATION & RUN ========== */
 async function initializeExperiment() {
   try {
-    // Check for required libraries
+    // Normalize Survey namespace (handles Module default export)
+    const SurveyNamespace = (window.Survey && window.Survey.default) ? window.Survey.default : window.Survey;
+
     if (!have('initJsPsych')) {
       alert('jsPsych core not loaded. Check your script tags.');
       return;
     }
-    if (!have('Survey')) {
+    if (!SurveyNamespace) {
       alert('SurveyJS not loaded. Check your script tags.');
       return;
     }
-    console.log('[pretest] Survey object available:', typeof window.Survey, window.Survey);
+    console.log('[pretest] Survey namespace available:', SurveyNamespace);
 
     if (!have('jsPsychSurvey')) {
       alert('jsPsych-Survey bridge not loaded. Check your script tags.');
@@ -658,7 +664,7 @@ async function initializeExperiment() {
     }
   } catch (error) {
     console.error('[pretest] Initialization error:', error);
-    alert('Error initializing experiment: ' + error.message + '\n\nCheck console for details.');
+    alert('Error initializing experiment: ' + (error?.message || error) + '\n\nCheck console for details.');
   }
 }
 
