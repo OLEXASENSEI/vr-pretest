@@ -4,15 +4,9 @@
   <meta charset="utf-8"/>
   <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>VR Pre-Test</title>
-  <meta name="description" content="VR Pre-Test Battery"/>
   <link rel="icon" href="data:,">
-
-  <!-- jsPsych CSS -->
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
-
-  <!-- SurveyJS CSS -->
   <link rel="stylesheet" href="https://unpkg.com/survey-knockout@1.9.112/defaultV2.min.css">
-
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial; }
     .wrap { max-width: 980px; margin: 24px auto; padding: 0 16px; }
@@ -22,80 +16,50 @@
     .precheck { font-size: 12px; color:#666; margin-bottom:12px; }
     .warn { color:#c1272d; font-weight: 600; }
     .success { color:#2e7d32; font-weight: 600; }
-    
-    /* Loading indicator */
-    .loading-overlay {
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(255,255,255,0.95); display: flex;
-      align-items: center; justify-content: center; z-index: 9999;
-      flex-direction: column; gap: 20px;
-    }
-    .loading-spinner {
-      border: 4px solid #f3f3f3; border-top: 4px solid #2196F3;
-      border-radius: 50%; width: 50px; height: 50px;
-      animation: spin 1s linear infinite;
-    }
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
-    }
+    .loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.95); display: flex; align-items: center; justify-content: center; z-index: 9999; flex-direction: column; gap: 20px; }
+    .loading-spinner { border: 4px solid #f3f3f3; border-top: 4px solid #2196F3; border-radius: 50%; width: 50px; height: 50px; animation: spin 1s linear infinite; }
+    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     .loading-text { font-size: 16px; color: #666; }
-    
-    /* Survey visibility */
     #surveyContainer { display: block !important; width: 100% !important; min-height: 400px !important; }
     .sv_main { display: block !important; visibility: visible !important; }
-    
-    details { 
-      position: fixed; bottom: 10px; right: 10px; background: white;
-      padding: 10px; border: 1px solid #ccc; border-radius: 6px;
-      max-width: 300px; z-index: 1000;
-    }
+    details { position: fixed; bottom: 10px; right: 10px; background: white; padding: 10px; border: 1px solid #ccc; border-radius: 6px; max-width: 300px; z-index: 1000; }
     details summary { cursor: pointer; font-weight: 600; }
   </style>
 </head>
 <body>
-  <!-- Loading overlay -->
   <div id="loading-overlay" class="loading-overlay">
     <div class="loading-spinner"></div>
-    <div class="loading-text">Initializing experiment...</div>
+    <div class="loading-text">Initializing...</div>
     <div id="loading-status" style="font-size: 12px; color: #999;"></div>
   </div>
-
   <div class="wrap">
     <header>
       <h1>VR Pre-Test</h1>
-      <div class="precheck" id="lib-check">Checking libraries…</div>
+      <div class="precheck" id="lib-check">Checking...</div>
     </header>
-
     <div id="jspsych-target"></div>
-
     <details>
-      <summary>Help / Requirements</summary>
+      <summary>Help</summary>
       <ul>
-        <li>Assets required: sounds/*.mp3, img/*.jpg|jpeg|svg, pron/*.mp3</li>
-        <li>All libraries loaded from CDN</li>
-        <li>Open browser console (F12) for detailed logs</li>
+        <li>Assets: sounds/*.mp3, img/*.jpg|jpeg|svg</li>
+        <li>Press F12 for console</li>
       </ul>
     </details>
   </div>
 
-  <!-- Load libraries in order -->
   <script src="https://unpkg.com/jspsych@7.3.4"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
   <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
-
-  <!-- SurveyJS ALL-IN-ONE Knockout package (simpler approach) -->
   <script src="https://unpkg.com/knockout@3.5.1/build/output/knockout-latest.js"></script>
   <script src="https://unpkg.com/survey-knockout@1.9.112/survey.ko.min.js"></script>
 
-  <!-- Embedded jsPsych ↔ SurveyJS bridge (SIMPLIFIED) -->
+  <!-- Bridge Plugin -->
   <script>
     (function() {
       'use strict';
-
       const SurveyPlugin = (function() {
         const info = {
           name: 'survey',
@@ -104,134 +68,75 @@
             survey_function: { type: 'function', default: () => ({}) }
           }
         };
-
         class Plugin {
-          constructor(jsPsych) {
-            this.jsPsych = jsPsych;
-          }
-
+          constructor(jsPsych) { this.jsPsych = jsPsych; }
           trial(display_element, trial) {
-            console.log('[jsPsychSurvey] Starting survey trial');
-
-            // Get survey JSON
+            console.log('[Survey] Starting trial');
             let surveyJson = trial.survey_json;
             if (!surveyJson || Object.keys(surveyJson).length === 0) {
               if (typeof trial.survey_function === 'function') {
                 surveyJson = trial.survey_function();
               }
             }
-
-            // Check if Survey.Survey is available (all-in-one package)
-            if (!window.Survey || !window.Survey.Survey) {
-              console.error('[jsPsychSurvey] Survey.Survey not available');
-              this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
-              return;
-            }
-
-            console.log('[jsPsychSurvey] Rendering survey with Survey.Model + Knockout');
             
-            // Create container
-            const containerId = 'surveyContainer-' + Date.now();
+            const containerId = 'survey-' + Date.now();
             display_element.innerHTML = '<div id="' + containerId + '"></div>';
-            const container = display_element.querySelector('#' + containerId);
             
-            if (!container) {
-              console.error('[jsPsychSurvey] Container element not found');
-              this.jsPsych.finishTrial({ error: 'Container creation failed' });
-              return;
-            }
-
-            // Check if Survey.Model exists
-            if (!window.Survey || !window.Survey.Model) {
-              console.error('[jsPsychSurvey] Survey.Model not available');
-              this.jsPsych.finishTrial({ error: 'Survey.Model not found' });
-              return;
-            }
-
-            try {
-              console.log('[jsPsychSurvey] Creating Survey.Model...');
-              const survey = new window.Survey.Model(surveyJson);
-              
-              // Set up completion handler BEFORE rendering
-              survey.onComplete.add((sender) => {
-                console.log('[jsPsychSurvey] Survey completed');
-                const trial_data = {
-                  response: sender.data,
-                  rt: null,
-                  question_order: (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
-                };
-                
-                // Clean up Knockout bindings
-                if (window.ko && container) {
-                  try {
-                    window.ko.cleanNode(container);
-                  } catch (e) {
-                    console.warn('[jsPsychSurvey] Knockout cleanup warning:', e);
-                  }
-                }
-                
-                display_element.innerHTML = '';
-                this.jsPsych.finishTrial(trial_data);
-              });
-
-              // Render using Knockout bindings
-              console.log('[jsPsychSurvey] Applying Knockout bindings...');
-              container.innerHTML = '<div data-bind="survey: surveyModel"></div>';
-              
-              if (window.ko && typeof window.ko.applyBindings === 'function') {
-                window.ko.applyBindings({ surveyModel: survey }, container);
-                console.log('[jsPsychSurvey] ✓ Knockout bindings applied');
-              } else {
-                throw new Error('Knockout not available for binding');
+            setTimeout(() => {
+              const container = document.getElementById(containerId);
+              if (!container) {
+                console.error('[Survey] Container not found');
+                this.jsPsych.finishTrial({ error: 'No container' });
+                return;
               }
-
-              console.log('[jsPsychSurvey] ✓ Survey created successfully');
-
-              // Verify render
-              setTimeout(() => {
-                console.log('[jsPsychSurvey] Container check:',
-                  'children=' + container.children.length,
-                  'innerHTML length=' + container.innerHTML.length);
-              }, 100);
-
-            } catch (error) {
-              console.error('[jsPsychSurvey] Error creating survey:', error);
-              display_element.innerHTML = 
-                '<div style="padding:20px;color:#c00;text-align:center;">' +
-                '<h3>Survey Failed to Load</h3>' +
-                '<p>Error: ' + (error?.message || String(error)) + '</p>' +
-                '</div>';
               
-              setTimeout(() => {
-                this.jsPsych.finishTrial({ error: error?.message || String(error) });
-              }, 2000);
-            }
+              try {
+                console.log('[Survey] Creating with Survey.Survey + element');
+                const survey = new window.Survey.Survey(surveyJson, container);
+                
+                survey.onComplete.add((sender) => {
+                  console.log('[Survey] Complete');
+                  const trial_data = {
+                    response: sender.data,
+                    rt: null,
+                    question_order: (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
+                  };
+                  display_element.innerHTML = '';
+                  this.jsPsych.finishTrial(trial_data);
+                });
+                
+                console.log('[Survey] Created successfully');
+                setTimeout(() => {
+                  console.log('[Survey] Check:', container.innerHTML.length, 'chars');
+                }, 200);
+                
+              } catch (error) {
+                console.error('[Survey] Error:', error);
+                display_element.innerHTML = '<div style="padding:20px;color:#c00;text-align:center;"><h3>Survey Error</h3><p>' + error.message + '</p></div>';
+                setTimeout(() => this.jsPsych.finishTrial({ error: error.message }), 2000);
+              }
+            }, 10);
           }
         }
-
         Plugin.info = info;
         return Plugin;
       })();
-
       if (typeof window !== 'undefined') {
         window.jsPsychSurvey = SurveyPlugin;
-        console.log('[jsPsychSurvey] Plugin registered');
+        console.log('[Survey] Plugin registered');
       }
     })();
   </script>
 
-  <!-- Your pretest logic -->
   <script src="pretest.js"></script>
 
-  <!-- Initialization wrapper -->
   <script>
     (function() {
-      const updateLoadingStatus = (msg) => {
+      const updateStatus = (msg) => {
         const el = document.getElementById('loading-status');
         if (el) el.textContent = msg;
         console.log('[Init]', msg);
       };
-
       const hideLoading = () => {
         const overlay = document.getElementById('loading-overlay');
         if (overlay) {
@@ -240,59 +145,30 @@
           setTimeout(() => overlay.remove(), 300);
         }
       };
-
-      const showError = (msg) => {
-        const overlay = document.getElementById('loading-overlay');
-        if (overlay) {
-          overlay.innerHTML = `
-            <div style="text-align:center; padding:40px;">
-              <div style="font-size:48px;color:#c1272d;">⚠️</div>
-              <h2 style="color:#c1272d;">Initialization Error</h2>
-              <p style="max-width:500px;">${msg}</p>
-              <button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;">Reload</button>
-            </div>`;
-        }
-      };
-
       window.addEventListener('load', () => {
-        updateLoadingStatus('Checking libraries...');
-
+        updateStatus('Checking...');
         const el = document.getElementById('lib-check');
         const checks = [
-          ['initJsPsych', typeof window.initJsPsych === 'function'],
-          ['Knockout', typeof window.ko === 'object'],
-          ['Survey.Survey', typeof window.Survey?.Survey === 'function'],
-          ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function'],
-          ['HtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function'],
-          ['SurveyText', typeof window.jsPsychSurveyText === 'function']
+          ['jsPsych', typeof window.initJsPsych === 'function'],
+          ['ko', typeof window.ko === 'object'],
+          ['Survey', typeof window.Survey?.Survey === 'function'],
+          ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function']
         ];
-
         const missing = checks.filter(([_, v]) => !v).map(([k]) => k);
-        
         if (missing.length) {
-          const msg = 'Missing: ' + missing.join(', ');
-          el.innerHTML = '<span class="warn">' + msg + '</span>';
-          showError(msg);
+          el.innerHTML = '<span class="warn">Missing: ' + missing.join(', ') + '</span>';
           return;
         }
-
-        el.innerHTML = '<span class="success">✓ All libraries loaded</span>';
-        updateLoadingStatus('Starting...');
-
+        el.innerHTML = '<span class="success">✓ Ready</span>';
+        updateStatus('Starting...');
         setTimeout(() => {
-          const checkInterval = setInterval(() => {
+          const check = setInterval(() => {
             if (window.jsPsych) {
-              clearInterval(checkInterval);
+              clearInterval(check);
               hideLoading();
             }
           }, 100);
-          
-          setTimeout(() => {
-            clearInterval(checkInterval);
-            if (!window.jsPsych) {
-              showError('Failed to start. Check console.');
-            }
-          }, 10000);
+          setTimeout(() => clearInterval(check), 10000);
         }, 500);
       });
     })();
