@@ -10,8 +10,21 @@
   <!-- jsPsych CSS -->
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
 
-  <!-- SurveyJS CSS -->
+  <!-- SurveyJS CSS - Updated for proper rendering -->
   <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/defaultV2.min.css">
+  <style>
+    /* Ensure survey is visible */
+    #surveyContainer { 
+      display: block !important; 
+      width: 100% !important;
+      min-height: 400px !important;
+      background: white !important;
+    }
+    .sd-root-modern {
+      display: block !important;
+      visibility: visible !important;
+    }
+  </style>
 
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
@@ -60,6 +73,7 @@
   
   <!-- SurveyJS -->
   <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
+  <script src="https://unpkg.com/survey-knockout-ui@1.11.7"></script>
 
   <!-- Embedded jsPsych ↔ SurveyJS bridge (jsPsychSurvey) -->
   <script>
@@ -120,9 +134,27 @@
               });
 
               console.log('[jsPsychSurvey] Rendering survey...');
-              display_element.innerHTML = '<div id="surveyContainer"></div>';
-              survey.render('surveyContainer');
+              display_element.innerHTML = '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
+              
+              // Try different rendering methods
+              if (typeof Survey.Survey !== 'undefined') {
+                console.log('[jsPsychSurvey] Using Survey.Survey constructor');
+                window.currentSurvey = new Survey.Survey(surveyJson, 'surveyContainer');
+              } else if (survey.render) {
+                console.log('[jsPsychSurvey] Using survey.render()');
+                survey.render('surveyContainer');
+              } else {
+                console.error('[jsPsychSurvey] No rendering method available!');
+              }
+              
               console.log('[jsPsychSurvey] Survey rendered successfully');
+              
+              // Debug: Check if survey has visible content
+              setTimeout(() => {
+                const container = document.getElementById('surveyContainer');
+                console.log('[jsPsychSurvey] Container children:', container?.children.length);
+                console.log('[jsPsychSurvey] Container innerHTML length:', container?.innerHTML.length);
+              }, 100);
             } catch (error) {
               console.error('[jsPsychSurvey] Error in trial():', error);
               this.jsPsych.finishTrial({ error: error.message });
@@ -141,7 +173,7 @@
   </script>
 
   <!-- Your pretest logic -->
-  <script src="pretest.js?v=2026"></script>
+  <script src="pretest.js?v=2028"></script>
 
   <!-- Runtime check -->
   <script>
