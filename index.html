@@ -122,7 +122,8 @@
               
               console.log('[jsPsychSurvey] Creating survey model...');
               const survey = new Survey.Model(surveyJson);
-              
+
+              // ✔ onComplete + finishTrial
               survey.onComplete.add((sender) => {
                 console.log('[jsPsychSurvey] Survey completed');
                 const trial_data = {
@@ -135,15 +136,18 @@
               });
 
               console.log('[jsPsychSurvey] Rendering survey...');
-              display_element.innerHTML = '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
-              
-              // Try different rendering methods
-              if (typeof Survey.Survey !== 'undefined') {
-                console.log('[jsPsychSurvey] Using Survey.Survey constructor');
-                window.currentSurvey = new Survey.Survey(surveyJson, 'surveyContainer');
-              } else if (survey.render) {
-                console.log('[jsPsychSurvey] Using survey.render()');
+              display_element.innerHTML =
+                '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
+
+              // ✅ Updated rendering logic
+              if (typeof survey.render === 'function') {
+                console.log('[jsPsychSurvey] Rendering survey via survey.render()');
                 survey.render('surveyContainer');
+                window.currentSurvey = survey; // optional, for debugging
+              } else if (Survey.SurveyNG?.render) {
+                console.log('[jsPsychSurvey] Rendering survey via Survey.SurveyNG.render()');
+                Survey.SurveyNG.render('surveyContainer', { model: survey });
+                window.currentSurvey = survey;
               } else {
                 console.error('[jsPsychSurvey] No rendering method available!');
               }
