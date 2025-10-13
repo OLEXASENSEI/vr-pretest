@@ -126,7 +126,7 @@
   <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
   <script src="https://unpkg.com/survey-knockout-ui@1.11.7"></script>
 
-  <!-- Embedded jsPsych ↔ SurveyJS bridge -->
+  <!-- Embedded jsPsych ↔ SurveyJS bridge (IMPROVED VERSION) -->
   <script>
     (function() {
       'use strict';
@@ -148,16 +148,6 @@
           trial(display_element, trial) {
             console.log('[jsPsychSurvey] Starting survey trial');
 
-            const SurveyNamespace = (window.Survey && window.Survey.default)
-              ? window.Survey.default
-              : window.Survey;
-
-            if (!SurveyNamespace) {
-              console.error('[jsPsychSurvey] SurveyJS not loaded');
-              this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
-              return;
-            }
-
             let surveyJson = trial.survey_json;
             if (!surveyJson || Object.keys(surveyJson).length === 0) {
               if (typeof trial.survey_function === 'function') {
@@ -165,58 +155,82 @@
               }
             }
 
+            console.log('[jsPsychSurvey] Rendering survey…');
             display_element.innerHTML =
               '<div id="surveyContainer" style="display:block;width:100%;min-height:400px;"></div>';
-
+            
             const container = display_element.querySelector('#surveyContainer');
             if (!container) {
-              console.error('[jsPsychSurvey] Container not found');
+              console.error('[jsPsychSurvey] surveyContainer not found');
               this.jsPsych.finishTrial({ error: 'Survey container missing' });
               return;
             }
 
-            const finish = (sender) => {
+            // Normalize the SurveyJS namespace (handles Module.default exports)
+            const SurveyNamespace =
+              (window.Survey && window.Survey.default) ? window.Survey.default : window.Survey;
+            
+            if (!SurveyNamespace) {
+              console.error('[jsPsychSurvey] SurveyJS namespace unavailable');
+              this.jsPsych.finishTrial({ error: 'SurveyJS unavailable' });
+              return;
+            }
+
+            // Make sure window.Survey points at the usable namespace for any other code
+            window.Survey = SurveyNamespace;
+            console.log('[jsPsychSurvey] Survey namespace normalized:', typeof SurveyNamespace.Model);
+
+            const surveyInstance = new SurveyNamespace.Model(surveyJson);
+            
+            surveyInstance.onComplete.add((sender) => {
               console.log('[jsPsychSurvey] Survey completed');
               const trial_data = {
                 response: sender.data,
                 rt: null,
-                question_order: (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
+                question_order:
+                  (surveyJson.pages?.[0]?.elements || []).map(e => e.name)
               };
               display_element.innerHTML = '';
               this.jsPsych.finishTrial(trial_data);
-            };
+            });
 
             try {
-              let surveyInstance = null;
-
-              if (typeof SurveyNamespace.Survey === 'function') {
-                surveyInstance = new SurveyNamespace.Survey(surveyJson);
-              } else if (typeof SurveyNamespace.Model === 'function') {
-                surveyInstance = new SurveyNamespace.Model(surveyJson);
-              } else {
-                throw new Error('SurveyJS API not available');
-              }
-
-              surveyInstance.onComplete.add(finish);
-
               if (typeof surveyInstance.render === 'function') {
+                console.log('[jsPsychSurvey] Rendering via surveyInstance.render');
                 surveyInstance.render(container);
               } else if (SurveyNamespace.SurveyNG?.render) {
+                console.log('[jsPsychSurvey] Rendering via Survey.SurveyNG');
                 SurveyNamespace.SurveyNG.render(container, { model: surveyInstance });
               } else {
-                throw new Error('Survey render method not found');
+                throw new Error('SurveyJS render API not available');
               }
-
-              window.currentSurvey = surveyInstance;
-              console.log('[jsPsychSurvey] Survey rendered successfully');
+              
+              console.log('[jsPsychSurvey] Survey render complete; container child count:',
+                          container.children.length);
+              
+              // Wait a moment and check again
+              setTimeout(() => {
+                console.log('[jsPsychSurvey] Container check after 100ms:',
+                  'children=' + container.children.length,
+                  'innerHTML length=' + container.innerHTML.length);
+                
+                if (container.children.length === 0 && container.innerHTML.length < 50) {
+                  console.error('[jsPsychSurvey] Survey failed to render - container is empty');
+                }
+              }, 100);
 
             } catch (error) {
-              console.error('[jsPsychSurvey] Render error:', error);
+              console.error('[jsPsychSurvey] Error rendering survey:', error);
               display_element.innerHTML = 
-                '<div style="padding:20px;color:#c00;">Survey failed to load. Check console.</div>';
+                '<div style="padding:20px;color:#c00;text-align:center;">' +
+                '<h3>Survey Failed to Load</h3>' +
+                '<p>Error: ' + (error?.message || String(error)) + '</p>' +
+                '<p style="font-size:12px;">Check browser console for details.</p>' +
+                '</div>';
+              
               setTimeout(() => {
                 this.jsPsych.finishTrial({ error: error?.message || String(error) });
-              }, 2000);
+              }, 3000);
             }
           }
         }
@@ -227,6 +241,7 @@
 
       if (typeof window !== 'undefined') {
         window.jsPsychSurvey = SurveyPlugin;
+        console.log('[jsPsychSurvey] Plugin registered');
       }
     })();
   </script>
@@ -260,6 +275,7 @@
               <div style="font-size:48px;color:#c1272d;">⚠️</div>
               <h2 style="color:#c1272d;">Initialization Error</h2>
               <p style="max-width:500px;">${message}</p>
+              <p style="font-size:12px;color:#666;margin-top:10px;">Check browser console (F12) for details</p>
               <button onclick="location.reload()" style="margin-top:20px;padding:10px 20px;">
                 Reload Page
               </button>
@@ -295,53 +311,28 @@
         el.innerHTML = '<span class="success">✓ All libraries loaded</span>';
         updateLoadingStatus('Starting experiment...');
 
-        // Wait a moment for everything to settle
+        // Wait for pretest.js to initialize
         setTimeout(() => {
-          // Check if the pretest initialization function exists
-          if (typeof window.initializeExperiment === 'function') {
-            console.log('[Init] Calling initializeExperiment()...');
-            
-            // The pretest.js should handle its own initialization
-            // Just hide loading when ready
-            const originalInit = window.initializeExperiment;
-            window.initializeExperiment = async function() {
-              try {
-                updateLoadingStatus('Validating assets...');
-                await originalInit();
-                hideLoading();
-              } catch (error) {
-                console.error('[Init] Error:', error);
-                showError('Initialization failed: ' + (error?.message || error));
-              }
-            };
-            
-            // Trigger if not already running
-            if (!window.jsPsych) {
-              window.initializeExperiment();
-            } else {
+          console.log('[Init] Checking for jsPsych initialization...');
+          
+          // Monitor for jsPsych to start
+          const checkInterval = setInterval(() => {
+            if (window.jsPsych) {
+              console.log('[Init] jsPsych detected, hiding loading overlay');
+              clearInterval(checkInterval);
               hideLoading();
             }
-          } else {
-            // The pretest.js auto-initializes
-            console.log('[Init] Waiting for auto-initialization...');
-            
-            // Hide loading after a delay if jsPsych starts
-            const checkInterval = setInterval(() => {
-              if (window.jsPsych) {
-                clearInterval(checkInterval);
-                hideLoading();
-              }
-            }, 100);
-            
-            // Timeout after 5 seconds
-            setTimeout(() => {
-              clearInterval(checkInterval);
-              if (!window.jsPsych) {
-                showError('Experiment failed to start. Check console for errors.');
-              }
-            }, 5000);
-          }
-        }, 100);
+          }, 100);
+          
+          // Timeout after 10 seconds
+          setTimeout(() => {
+            clearInterval(checkInterval);
+            if (!window.jsPsych) {
+              console.error('[Init] jsPsych failed to initialize within 10 seconds');
+              showError('Experiment failed to start.<br><br>Possible causes:<br>• Asset validation taking too long<br>• JavaScript error in pretest.js<br><br>Check console for details.');
+            }
+          }, 10000);
+        }, 500);
       });
     })();
   </script>
