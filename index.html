@@ -10,27 +10,8 @@
   <!-- jsPsych CSS -->
   <link rel="stylesheet" href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css">
 
-  <!-- SurveyJS (NON-jQuery) CSS -->
+  <!-- SurveyJS CSS -->
   <link rel="stylesheet" href="https://unpkg.com/survey-core@1.11.7/defaultV2.min.css">
-  <link rel="stylesheet" href="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.css">
-
-  <!-- jsPsych core -->
-  <script src="https://unpkg.com/jspsych@7.3.4/dist/jspsych.js" defer></script>
-
-  <!-- jsPsych plugins used by pretest.js -->
-  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3/dist/index.js" defer></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3/dist/index.js" defer></script>
-  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3/dist/index.js" defer></script>
-  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3/dist/index.js" defer></script>
-  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3/dist/index.js" defer></script>
-
-  <!-- SurveyJS (NON-jQuery) JS -->
-  <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js" defer></script>
-  <script src="https://unpkg.com/survey-js-ui@1.11.7/survey-js-ui.min.js" defer></script>
-
-  <!-- jsPsych ↔ SurveyJS bridge (YOUR file; ensure this path exists in your repo) -->
-  <!-- If your plugin is named differently or in another folder, update the src -->
-  <script src="/plugins/jspsych-survey.js" defer></script>
 
   <style>
     body { margin: 0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji", "Segoe UI Emoji"; }
@@ -49,10 +30,8 @@
       <div class="precheck" id="lib-check">Loading libraries…</div>
     </header>
 
-    <!-- jsPsych renders here -->
     <div id="jspsych-target"></div>
 
-    <!-- Optional: quick asset sanity hints -->
     <details>
       <summary>Help / Requirements</summary>
       <ul>
@@ -63,33 +42,108 @@
             <li><code>pron/*.mp3</code> if you use model pronunciations</li>
           </ul>
         </li>
-        <li>SurveyJS is loaded via <code>survey-core</code> + <code>survey-js-ui</code> (no jQuery).</li>
-        <li>Bridge plugin must be at <code>/plugins/jspsych-survey.js</code> (or update the script tag above).</li>
+        <li>All libraries are loaded from CDN</li>
+        <li>Bridge plugin is embedded in this page</li>
       </ul>
     </details>
   </div>
 
-  <!-- Your pretest logic (the robust file I gave you) -->
-  <script src="pretest.js" defer></script>
+  <!-- Load everything in correct order -->
+  <script src="https://unpkg.com/jspsych@7.3.4"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-button-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-survey-text@1.1.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-initialize-microphone@1.0.3"></script>
+  <script src="https://unpkg.com/@jspsych/plugin-html-audio-response@1.0.3"></script>
+  
+  <!-- SurveyJS -->
+  <script src="https://unpkg.com/survey-core@1.11.7/survey.core.min.js"></script>
 
-  <!-- Light runtime check to surface missing libs early -->
-  <script defer>
-    document.addEventListener('DOMContentLoaded', () => {
+  <!-- Embedded jsPsych-Survey Bridge Plugin -->
+  <script>
+    (function() {
+      'use strict';
+      
+      var jsPsychSurvey = (function() {
+        const info = {
+          name: 'survey',
+          parameters: {
+            survey_json: {
+              type: window.jsPsych?.plugins?.parameterType?.COMPLEX || 'complex',
+              default: undefined
+            },
+            survey_function: {
+              type: window.jsPsych?.plugins?.parameterType?.FUNCTION || 'function',
+              default: undefined
+            }
+          }
+        };
+
+        class SurveyPlugin {
+          constructor(jsPsych) {
+            this.jsPsych = jsPsych;
+          }
+
+          trial(display_element, trial) {
+            if (!window.Survey) {
+              console.error('SurveyJS library not loaded');
+              this.jsPsych.finishTrial({ error: 'SurveyJS not loaded' });
+              return;
+            }
+
+            const surveyJson = trial.survey_json || {};
+            const survey = new Survey.Model(surveyJson);
+            
+            survey.onComplete.add((sender) => {
+              const trial_data = {
+                response: sender.data,
+                rt: null,
+                question_order: surveyJson.pages?.[0]?.elements?.map(e => e.name) || []
+              };
+              display_element.innerHTML = '';
+              this.jsPsych.finishTrial(trial_data);
+            });
+
+            display_element.innerHTML = '<div id="surveyContainer"></div>';
+            survey.render('surveyContainer');
+          }
+        }
+
+        SurveyPlugin.info = info;
+        return SurveyPlugin;
+      })();
+
+      // Register plugin
+      if (typeof window !== 'undefined') {
+        window.jsPsychSurvey = jsPsychSurvey;
+      }
+    })();
+  </script>
+
+  <!-- Your pretest logic -->
+  <script src="pretest.js"></script>
+
+  <!-- Runtime check -->
+  <script>
+    window.addEventListener('load', () => {
       const el = document.getElementById('lib-check');
       try {
-        const ok = [
+        const checks = [
           ['initJsPsych', typeof window.initJsPsych === 'function'],
           ['Survey', typeof window.Survey === 'object'],
-          // Plugin names vary; most bridges register type name on use, so just note it's expected:
+          ['jsPsychSurvey', typeof window.jsPsychSurvey === 'function'],
+          ['jsPsychHtmlButtonResponse', typeof window.jsPsychHtmlButtonResponse === 'function']
         ];
-        const missing = ok.filter(([_, v]) => !v).map(([k]) => k);
+        const missing = checks.filter(([_, v]) => !v).map(([k]) => k);
         if (missing.length) {
-          el.innerHTML = 'Missing: <span class="warn">' + missing.join(', ') + '</span>. Check script tags.';
+          el.innerHTML = 'Missing: <span class="warn">' + missing.join(', ') + '</span>';
         } else {
-          el.textContent = '✓ All components loaded successfully';
+          el.textContent = '✓ All components loaded';
+          el.style.color = '#2e7d32';
         }
       } catch (e) {
-        el.textContent = 'Library check failed. Open console.';
+        el.textContent = 'Check failed: ' + e.message;
+        el.className = 'warn';
       }
     });
   </script>
