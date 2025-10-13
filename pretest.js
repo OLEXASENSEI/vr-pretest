@@ -1,7 +1,7 @@
-// Version 5.2 (FINAL SHORT & FIXED) — Pre-Test Battery
-// - Fix: jsPsych redeclaration, missing implementations, timeline build/run
-// - Fix: image/shape mapping, mic plugin gating, robust SurveyText parsing
-// - Fix: asset filtering awaited before intros; safe fallbacks for optional tasks
+// Version 5.3 (FINAL SHORT & HARDENED) — Pre-Test Battery
+// - Fix: safe choices/button_html for HtmlButtonResponse trials (avoids undefined .entries errors)
+// - Fix: await asset filtering before intros; mic gating; single jsPsych declaration
+// - Fix: image/shape mapping; minimal stubs; timeline validator
 
 /* ========== GLOBAL STATE ========== */
 let latestMetrics = null;
@@ -72,6 +72,13 @@ function nukeSurveyArtifacts() {
   });
 }
 
+/* ========== SURVEYJS RUNTIME HINT ========== */
+(function checkSurveyJS() {
+  if (!have('Survey')) {
+    console.warn('[pretest] SurveyJS "Survey" global not found. If you included survey.jquery.min.js, load jQuery first; or use survey-core instead.');
+  }
+})();
+
 /* ========== INIT jsPsych ========== */
 if (!have('initJsPsych')) { console.error('jsPsych core (initJsPsych) is not loaded. Cannot start Pre-Test.'); throw new Error("jsPsych core not loaded."); }
 
@@ -103,16 +110,16 @@ const foley_stimuli = [
   { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                       correct: 1, mapping_type: 'action'    },
 ];
 
-// Keep 4 objects + 4 actions. Ensure extensions match your files on disk.
+// Shortened: 8 total
 const picture_naming_stimuli = [
-  { image: 'img/bowl.jpg',      target: 'bowl',     category: 'utensil'    },
-  { image: 'img/egg.jpg',       target: 'egg',      category: 'ingredient' },
-  { image: 'img/flour.jpg',     target: 'flour',    category: 'ingredient' },
-  { image: 'img/spatula.jpg',   target: 'spatula',  category: 'utensil'    },
-  { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action'     },
-  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action'     },
-  { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action'     },
-  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action'     },
+  { image: 'img/bowl.jpg',     target: 'bowl',     category: 'utensil'    },
+  { image: 'img/egg.jpg',      target: 'egg',      category: 'ingredient' },
+  { image: 'img/flour.jpg',    target: 'flour',    category: 'ingredient' },
+  { image: 'img/spatula.jpg',  target: 'spatula',  category: 'utensil'    },
+  { image: 'img/mixing.jpeg',   target: 'mixing',   category: 'action'    },
+  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action'    },
+  { image: 'img/pouring.jpeg',  target: 'pouring',  category: 'action'    },
+  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action'    },
 ];
 
 const visual_iconicity_stimuli = [
@@ -121,7 +128,7 @@ const visual_iconicity_stimuli = [
   { shape: 'img/spiky_shape.svg', words: ['bouba','kiki'],       expected: 1, shape_type: 'spiky'     },
 ];
 
-/* ========== SAVE & UTIL (implemented minimal) ========== */
+/* ========== SAVE & UTIL (stubs) ========== */
 function saveDataToServer(_data) {
   // TODO: Replace with your real save pipeline (fetch/POST). For now, no-op.
   console.log('[saveDataToServer] total trials:', Array.isArray(_data) ? _data.length : 'n/a');
@@ -135,9 +142,11 @@ function modelPronAudioFor(target) { return 'pron/' + (target || '').toLowerCase
 function checkAudioExists(url) {
   return new Promise(resolve => {
     const a = new Audio();
-    const done = ok => () => { a.src = ''; resolve(ok); };
-    a.addEventListener('canplaythrough', done(true), { once: true });
-    a.addEventListener('error', done(false), { once: true });
+    const ok  = () => { cleanup(); resolve(true); };
+    const bad = () => { cleanup(); resolve(false); };
+    const cleanup = () => { a.removeEventListener('canplaythrough', ok); a.removeEventListener('error', bad); a.src = ''; };
+    a.addEventListener('canplaythrough', ok,  { once: true });
+    a.addEventListener('error', bad, { once: true });
     a.preload = 'auto';
     a.src = asset(url);
   });
@@ -156,26 +165,22 @@ let PRELOAD_IMAGES = [];
 let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [] };
 
 async function filterExistingStimuli() {
-  // Phoneme pairs
   const phoneme = [];
   for (const s of phoneme_discrimination_stimuli) {
     const ok1 = await checkAudioExists(s.audio1);
     const ok2 = await checkAudioExists(s.audio2);
     if (ok1 && ok2) { phoneme.push(s); PRELOAD_AUDIO.push(s.audio1, s.audio2); }
   }
-  // Foley
   const foley = [];
   for (const s of foley_stimuli) {
     const ok = await checkAudioExists(s.audio);
     if (ok) { foley.push(s); PRELOAD_AUDIO.push(s.audio); }
   }
-  // Pictures
   const picture = [];
   for (const s of picture_naming_stimuli) {
     const ok = await checkImageExists(s.image);
     if (ok) { picture.push(s); PRELOAD_IMAGES.push(s.image); }
   }
-  // Visual shapes
   const visual = [];
   for (const s of visual_iconicity_stimuli) {
     const ok = await checkImageExists(s.shape);
@@ -360,7 +365,7 @@ const ldt_procedure = (ldt_fixation && ldt_trial) ? {
   randomize_order: true
 } : null;
 
-/* ========== PICTURE NAMING ========== */
+/* ========== PICTURE NAMING (Mic gated) ========== */
 const naming_intro = have('jsPsychHtmlButtonResponse') ? {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: () => '<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：(1) モデル音声（任意）、(2) 4秒録音。</p><p style="color:#666">Pictures available: ' + (FILTERED_STIMULI.picture?.length || 0) + '</p>',
@@ -460,7 +465,7 @@ const naming_record = mic_plugins_available() ? {
   }
 } : null;
 
-/* ========== FOLEY & VISUAL ICONICITY ========== */
+/* ========== FOLEY & VISUAL ICONICITY (hardened) ========== */
 const foley_intro = have('jsPsychHtmlButtonResponse') ? {
   type: T('jsPsychHtmlButtonResponse'),
   stimulus: () => '<h2>Sound Matching / 音のマッチング</h2><p>Play the sound and choose what it represents.<br/>音を再生し、何を表しているか選択してください。</p><p style="color:#666">Sounds: ' + (FILTERED_STIMULI.foley?.length || 0) + '</p>',
@@ -474,7 +479,15 @@ const foley_trial = have('jsPsychHtmlButtonResponse') ? {
       '<button id="play" class="jspsych-btn">Play / 再生</button>' +
       '<p id="status" style="margin-top:10px;color:#666">Listen, then choose.</p></div>';
   },
-  choices: () => jsPsych.timelineVariable('options'),
+  choices: () => {
+    const opts = jsPsych.timelineVariable('options');
+    return Array.isArray(opts) && opts.length ? opts : ['Option A', 'Option B'];
+  },
+  button_html: () => {
+    const opts = jsPsych.timelineVariable('options');
+    const safe = Array.isArray(opts) && opts.length ? opts : ['Option A', 'Option B'];
+    return safe.map((_, i) => `<button class="jspsych-btn answer-btn" id="answer-btn-${i}">%s</button>`);
+  },
   post_trial_gap: 250,
   data: () => ({
     task: 'foley_iconicity',
@@ -485,16 +498,26 @@ const foley_trial = have('jsPsychHtmlButtonResponse') ? {
   on_load: function () {
     const btn = document.getElementById('play');
     const stat = document.getElementById('status');
-    const a = new Audio(asset(jsPsych.timelineVariable('audio')));
-    a.preload = 'auto';
-    a.addEventListener('canplaythrough', () => { stat.textContent = 'Ready / 準備完了'; }, { once: true });
-    a.addEventListener('error', () => { stat.textContent = 'Audio not available / 音声なし'; btn.disabled = true; }, { once: true });
-    btn.addEventListener('click', () => { try { a.currentTime = 0; a.play(); stat.textContent = 'Playing... / 再生中...'; } catch (e) {} });
+    const candidates = [jsPsych.timelineVariable('audio')].filter(Boolean).map(asset);
+    const a = new Audio();
+    let ready = false;
+    const onCan = () => { ready = true; stat.textContent = 'Ready / 準備完了'; btn.disabled = false; };
+    const onErr = () => { stat.textContent = 'Audio not available / 音声なし'; btn.disabled = true; };
+    if (candidates[0]) {
+      a.addEventListener('canplaythrough', onCan, { once: true });
+      a.addEventListener('error', onErr, { once: true });
+      a.preload = 'auto'; a.src = candidates[0];
+    } else { onErr(); }
+    btn.disabled = true;
+    btn.addEventListener('click', () => {
+      if (!ready) return;
+      try {
+        stat.textContent = 'Playing... / 再生中...';
+        a.currentTime = 0; a.play().catch(()=>{});
+      } catch (e) {}
+    });
   },
-  on_finish: function (d) {
-    d.skipped = false;
-    d.correct = (d.response === d.correct_answer);
-  }
+  on_finish: function (d) { d.correct = (d.response === d.correct_answer); }
 } : null;
 
 const visual_intro = have('jsPsychHtmlButtonResponse') ? {
@@ -512,7 +535,10 @@ const visual_trial = have('jsPsychHtmlButtonResponse') ? {
     return '<div style="text-align:center;">' + img +
       '<p style="margin-top:20px;">Which word matches this shape?<br/>この形に合う単語はどれですか？</p></div>';
   },
-  choices: () => jsPsych.timelineVariable('words') || [],
+  choices: () => {
+    const words = jsPsych.timelineVariable('words');
+    return Array.isArray(words) && words.length ? words : ['(missing)', '(missing)'];
+  },
   post_trial_gap: 250,
   data: { task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type') },
   on_finish: d => { d.correct = (d.response === d.correct_answer); }
@@ -563,7 +589,27 @@ const ideophone_test = have('jsPsychSurvey') ? {
   data: { task: 'ideophone_mapping' }
 } : null;
 
-/* ========== INITIALIZATION FUNCTION (FIXED) ========== */
+/* ========== TIMELINE VALIDATOR (debug helper) ========== */
+function validateTimeline(nodes, path = 'root') {
+  for (const [i, n] of nodes.entries()) {
+    const here = `${path}[${i}]`;
+    if (n && n.type && n.type.info && n.type.info.name === 'html-button-response') {
+      const c = typeof n.choices === 'function' ? n.choices() : n.choices;
+      if (!Array.isArray(c) || c.length === 0) {
+        console.warn(`[validateTimeline] Empty/invalid choices at ${here}`, n);
+      }
+      if (n.button_html) {
+        const bh = typeof n.button_html === 'function' ? n.button_html() : n.button_html;
+        if (Array.isArray(bh) && Array.isArray(c) && bh.length !== c.length) {
+          console.warn(`[validateTimeline] button_html length != choices length at ${here}`, { button_html: bh.length, choices: c.length });
+        }
+      }
+    }
+    if (n && n.timeline) validateTimeline(n.timeline, `${here}.timeline`);
+  }
+}
+
+/* ========== INITIALIZATION FUNCTION ========== */
 async function initializeExperiment() {
   assignedCondition = assignCondition();
 
@@ -573,37 +619,28 @@ async function initializeExperiment() {
   // 2) Build timeline
   const timeline = [];
 
-  // Participant info + motion sickness
   if (participant_info) timeline.push(participant_info);
   if (motion_sickness_questionnaire) timeline.push(motion_sickness_questionnaire);
 
-  // Digit span forward
   if (digit_span_forward_instructions) timeline.push(digit_span_forward_instructions);
   const dsf = generateOptimizedDigitSpanTrials(true);
   if (dsf.length) timeline.push({ timeline: dsf, randomize_order: false });
 
-  // Digit span backward
   if (digit_span_backward_instructions) timeline.push(digit_span_backward_instructions);
   const dsb = generateOptimizedDigitSpanTrials(false);
   if (dsb.length) timeline.push({ timeline: dsb, randomize_order: false });
 
-  // Phoneme discrimination (only if we have stimuli)
   if ((FILTERED_STIMULI.phoneme?.length || 0) > 0 && phoneme_instructions && phoneme_trial) {
     timeline.push(phoneme_instructions);
     timeline.push({
       timeline: [phoneme_trial],
-      timeline_variables: FILTERED_STIMULI.phoneme.map(s => ({ ...s })), // pass audio1/2, correct, contrast
+      timeline_variables: FILTERED_STIMULI.phoneme.map(s => ({ ...s })), // audio1/2, correct, contrast
       randomize_order: true
     });
   }
 
-  // LDT
-  if (ldt_instructions && ldt_procedure) {
-    timeline.push(ldt_instructions);
-    timeline.push(ldt_procedure);
-  }
+  if (ldt_instructions && ldt_procedure) { timeline.push(ldt_instructions, ldt_procedure); }
 
-  // Picture naming (guard mic availability & asset presence)
   if ((FILTERED_STIMULI.picture?.length || 0) > 0 && naming_intro) {
     timeline.push(naming_intro);
     if (mic_request) timeline.push(mic_request);
@@ -620,26 +657,24 @@ async function initializeExperiment() {
     }
   }
 
-  // Foley iconicity
   if ((FILTERED_STIMULI.foley?.length || 0) > 0 && foley_intro && foley_trial) {
     timeline.push(foley_intro);
-    const foleyTV = FILTERED_STIMULI.foley.map(s => ({ ...s, audio: s.audio }));
+    const foleyTV = FILTERED_STIMULI.foley.map(s => ({ ...s }));
     timeline.push({ timeline: [foley_trial], timeline_variables: foleyTV, randomize_order: true });
   }
 
-  // Visual iconicity
   if ((FILTERED_STIMULI.visual?.length || 0) > 0 && visual_intro && visual_trial) {
     timeline.push(visual_intro);
     const visualTV = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: asset(s.shape) }));
     timeline.push({ timeline: [visual_trial], timeline_variables: visualTV, randomize_order: true });
   }
 
-  // Procedural ordering + ideophone
   if (procedural_instructions) timeline.push(procedural_instructions);
   if (procedural_test) timeline.push(procedural_test);
   if (ideophone_test) timeline.push(ideophone_test);
 
-  // 3) Run
+  // 3) Validate + Run
+  validateTimeline(timeline);
   jsPsych.run(timeline);
 }
 
