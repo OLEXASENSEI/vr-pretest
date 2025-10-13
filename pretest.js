@@ -1,4 +1,4 @@
-// Version 5.9 — Pre-Test Battery (FINAL - ALL FIXES APPLIED)
+// Version 6.0 — Pre-Test Battery (FIXED: Randomized Procedural, No Pre-teaching, Clear Instructions)
 
 /* ========== GLOBAL STATE ========== */
 let jsPsych = null;
@@ -107,7 +107,6 @@ function saveDataToServer(data) {
 function assignCondition() { return 'immediate'; }
 function currentPID() { return currentPID_value; }
 function namingPhase() { return 'pre'; }
-function modelPronAudioFor(target) { return 'pron/' + (target || '').toLowerCase() + '.mp3'; }
 
 /* ========== ASSET VALIDATION ========== */
 function checkAudioExists(url) {
@@ -212,7 +211,7 @@ function createDigitSpanInstructions(forward = true) {
 
 function generateOptimizedDigitSpanTrials(forward = true) {
   const trials = []; let failCount = 0;
-    for (let length = 4; length <= 7; length++) {
+  for (let length = 4; length <= 7; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
     trials.push({
       type: T('jsPsychHtmlKeyboardResponse'),
@@ -319,12 +318,33 @@ function createLDTTimeline() {
   return [instructions, { timeline: [fixation, trial], timeline_variables: ldt_stimuli, randomize_order: true }];
 }
 
-/* ========== PICTURE NAMING ========== */
+/* ========== PICTURE NAMING (NO MODEL AUDIO - FIXED) ========== */
 function createNamingTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => '<h2>Picture Naming / 絵の命名</h2><p>For each picture: (1) optionally hear a model, (2) record your pronunciation (4s).</p><p>各絵：(1) モデル音声（任意）、(2) 4秒録音。</p><p style="color:#666">Pictures available: ' + (FILTERED_STIMULI.picture?.length || 0) + '</p>',
-    choices: ['Begin / 開始'], post_trial_gap: 500
+    stimulus: () => `
+      <div style="max-width:640px;margin:0 auto;text-align:center">
+        <h2>Picture Description / 絵の説明</h2>
+        <p style="margin:20px 0;">
+          <strong>For each picture, describe in English:</strong><br>
+          各絵について、英語で説明してください：
+        </p>
+        <div style="background:#f0f7ff;padding:20px;border-radius:8px;margin:20px 0;text-align:left;">
+          <ul style="list-style:none;padding:0;">
+            <li style="margin:10px 0;">✓ <strong>Objects</strong> you see / 見える物</li>
+            <li style="margin:10px 0;">✓ <strong>Actions</strong> happening / 起こっている動作</li>
+            <li style="margin:10px 0;">✓ <strong>Sounds</strong> you might hear / 聞こえるかもしれない音</li>
+            <li style="margin:10px 0;">✓ <strong>Smells</strong> you might notice / 気づくかもしれない匂い</li>
+          </ul>
+        </div>
+        <p style="color:#666;font-size:14px;">
+          You will have <strong>4 seconds</strong> to describe each picture.<br>
+          各画像について4秒間録音します。
+        </p>
+        <p style="color:#666;font-size:14px;">Pictures available: ${FILTERED_STIMULI.picture?.length || 0}</p>
+      </div>`,
+    choices: ['Begin / 開始'], 
+    post_trial_gap: 500
   };
 
   const mic_request =
@@ -343,42 +363,62 @@ function createNamingTimeline() {
         }
       : null;
 
+  // NO MODEL AUDIO - just show image and record
   const prepare = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => {
       const imgURL = jsPsych.timelineVariable('imageUrl');
-      const imgHTML = (imgURL && imgURL.length) ? '<img src="' + imgURL + '" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>';
-      return '<div style="text-align:center;">' + imgHTML +
-        '<div style="margin-top:12px;"><button id="play-model" class="jspsych-btn" style="margin-right:8px;">Play model / モデル再生</button>' +
-        '<span id="model-status" style="font-size:13px;color:#666">Optional / 任意</span></div>' +
-        '<p style="margin-top:16px;">When ready, click <b>Start recording</b> and say the English name.<br/>準備ができたら「録音開始」をクリックし、英語で名前を言ってください。</p></div>';
+      const imgHTML = (imgURL && imgURL.length) 
+        ? '<img src="' + imgURL + '" style="width:350px;border-radius:8px;" />' 
+        : '<p style="color:#c00">Missing image.</p>';
+      
+      return `
+        <div style="text-align:center;">
+          ${imgHTML}
+          <div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;">
+            <p style="margin:0;"><strong>Remember to describe:</strong></p>
+            <p style="margin:5px 0;font-size:14px;">Objects, Actions, Sounds, Smells</p>
+            <p style="margin:5px 0;font-size:14px;color:#666;">物・動作・音・匂い</p>
+          </div>
+          <p style="margin-top:20px;">When ready, click <b>Start recording</b><br/>
+          準備ができたら「録音開始」をクリック</p>
+        </div>`;
     },
-    choices: ['Start recording / 録音開始'], post_trial_gap: 200,
-    data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target')||'unknown', category: jsPsych.timelineVariable('category')||'unknown', image_file: jsPsych.timelineVariable('image')||'none' }),
-    on_load: () => {
-      const tgt = jsPsych.timelineVariable('target') || '';
-      const model = asset(modelPronAudioFor(tgt));
-      const btn = document.getElementById('play-model');
-      const stat = document.getElementById('model-status');
-      let a=null, ready=false;
-      const onCan = () => { ready=true; stat.textContent='Ready / 準備完了'; };
-      const onErr = () => { ready=false; stat.textContent='Not available / 利用不可'; if (btn) btn.disabled=true; };
-      if (!model) return onErr();
-      a = new Audio(); a.preload='auto';
-      a.addEventListener('canplaythrough', onCan); a.addEventListener('error', onErr); a.src = model;
-      btn?.addEventListener('click', () => { if (!ready) return; try { a.currentTime=0; a.play(); stat.textContent='Playing... / 再生中...'; } catch {} });
-    }
+    choices: ['Start recording / 録音開始'], 
+    post_trial_gap: 200,
+    data: () => ({ 
+      task: 'picture_naming_prepare', 
+      target: jsPsych.timelineVariable('target')||'unknown', 
+      category: jsPsych.timelineVariable('category')||'unknown', 
+      image_file: jsPsych.timelineVariable('image')||'none' 
+    })
   };
 
   const record = have('jsPsychHtmlAudioResponse') ? {
     type: T('jsPsychHtmlAudioResponse'),
     stimulus: () => {
       const imgURL = jsPsych.timelineVariable('imageUrl');
-      return '<div style="text-align:center;">' + (imgURL ? '<img src="'+imgURL+'" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>') +
-        '<p style="margin-top:16px; color:#d32f2f; font-weight:bold;">Recording... speak now!<br/>録音中...今話してください！</p></div>';
+      return `
+        <div style="text-align:center;">
+          ${imgURL ? '<img src="'+imgURL+'" style="width:350px;border-radius:8px;" />' : '<p style="color:#c00">Missing image.</p>'}
+          <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
+            <p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 Recording...</p>
+            <p style="margin:8px 0;font-size:14px;">Describe: Objects, Actions, Sounds, Smells</p>
+            <p style="margin:0;font-size:14px;color:#666;">物・動作・音・匂いを説明してください</p>
+          </div>
+        </div>`;
     },
-    recording_duration: 4000, show_done_button: false, allow_playback: false,
-    data: () => ({ task: 'picture_naming_audio', target: jsPsych.timelineVariable('target')||'unknown', category: jsPsych.timelineVariable('category')||'unknown', image_file: jsPsych.timelineVariable('image')||'none', phase: namingPhase(), pid_snapshot: currentPID() }),
+    recording_duration: 4000, 
+    show_done_button: false, 
+    allow_playback: false,
+    data: () => ({ 
+      task: 'picture_naming_audio', 
+      target: jsPsych.timelineVariable('target')||'unknown', 
+      category: jsPsych.timelineVariable('category')||'unknown', 
+      image_file: jsPsych.timelineVariable('image')||'none', 
+      phase: namingPhase(), 
+      pid_snapshot: currentPID() 
+    }),
     on_finish: (d) => {
       const pid = d.pid_snapshot || currentPID();
       const tgt = (d.target || 'unknown').toLowerCase();
@@ -398,7 +438,12 @@ function createNamingTimeline() {
   const timeline = [intro];
   if (mic_request) timeline.push(mic_request);
   if (mic_check) timeline.push(mic_check);
-  timeline.push({ timeline: [prepare, record].filter(Boolean), timeline_variables: pictureTV, randomize_order: true });
+  timeline.push({ 
+    timeline: [prepare, record].filter(Boolean), 
+    timeline_variables: pictureTV, 
+    randomize_order: true
+  });
+  
   return timeline;
 }
 
@@ -474,27 +519,58 @@ function createVisualTimeline() {
   return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.visual.map(s => ({...s, shapeUrl: asset(s.shape)})), randomize_order: true }];
 }
 
-/* ========== PROCEDURAL & IDEOPHONE ========== */
+/* ========== PROCEDURAL (RANDOMIZED - FIXED) & IDEOPHONE ========== */
 function createProceduralTimeline() {
   const instructions = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: '<h3>Quick Recipe Ordering / レシピの順序</h3><p>Number the actions 1-5. Some steps must precede others.</p>',
+    stimulus: '<h3>Quick Recipe Ordering / レシピの順序</h3><p>Number the actions 1-5. Some steps must precede others.</p><p style="color:#666;">Actions will be shown in random order.</p>',
     choices: ['OK']
   };
 
+  // RANDOMIZE THE STEPS
+  const shuffledSteps = PROCEDURE_STEPS.slice();
+  for (let i = shuffledSteps.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffledSteps[i], shuffledSteps[j]] = [shuffledSteps[j], shuffledSteps[i]];
+  }
+
   const test = {
     type: T('jsPsychSurveyText'),
-    preamble: '<h3>Assign a step number (1–5) to each action.</h3>',
-    questions: () => PROCEDURE_STEPS.map((label, i) => ({ prompt: '<b>' + label + '</b> — Step number (1–5)', name: 'ord_' + i, required: true })),
+    preamble: '<h3>Assign a step number (1–5) to each action.</h3><p style="color:#666;font-size:14px;">Actions are shown in random order.</p>',
+    questions: () => shuffledSteps.map((label, i) => ({ 
+      prompt: '<b>' + label + '</b> — Step number (1–5)', 
+      name: 'ord_' + i, 
+      required: true 
+    })),
     button_label: 'Submit / 送信',
-    data: { task: 'procedural_knowledge' },
+    data: { 
+      task: 'procedural_knowledge',
+      presented_order: shuffledSteps  // Store the random order shown
+    },
     on_finish: (data) => {
-      const resp = asObject(data.response); const pos = {};
-      PROCEDURE_STEPS.forEach((label, i) => { const v = parseInt(resp['ord_' + i], 10); pos[label] = Number.isFinite(v) ? v : null; });
+      const resp = asObject(data.response); 
+      const pos = {};
+      
+      // Map responses back to original step labels
+      shuffledSteps.forEach((label, i) => { 
+        const v = parseInt(resp['ord_' + i], 10); 
+        pos[label] = Number.isFinite(v) ? v : null; 
+      });
+      
       let tot=0, ok=0, violations=[];
-      PROC_CONSTRAINTS.forEach(([a,b]) => { if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(a+' -> '+b); } });
-      data.responses_positions = pos; data.constraints_total = tot; data.constraints_satisfied = ok;
-      data.partial_order_score = (tot > 0) ? ok / tot : null; data.violations = violations;
+      PROC_CONSTRAINTS.forEach(([a,b]) => { 
+        if (pos[a] && pos[b]) { 
+          tot++; 
+          if (pos[a] < pos[b]) ok++; 
+          else violations.push(a+' -> '+b); 
+        } 
+      });
+      
+      data.responses_positions = pos; 
+      data.constraints_total = tot; 
+      data.constraints_satisfied = ok;
+      data.partial_order_score = (tot > 0) ? ok / tot : null; 
+      data.violations = violations;
     }
   };
 
