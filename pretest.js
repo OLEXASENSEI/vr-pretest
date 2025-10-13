@@ -261,7 +261,7 @@ const phoneme_trial = {
     '<button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Same / 同じ</button>' +
     '<button id="btnDiff" class="jspsych-btn" disabled style="opacity:.5;margin:0 8px;">Different / 違う</button>' +
     '</div></div>',
-  data: { task: 'phoneme_discrimination', correct_answer: jsPsych.timelineVariable('correct'), contrast_type: jsPsych.timelineVariable('contrast') },
+  data: () => ({ task: 'phoneme_discrimination', correct_answer: jsPsych.timelineVariable('correct'), contrast_type: jsPsych.timelineVariable('contrast') }),
   on_load: function () {
     const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
     const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
