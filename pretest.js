@@ -103,14 +103,9 @@ function checkAudioExists(url){
       a.removeEventListener('canplaythrough', ok); 
       a.removeEventListener('error', bad); 
       a.removeEventListener('loadedmetadata', ok);
-      // Gentle cleanup - don't trigger errors
-      try {
-        if (!a.paused) a.pause();
-        a.src='';
-      } catch(e) {}
+      try { if (!a.paused) a.pause(); a.src=''; } catch(e) {}
     }; 
     
-    // Add timeout to catch hanging loads
     setTimeout(() => {
       if(!resolved) {
         console.warn('[Validation] ⏱ Audio TIMEOUT:', url);
@@ -271,8 +266,8 @@ function createPhonemeTrial(){
       <div style="text-align:center;">
         <p id="status">Play both sounds, then choose.</p>
         <div style="margin:16px 0;">
-          <button id="playA" class="jspsych-btn">Sound A</button>
-          <button id="playB" class="jspsych-btn">Sound B</button>
+          <button id="playA" class="jspsych-btn" type="button">Sound A</button>
+          <button id="playB" class="jspsych-btn" type="button">Sound B</button>
         </div>
         <div>
           <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5">Same</button>
@@ -287,6 +282,7 @@ function createPhonemeTrial(){
     on_load: function () {
       const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
       const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
+      a.loop=false; b.loop=false;
 
       let aEnded = false, bEnded = false;
       const btnA   = document.getElementById('playA');
@@ -295,48 +291,46 @@ function createPhonemeTrial(){
       const btnDiff= document.getElementById('btnDiff');
       const status = document.getElementById('status');
 
-      function setAnswerLock(locked) {
-        btnSame.disabled = locked;
-        btnDiff.disabled = locked;
+      const setAnswerLock = (locked) => {
+        btnSame.disabled = locked; btnDiff.disabled = locked;
         btnSame.style.opacity = locked ? '.5' : '1';
         btnDiff.style.opacity = locked ? '.5' : '1';
-      }
-      function maybeEnable() {
-        if (aEnded && bEnded) {
-          setAnswerLock(false);
-          status.textContent = 'Choose an answer.';
-        }
-      }
+      };
+      const maybeEnable = () => {
+        if (aEnded && bEnded) { setAnswerLock(false); status.textContent = 'Choose an answer.'; }
+      };
 
-      // Require a full playthrough for each file before enabling answers
-      a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once:true });
-      b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once:true });
+      a.addEventListener('ended', () => { aEnded = true; maybeEnable(); });
+      b.addEventListener('ended', () => { bEnded = true; maybeEnable(); });
 
-      btnA.addEventListener('click', () => {
+      const safeStopBoth = () => { try{a.pause();b.pause();a.currentTime=0;b.currentTime=0;}catch{} };
+
+      btnA.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
         status.textContent = 'Playing A...';
-        a.currentTime = 0;
-        a.play().catch(()=>{});
+        b.pause(); a.currentTime = 0; a.play().catch(()=>{});
       });
-      btnB.addEventListener('click', () => {
+      btnB.addEventListener('click', (e) => {
+        e.preventDefault(); e.stopPropagation();
         status.textContent = 'Playing B...';
-        b.currentTime = 0;
-        b.play().catch(()=>{});
+        a.pause(); b.currentTime = 0; b.play().catch(()=>{});
       });
 
-      // start locked
       setAnswerLock(true);
 
-      btnSame.addEventListener('click', () => jsPsych.finishTrial({ response_label: 'same' }));
-      btnDiff.addEventListener('click', () => jsPsych.finishTrial({ response_label: 'different' }));
+      btnSame.addEventListener('click', () => { safeStopBoth(); jsPsych.finishTrial({ response_label: 'same' }); });
+      btnDiff.addEventListener('click', () => { safeStopBoth(); jsPsych.finishTrial({ response_label: 'different' }); });
+
+      this._a=a; this._b=b; this._stop=safeStopBoth;
     },
-    on_finish: d => {
+    on_finish: function(d){
       const r = d.response_label || null;
       d.selected_option = r;
       d.correct = r ? (r === d.correct_answer) : null;
+      try { this._stop && this._stop(); this._a.src=''; this._b.src=''; } catch {}
     }
   };
 }
-
 
 /* ======================== 4AFC RECEPTIVE VOCABULARY BASELINE ======================== */
 function create4AFCReceptiveBaseline(){
@@ -376,7 +370,6 @@ function create4AFCReceptiveBaseline(){
       
       let hasPlayed = false;
       
-      // Disable choices until audio plays
       choices.forEach(c => {
         c.style.opacity = '0.5';
         c.style.pointerEvents = 'none';
@@ -398,15 +391,9 @@ function create4AFCReceptiveBaseline(){
         status.textContent = 'Click the matching picture. / 対応する画像をクリック';
         playBtn.disabled = false;
         playBtn.textContent = '🔁 Play Again / もう一度';
-        
-        // Enable choices
-        choices.forEach(c => {
-          c.style.opacity = '1';
-          c.style.pointerEvents = 'auto';
-        });
+        choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
       });
       
-      // Handle image clicks
       choices.forEach(choice => {
         choice.addEventListener('click', () => {
           if (!hasPlayed) return;
@@ -431,7 +418,6 @@ function create4AFCReceptiveBaseline(){
     }
   ];
 }
-
 
 /* ======================== LDT ======================== */
 const ldt_stimuli=[
@@ -488,7 +474,7 @@ function createFoleyTimeline(){
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () =>
       '<div>' +
-        '<button id="play" class="play-btn" type="button">Play / 再生</button>' +
+        '<button id="play" class="play-btn" type="button">▶️ Play / 再生</button>' +
         '<p id="status" class="msg">Listen, then choose.</p>' +
       '</div>',
     choices: () => {
@@ -508,141 +494,107 @@ function createFoleyTimeline(){
       audio_file: jsPsych.timelineVariable('audio')
     }),
     on_load: function () {
-      const btn  = document.getElementById('play');
-      const stat = document.getElementById('status');
-      const a    = new Audio();
-      
-      // FORCE audio to not loop
-      a.loop = false;
-      a.autoplay = false;
-      a.preload = 'auto';
+      const btn   = document.getElementById('play');
+      const stat  = document.getElementById('status');
+      const src   = jsPsych.timelineVariable('audio');
+      const a     = new Audio();
+      a.loop = false; a.autoplay = false; a.preload = 'auto';
 
-      let ready = false;
-      let unlocked = false;
-      let playing = false;
-      let hasLoaded = false;
-      let errorListener = null;
+      let ready = false, unlocked = false, playing = false;
+      let fallbackTimer = null, progressTimer = null, lastT = 0;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
-      function lockAnswers(lock = true) {
-        answerBtns.forEach(b => {
-          b.disabled = lock;
-          b.style.opacity = lock ? '.5' : '1';
-        });
-      }
-      function unlockAnswers() {
-        if (!unlocked) {
-          unlocked = true;
-          lockAnswers(false);
-          stat.textContent = 'Choose an answer / 答えを選択';
-          console.log('[Foley] Answers unlocked');
-        }
-      }
+      const lockAnswers = (lock=true)=> {
+        answerBtns.forEach(b => { b.disabled = lock; b.style.opacity = lock ? '.5' : '1'; });
+      };
+      const unlockAnswers = ()=> {
+        if (unlocked) return;
+        unlocked = true;
+        lockAnswers(false);
+        stat.textContent = 'Choose an answer / 答えを選択';
+      };
+      const clearTimers = ()=> {
+        if (fallbackTimer) { clearTimeout(fallbackTimer); fallbackTimer = null; }
+        if (progressTimer) { clearInterval(progressTimer); progressTimer = null; }
+      };
+      const safeStop = ()=> { try { a.pause(); a.currentTime = 0; } catch{} };
+
       lockAnswers(true);
 
-      const onCan = () => {
-        if(hasLoaded) return; // Prevent duplicate calls
-        hasLoaded = true;
-        ready = true;
-        stat.textContent = 'Ready / 準備完了';
-        btn.disabled = false;
-        console.log('[Foley] Audio ready:', src);
-        
-        // FIX: Remove error listener after successful load
-        if(errorListener) {
-          a.removeEventListener('error', errorListener);
-          errorListener = null;
-        }
-      };
-      
-      const onErr = (e) => {
-        console.error('[Foley] Audio load error for:', src, e);
-        stat.textContent = 'Audio failed - you can still answer / 音声失敗 - 回答可能';
-        btn.disabled = true;
-        unlockAnswers();
-      };
+      const onReady = ()=> { ready = true; stat.textContent = 'Ready / 準備完了'; btn.disabled = false; };
+      const onErr   = (e)=> { console.error('[Foley] load error:', src, e); stat.textContent = 'Audio failed - you can still answer'; btn.disabled = true; unlockAnswers(); };
 
-      const src = jsPsych.timelineVariable('audio');
-      if (!src) { 
-        console.error('[Foley] No audio source provided');
-        onErr(new Error('No source')); 
-        return; 
-      }
+      if (!src) { onErr(new Error('No source')); return; }
+      a.addEventListener('canplaythrough', onReady, { once:true });
+      a.addEventListener('loadeddata',     onReady, { once:true });
+      a.addEventListener('error',          onErr,   { once:true  });
 
-      // Store error listener reference so we can remove it later
-      errorListener = onErr;
-
-      // Listen for multiple load events (different browsers prefer different ones)
-      a.addEventListener('canplaythrough', onCan, { once: true });
-      a.addEventListener('loadeddata', onCan, { once: true });
-      a.addEventListener('error', errorListener, { once: true });
-      
-      // CRITICAL: Handle ended event - DON'T manipulate audio after natural end
-      a.addEventListener('ended', () => {
-        console.log('[Foley] Audio ended');
+      a.addEventListener('ended', ()=> {
         playing = false;
-        // FIX: Don't pause or reset after natural ending - causes errors in some browsers
+        clearTimers();
         unlockAnswers();
         btn.disabled = false;
-        btn.textContent = '🔁 Play again / 再生';
-      }, { once: false }); // NOT once, so it works for replay
+        btn.textContent = '🔁 Play again / もう一度';
+      });
+
+      progressTimer = setInterval(()=> {
+        const d = a.duration;
+        const t = a.currentTime || 0;
+        if (Number.isFinite(d) && d > 0 && d - t < 0.12) {
+          a.dispatchEvent(new Event('ended'));
+        }
+        lastT = t;
+      }, 150);
 
       a.src = asset(src);
       btn.disabled = true;
 
-      // Play button handler
       btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (!ready || playing) {
-          console.log('[Foley] Click ignored - ready:', ready, 'playing:', playing);
-          return;
-        }
+        e.preventDefault(); e.stopPropagation();
+        if (!ready || playing) return;
 
-        console.log('[Foley] Playing audio:', src);
         stat.textContent = 'Playing... / 再生中...';
         btn.disabled = true;
         playing = true;
+        clearTimers();
+        safeStop();
+        a.loop = false;
+        lastT = 0;
 
-        // Reset to beginning before playing
-        a.currentTime = 0;
-        a.loop = false; // Double-check loop is off
-        
-        const playPromise = a.play();
-        if (playPromise !== undefined) {
-          playPromise.catch((err) => {
-            console.error('[Foley] Playback error:', err);
-            stat.textContent = 'Playback failed - you can still answer';
-            playing = false;
-            unlockAnswers();
-            btn.disabled = false;
-          });
-        }
+        const fallbackMs = Number.isFinite(a.duration) && a.duration > 0 ? (a.duration*1000 + 400) : 6000;
+        fallbackTimer = setTimeout(()=> {
+          console.warn('[Foley] Fallback unlock fired for', src);
+          playing = false;
+          unlockAnswers();
+          btn.disabled = false;
+          btn.textContent = '🔁 Play again / もう一度';
+          safeStop();
+        }, fallbackMs);
+
+        a.play().catch(err => {
+          console.error('[Foley] play() error:', err);
+          playing = false;
+          unlockAnswers();
+          btn.disabled = false;
+          stat.textContent = 'Playback failed - you can still answer';
+        });
       });
 
       this._audioRef = a;
+      this._clearTimers = clearTimers;
+      this._safeStop = safeStop;
     },
     on_finish: function(d){
-      const a = this._audioRef;
       try {
-        if (a) {
-          a.pause();
-          a.src = '';
-          a.load();
-        }
+        this._clearTimers && this._clearTimers();
+        this._safeStop && this._safeStop();
+        if (this._audioRef) { this._audioRef.src = ''; this._audioRef.load(); }
       } catch {}
       d.correct = (d.response === d.correct_answer);
     }
   };
 
-  return [
-    intro,
-    {
-      timeline: [trial],
-      timeline_variables: FILTERED_STIMULI.foley.map(s => ({ ...s })),
-      randomize_order: true
-    }
-  ];
+  return [ intro, { timeline:[trial], timeline_variables: FILTERED_STIMULI.foley.map(s=>({...s})), randomize_order: true } ];
 }
 
 function createVisualTimeline(){
@@ -695,12 +647,12 @@ function createSpatialSpanTimeline(){
       if(m) m.textContent='Click the sequence.';
       
       function clicker(e){
-        const target = e.currentTarget; // FIX: Capture reference before setTimeout
+        const target = e.currentTarget; // capture before timeout
         const i=Number(target.dataset.i);
         if(Number.isFinite(i)){
           chosen.push(i);
           target.classList.add('lit');
-          setTimeout(()=>target.classList.remove('lit'), 150); // FIX: Use captured reference
+          setTimeout(()=>target.classList.remove('lit'), 150);
           if(chosen.length===seq.length){
             cleanup();
             const correct = chosen.every((v,j)=> v===seq[j]);
@@ -736,15 +688,10 @@ function createSpatialSpanTimeline(){
       trial_duration:null,
       stimulus: presentationHTML,
       data:{ task:'spatial_span_present', length: len },
-      // FIX: Handle async properly without async keyword
       on_load: function(){
-        const currentLen = len; // Capture length
+        const currentLen = len;
         const seq = makeSequence(currentLen);
-        
-        // Run async operations without await in on_load
-        playback(seq).then(() => {
-          return responseCollector(seq);
-        }).then(res => {
+        playback(seq).then(() => responseCollector(seq)).then(res => {
           jsPsych.finishTrial({
             sequence: JSON.stringify(seq),
             chosen: JSON.stringify(res.chosen || []),
@@ -795,10 +742,9 @@ function createProceduralTimeline(){
     choices:['OK'] 
   };
 
-  // Shuffle steps
   const steps=PROCEDURE_STEPS.slice(); 
   for(let i=steps.length-1;i>0;i--){ 
-    const j=Math.floor(Math.random()*(i+1)); 
+    const j=Math.floor(Math.random()* (i+1)); 
     [steps[i],steps[j]]=[steps[j],steps[i]]; 
   }
 
@@ -836,32 +782,23 @@ function createProceduralTimeline(){
       refresh();
     }, 
     on_finish(d){
-      // FIX: Safer element access with validation
       const realSelects = document.querySelectorAll('.proc-dd'); 
       const pos2={};
-      
-      // Build position map from actual DOM elements
       realSelects.forEach((select) => {
-        const label = select.dataset.label; // Use data attribute instead of index
+        const label = select.dataset.label;
         const value = select.value;
         if(label) {
           pos2[label] = value ? Number(value) : null;
         }
       });
-      
-      // Calculate constraint satisfaction
       let tot=0, ok=0, violations=[];
       PROC_CONSTRAINTS.forEach(([a,b])=>{ 
         if(pos2[a] && pos2[b]){ 
           tot++; 
-          if(pos2[a] < pos2[b]) {
-            ok++; 
-          } else {
-            violations.push(a+' -> '+b); 
-          }
+          if(pos2[a] < pos2[b]) { ok++; } 
+          else { violations.push(a+' -> '+b); }
         } 
       });
-      
       d.responses_positions = pos2; 
       d.constraints_total=tot; 
       d.constraints_satisfied=ok; 
@@ -869,7 +806,6 @@ function createProceduralTimeline(){
       d.violations=violations;
     }
   };
-  
   return [instructions, test];
 }
 
@@ -881,7 +817,23 @@ function createIdeophoneTest(){
 }
 
 /* ======================== HARDEN BUTTONS ======================== */
-function hardenButtons(nodes){ for(const n of nodes){ if(!n||typeof n!=='object') continue; if(Array.isArray(n.timeline)) hardenButtons(n.timeline); const tn=n.type&&n.type.info&&n.type.info.name; if(tn!=='html-button-response') continue; if(typeof n.choices==='function'){ if(Array.isArray(n.button_html)){ n.button_html='<button class="jspsych-btn">%choice%</button>'; } continue; } let choices=n.choices; if(!Array.isArray(choices)||choices.length===0){ choices=['Continue']; n.choices=choices; } if(Array.isArray(n.button_html) && n.button_html.length!==choices.length){ n.button_html = choices.map(()=>'<button class="jspsych-btn">%choice%</button>'); } } }
+function hardenButtons(nodes){ 
+  for(const n of nodes){ 
+    if(!n||typeof n!=='object') continue; 
+    if(Array.isArray(n.timeline)) hardenButtons(n.timeline); 
+    const tn=n.type&&n.type.info&&n.type.info.name; 
+    if(tn!=='html-button-response') continue; 
+    if(typeof n.choices==='function'){ 
+      if(Array.isArray(n.button_html)){ n.button_html='<button class="jspsych-btn">%choice%</button>'; } 
+      continue; 
+    } 
+    let choices=n.choices; 
+    if(!Array.isArray(choices)||choices.length===0){ choices=['Continue']; n.choices=choices; } 
+    if(Array.isArray(n.button_html) && n.button_html.length!==choices.length){ 
+      n.button_html = choices.map(()=>'<button class="jspsych-btn">%choice%</button>'); 
+    } 
+  }
+}
 
 /* ======================== BOOTSTRAP ======================== */
 async function initializeExperiment(){
@@ -907,11 +859,11 @@ async function initializeExperiment(){
     // Surveys (Motion Sickness removed - use pre-screening instead)
     timeline.push(createParticipantInfo());
 
-    // Digit span (3–6, forward & backward)
+    // Digit span (3–6, forward & backward) — FIXED COLONS
     timeline.push(createDigitSpanInstructions(true));
-    timeline.push({ timeline: generateDigitSpanTrials({forward:true,startLen:3,endLen:6}), randomize_order:false });
+    timeline.push({ timeline: generateDigitSpanTrials({ forward: true, startLen: 3, endLen: 6 }), randomize_order:false });
     timeline.push(createDigitSpanInstructions(false));
-    timeline.push({ timeline: generateDigitSpanTrials({forward:false,startLen:3,endLen:6}), randomize_order:false });
+    timeline.push({ timeline: generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }), randomize_order:false });
 
     // Phoneme (reduced to 4 trials)
     if((FILTERED_STIMULI.phoneme?.length||0)>0){
@@ -922,7 +874,7 @@ async function initializeExperiment(){
     // LDT
     timeline.push(...createLDTTimeline());
 
-    // 4AFC Receptive Vocabulary Baseline (NEW - Critical for pre/post comparison)
+    // 4AFC Receptive Vocabulary Baseline
     if((FILTERED_STIMULI.receptive?.length||0)>0){
       timeline.push(...create4AFCReceptiveBaseline());
     }
@@ -935,10 +887,10 @@ async function initializeExperiment(){
     // Foley
     if((FILTERED_STIMULI.foley?.length||0)>0){ timeline.push(...createFoleyTimeline()); }
 
-    // Visual iconicity (kept as predictor)
+    // Visual iconicity (predictor)
     if((FILTERED_STIMULI.visual?.length||0)>0){ timeline.push(...createVisualTimeline()); }
 
-    // Spatial span (3-5)
+    // Spatial span (3–5)
     timeline.push(...createSpatialSpanTimeline());
 
     // Procedural + Ideophone
