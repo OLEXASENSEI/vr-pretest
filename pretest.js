@@ -249,6 +249,8 @@ function createNamingTimeline(){
 }
 
 /* ======================== FOLEY / VISUAL ======================== */
+// Replace the createFoleyTimeline function with this fixed version:
+
 function createFoleyTimeline(){
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -288,8 +290,10 @@ function createFoleyTimeline(){
       const a = new Audio();
       let ready = false;
       let unlocked = false;
+      let playTimeout = null;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
+      
       function lockAnswers(lock = true) {
         answerBtns.forEach(b => {
           b.disabled = lock;
@@ -297,16 +301,30 @@ function createFoleyTimeline(){
           b.style.pointerEvents = lock ? 'none' : 'auto';
         });
       }
-      lockAnswers(true); // start locked
+      
+      function unlockAnswers() {
+        if (!unlocked) {
+          unlocked = true;
+          lockAnswers(false);
+          stat.textContent = 'Choose an answer.';
+          btn.textContent = '🔁 Play again';
+          if (playTimeout) clearTimeout(playTimeout);
+        }
+      }
+      
+      lockAnswers(true);
 
       const onCan = () => {
         ready = true;
         stat.textContent = 'Ready / 準備完了';
         btn.disabled = false;
       };
+      
       const onErr = () => {
         stat.textContent = 'Audio not available / 音声なし';
         btn.disabled = true;
+        // Unlock answers even if audio fails
+        unlockAnswers();
       };
 
       const src = jsPsych.timelineVariable('audio');
@@ -315,14 +333,8 @@ function createFoleyTimeline(){
       a.addEventListener('canplaythrough', onCan, { once: true });
       a.addEventListener('error', onErr, { once: true });
 
-      // Unlock only after the first full playthrough completes
-      a.addEventListener('ended', () => {
-        if (!unlocked) {
-          unlocked = true;
-          lockAnswers(false);
-          stat.textContent = 'Choose an answer.';
-        }
-      }, { once: true });
+      // Unlock when audio ends
+      a.addEventListener('ended', unlockAnswers, { once: true });
 
       a.preload = 'auto';
       a.src = asset(src);
@@ -330,9 +342,30 @@ function createFoleyTimeline(){
 
       btn.addEventListener('click', () => {
         if (!ready) return;
+        
         stat.textContent = 'Playing... / 再生中...';
+        btn.disabled = true;
+        
+        // Clear any existing timeout
+        if (playTimeout) clearTimeout(playTimeout);
+        
         a.currentTime = 0;
-        a.play().catch(() => {});
+        a.play()
+          .then(() => {
+            // Fallback: unlock after duration + 500ms if 'ended' doesn't fire
+            const duration = a.duration || 3;
+            playTimeout = setTimeout(() => {
+              console.warn('[Foley] Audio ended event did not fire, using timeout fallback');
+              unlockAnswers();
+              btn.disabled = false;
+            }, (duration * 1000) + 500);
+          })
+          .catch((err) => {
+            console.error('[Foley] Playback error:', err);
+            stat.textContent = 'Playback failed - you can still answer';
+            unlockAnswers();
+            btn.disabled = false;
+          });
       });
     },
     on_finish: d => {
