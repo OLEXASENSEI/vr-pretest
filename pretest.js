@@ -1,8 +1,10 @@
-// 6.3 pretest.js — VR Pre-Test Battery (Pure jsPsych)
-// Includes: surveys, digit span (3–8, fwd/back), phoneme discrimination,
-// lexical decision, picture naming (mic), foley, visual iconicity,
-// spatial span (Corsi 3–6), procedural ordering (dropdown w/ uniqueness),
+// 6.2 pretest.js — VR Pre-Test Battery (Pure jsPsych) — OPTIMIZED VERSION
+// ~20 minutes duration with critical gap fixes
+// Includes: surveys (with TOEIC/EIKEN), digit span (3–6, fwd/back), phoneme discrimination (4 trials),
+// lexical decision, 4AFC receptive vocab baseline (NEW), picture naming (mic, 6 images), foley (4 trials), 
+// visual iconicity (3 trials), spatial span (Corsi 3–5), procedural ordering (dropdown w/ uniqueness),
 // ideophone mapping, and robust save (download or POST via ?post=).
+// Motion sickness removed - use pre-screening survey instead.
 
 /* ======================== GLOBAL / HELPERS ======================== */
 let jsPsych=null; let assignedCondition=null; let microphoneAvailable=false; let currentPID_value='unknown';
@@ -41,11 +43,9 @@ async function saveData(data){
 /* ======================== STIMULI ======================== */
 const phoneme_discrimination_stimuli=[
   { audio1:'sounds/bowl.mp3',   audio2:'sounds/ball.mp3',   correct:'different', contrast:'l_r' },
-  { audio1:'sounds/pan.mp3',    audio2:'sounds/pan.mp3',    correct:'same',      contrast:'control' },
-  { audio1:'sounds/flour.mp3',  audio2:'sounds/flower.mp3', correct:'different', contrast:'l_r' },
-  { audio1:'sounds/batter.mp3', audio2:'sounds/better.mp3', correct:'different', contrast:'vowel' },
   { audio1:'sounds/flip.mp3',   audio2:'sounds/frip.mp3',   correct:'different', contrast:'l_r' },
-  { audio1:'sounds/heat.mp3',   audio2:'sounds/hit.mp3',    correct:'different', contrast:'vowel_length' },
+  { audio1:'sounds/pan.mp3',    audio2:'sounds/pan.mp3',    correct:'same',      contrast:'control' },
+  { audio1:'sounds/batter.mp3', audio2:'sounds/better.mp3', correct:'different', contrast:'vowel' },
 ];
 const foley_stimuli=[
   { audio:'sounds/high_tinkle.mp3',   options:['small sugar granule','large mixing bowl'], correct:0, mapping_type:'size_pitch' },
@@ -54,10 +54,8 @@ const foley_stimuli=[
   { audio:'sounds/egg_crack.mp3',     options:['stirring','cracking'],                       correct:1, mapping_type:'action' },
 ];
 const picture_naming_stimuli=[
-  { image:'img/bowl.jpg',     target:'bowl',     category:'utensil' },
-  { image:'img/egg.jpg',      target:'egg',      category:'ingredient' },
-  { image:'img/flour.jpg',    target:'flour',    category:'ingredient' },
-  { image:'img/spatula.jpg',  target:'spatula',  category:'utensil' },
+  { image:'img/bowl.jpg',      target:'bowl',     category:'utensil' },
+  { image:'img/spatula.jpg',   target:'spatula',  category:'utensil' },
   { image:'img/mixing.jpeg',   target:'mixing',   category:'action' },
   { image:'img/cracking.jpeg', target:'cracking', category:'action' },
   { image:'img/pouring.jpeg',  target:'pouring',  category:'action' },
@@ -67,6 +65,16 @@ const visual_iconicity_stimuli=[
   { shape:'img/bowl_shape.svg',  words:['container','cutter'], expected:0, shape_type:'container' },
   { shape:'img/round_shape.svg', words:['maluma','takete'],    expected:0, shape_type:'round' },
   { shape:'img/spiky_shape.svg', words:['bouba','kiki'],       expected:1, shape_type:'spiky' },
+];
+
+/* ======================== 4AFC RECEPTIVE VOCABULARY BASELINE ======================== */
+const receptive_vocab_baseline_stimuli=[
+  { word_audio:'sounds/bowl.mp3',     images:['img/bowl.jpg','img/spatula.jpg','img/mixing.jpeg','img/pouring.jpeg'], correct:0, target:'bowl' },
+  { word_audio:'sounds/spatula.mp3',  images:['img/cracking.jpeg','img/spatula.jpg','img/flipping.jpg','img/bowl.jpg'], correct:1, target:'spatula' },
+  { word_audio:'sounds/mixing.mp3',   images:['img/pouring.jpeg','img/cracking.jpeg','img/mixing.jpeg','img/flipping.jpg'], correct:2, target:'mixing' },
+  { word_audio:'sounds/cracking.mp3', images:['img/mixing.jpeg','img/flipping.jpg','img/bowl.jpg','img/cracking.jpeg'], correct:3, target:'cracking' },
+  { word_audio:'sounds/pouring.mp3',  images:['img/pouring.jpeg','img/mixing.jpeg','img/spatula.jpg','img/cracking.jpeg'], correct:0, target:'pouring' },
+  { word_audio:'sounds/flipping.mp3', images:['img/bowl.jpg','img/mixing.jpeg','img/flipping.jpg','img/spatula.jpg'], correct:2, target:'flipping' },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -95,7 +103,11 @@ function checkAudioExists(url){
       a.removeEventListener('canplaythrough', ok); 
       a.removeEventListener('error', bad); 
       a.removeEventListener('loadedmetadata', ok);
-      a.src=''; 
+      // Gentle cleanup - don't trigger errors
+      try {
+        if (!a.paused) a.pause();
+        a.src='';
+      } catch(e) {}
     }; 
     
     // Add timeout to catch hanging loads
@@ -146,7 +158,7 @@ function checkImageExists(url){
   }); 
 }
 
-let PRELOAD_AUDIO=[]; let PRELOAD_IMAGES=[]; let FILTERED_STIMULI={phoneme:[], foley:[], picture:[], visual:[]};
+let PRELOAD_AUDIO=[]; let PRELOAD_IMAGES=[]; let FILTERED_STIMULI={phoneme:[], foley:[], picture:[], visual:[], receptive:[]};
 async function filterExistingStimuli(){
   console.log('[Validation] Starting asset validation...');
   
@@ -197,7 +209,22 @@ async function filterExistingStimuli(){
   }
   console.log(`[Validation] Visual: ${visual.length}/${visual_iconicity_stimuli.length} trials valid`);
   
-  FILTERED_STIMULI={phoneme,foley,picture,visual};
+  const receptive=[];
+  console.log('[Validation] Checking receptive vocab baseline...');
+  for(const s of receptive_vocab_baseline_stimuli){
+    const okAudio = await checkAudioExists(s.word_audio);
+    const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
+    if(okAudio && okImages.every(ok => ok)){
+      receptive.push(s);
+      PRELOAD_AUDIO.push(s.word_audio);
+      s.images.forEach(img => { if(!PRELOAD_IMAGES.includes(img)) PRELOAD_IMAGES.push(img); });
+    } else {
+      console.warn('[Validation] Skipping receptive trial for:', s.target);
+    }
+  }
+  console.log(`[Validation] Receptive: ${receptive.length}/${receptive_vocab_baseline_stimuli.length} trials valid`);
+  
+  FILTERED_STIMULI={phoneme,foley,picture,visual,receptive};
   console.log('[Validation] Asset validation complete');
 }
 
@@ -211,6 +238,7 @@ function createParticipantInfo(){
       { prompt:'<b>Age / 年齢</b> (e.g., 18-25, 26-35, 36-45, 46-55, 56+)', name:'age', required:true },
       { prompt:'<b>Native Language / 母語</b> (e.g., Japanese, Other)', name:'native_language', required:true },
       { prompt:'<b>English Learning Years / 英語学習年数</b> (e.g., 0-3, 4-6, 7-10, 10+)', name:'english_years', required:true },
+      { prompt:'<b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b> (e.g., TOEIC 600, EIKEN Pre-1, N/A)', name:'english_proficiency', required:false, placeholder:'Enter score or N/A' },
       { prompt:'<b>VR Experience / VR経験</b> (e.g., None, 1-2 times, Several, Regular)', name:'vr_experience', required:true }
     ],
     button_label: 'Continue / 続行',
@@ -219,28 +247,11 @@ function createParticipantInfo(){
   };
 }
 
-function createMotionSicknessQuestionnaire(){
-  const intro={ type:T('jsPsychHtmlButtonResponse'), stimulus:'<h2>Motion Sickness Susceptibility / 乗り物酔い傾向</h2><p>Answer the following questions.</p>', choices:['Begin / 開始'] };
-  const questions={
-    type:T('jsPsychSurveyLikert'),
-    preamble:'<h3>How often do you experience these?</h3><p style="color:#666">どのくらい経験しますか？</p>',
-    questions:[
-      { prompt:'Feel sick when reading in a car / 車で読書中に気分が悪くなる', name:'mssq_car_reading', labels:['Never','Rarely','Sometimes','Often','Always'], required:true },
-      { prompt:'Feel sick on boats / 船で気分が悪くなる', name:'mssq_boat', labels:['Never','Rarely','Sometimes','Often','Always'], required:true },
-      { prompt:'Feel dizzy playing video games / ゲーム中にめまいを感じる', name:'mssq_games', labels:['Never','Rarely','Sometimes','Often','Always'], required:true },
-      { prompt:'Feel sick in VR (if experienced) / VRで気分が悪くなる', name:'mssq_vr', labels:['No experience','Never','Rarely','Sometimes','Often','Always'], required:false }
-    ],
-    button_label:'Continue / 続行',
-    data:{ task:'motion_sickness' }
-  };
-  return [intro, questions];
-}
-
-/* ======================== DIGIT SPAN (3–8) ======================== */
+/* ======================== DIGIT SPAN (3–6) ======================== */
 function createDigitSpanInstructions(forward=true){
   return { type:T('jsPsychHtmlButtonResponse'), stimulus: forward? '<h2>Number Memory Test / 数字記憶テスト</h2><p>Remember digits in order.</p>' : '<h2>Reverse Number Memory / 逆順数字記憶</h2><p>Enter digits in <b>reverse</b> order.</p>', choices:['Begin / 開始'] };
 }
-function generateDigitSpanTrials({forward=true, startLen=3, endLen=8}){
+function generateDigitSpanTrials({forward=true, startLen=3, endLen=6}){
   const trials=[]; let failCount=0;
   for(let length=startLen; length<=endLen; length++){
     const digits = Array.from({length}, ()=> Math.floor(Math.random()*10));
@@ -327,6 +338,101 @@ function createPhonemeTrial(){
 }
 
 
+/* ======================== 4AFC RECEPTIVE VOCABULARY BASELINE ======================== */
+function create4AFCReceptiveBaseline(){
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: '<h2>Word Recognition Test / 単語認識テスト</h2><p>Listen to the word, then click the matching picture.</p><p style="color:#666;font-size:14px;">音声を聞いて、対応する画像をクリックしてください。</p>',
+    choices: ['Begin / 開始']
+  };
+
+  const trial = {
+    type: T('jsPsychHtmlKeyboardResponse'),
+    choices: 'NO_KEYS',
+    stimulus: () => {
+      const images = jsPsych.timelineVariable('images');
+      const imgHTML = images.map((src, i) => 
+        `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
+          <img src="${asset(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;"/>
+        </div>`
+      ).join('');
+      return `<div style="margin-bottom:20px;">
+        <button id="play-word" class="jspsych-btn" style="font-size:18px;">▶️ Play Word / 音声を再生</button>
+        <p id="receptive-status" style="color:#666;margin-top:10px;">Click play to hear the word.</p>
+      </div>
+      <div style="margin-top:20px;">${imgHTML}</div>`;
+    },
+    data: () => ({
+      task: 'receptive_vocab_baseline',
+      target_word: jsPsych.timelineVariable('target'),
+      correct_answer: jsPsych.timelineVariable('correct')
+    }),
+    on_load: function() {
+      const audioSrc = jsPsych.timelineVariable('word_audio');
+      const playBtn = document.getElementById('play-word');
+      const status = document.getElementById('receptive-status');
+      const choices = document.querySelectorAll('.receptive-choice');
+      const audio = new Audio(asset(audioSrc));
+      
+      let hasPlayed = false;
+      
+      // Disable choices until audio plays
+      choices.forEach(c => {
+        c.style.opacity = '0.5';
+        c.style.pointerEvents = 'none';
+      });
+      
+      playBtn.addEventListener('click', () => {
+        status.textContent = 'Playing... / 再生中...';
+        playBtn.disabled = true;
+        audio.currentTime = 0;
+        audio.play().catch(err => {
+          console.error('[4AFC] Audio error:', err);
+          status.textContent = 'Audio failed - please try again';
+          playBtn.disabled = false;
+        });
+      });
+      
+      audio.addEventListener('ended', () => {
+        hasPlayed = true;
+        status.textContent = 'Click the matching picture. / 対応する画像をクリック';
+        playBtn.disabled = false;
+        playBtn.textContent = '🔁 Play Again / もう一度';
+        
+        // Enable choices
+        choices.forEach(c => {
+          c.style.opacity = '1';
+          c.style.pointerEvents = 'auto';
+        });
+      });
+      
+      // Handle image clicks
+      choices.forEach(choice => {
+        choice.addEventListener('click', () => {
+          if (!hasPlayed) return;
+          const selected = parseInt(choice.dataset.choice);
+          audio.pause();
+          audio.src = '';
+          jsPsych.finishTrial({ response: selected });
+        });
+      });
+    },
+    on_finish: d => {
+      d.correct = (d.response === d.correct_answer);
+    }
+  };
+
+  return [
+    intro,
+    {
+      timeline: [trial],
+      timeline_variables: receptive_vocab_baseline_stimuli,
+      randomize_order: true
+    }
+  ];
+}
+
+
 /* ======================== LDT ======================== */
 const ldt_stimuli=[
   { stimulus:'BOWL', correct_response:'w', word_type:'target_high_freq' },
@@ -347,7 +453,7 @@ function createLDTTimeline(){
   return [instructions, { timeline:[fixation, trial], timeline_variables: ldt_stimuli, randomize_order:true }];
 }
 
-/* ======================== PICTURE NAMING ======================== */
+/* ======================== PICTURE NAMING (6 IMAGES) ======================== */
 function createNamingTimeline(){
   const intro={ type:T('jsPsychHtmlButtonResponse'), stimulus:()=>`<div style="max-width:640px;margin:0 auto;text-align:center">
     <h2>Picture Description / 絵の説明</h2>
@@ -415,6 +521,7 @@ function createFoleyTimeline(){
       let unlocked = false;
       let playing = false;
       let hasLoaded = false;
+      let errorListener = null;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
       function lockAnswers(lock = true) {
@@ -440,10 +547,16 @@ function createFoleyTimeline(){
         stat.textContent = 'Ready / 準備完了';
         btn.disabled = false;
         console.log('[Foley] Audio ready:', src);
+        
+        // FIX: Remove error listener after successful load
+        if(errorListener) {
+          a.removeEventListener('error', errorListener);
+          errorListener = null;
+        }
       };
       
       const onErr = (e) => {
-        console.error('[Foley] Audio error for:', src, e);
+        console.error('[Foley] Audio load error for:', src, e);
         stat.textContent = 'Audio failed - you can still answer / 音声失敗 - 回答可能';
         btn.disabled = true;
         unlockAnswers();
@@ -456,17 +569,19 @@ function createFoleyTimeline(){
         return; 
       }
 
+      // Store error listener reference so we can remove it later
+      errorListener = onErr;
+
       // Listen for multiple load events (different browsers prefer different ones)
       a.addEventListener('canplaythrough', onCan, { once: true });
       a.addEventListener('loadeddata', onCan, { once: true });
-      a.addEventListener('error', onErr, { once: true });
+      a.addEventListener('error', errorListener, { once: true });
       
-      // CRITICAL: Handle ended event to stop playback
+      // CRITICAL: Handle ended event - DON'T manipulate audio after natural end
       a.addEventListener('ended', () => {
         console.log('[Foley] Audio ended');
         playing = false;
-        a.pause(); // Extra safety: force pause
-        a.currentTime = 0; // Reset to beginning
+        // FIX: Don't pause or reset after natural ending - causes errors in some browsers
         unlockAnswers();
         btn.disabled = false;
         btn.textContent = '🔁 Play again / 再生';
@@ -489,16 +604,20 @@ function createFoleyTimeline(){
         btn.disabled = true;
         playing = true;
 
-        // Reset and play
+        // Reset to beginning before playing
         a.currentTime = 0;
         a.loop = false; // Double-check loop is off
-        a.play().catch((err) => {
-          console.error('[Foley] Playback error:', err);
-          stat.textContent = 'Playback failed - you can still answer';
-          playing = false;
-          unlockAnswers();
-          btn.disabled = false;
-        });
+        
+        const playPromise = a.play();
+        if (playPromise !== undefined) {
+          playPromise.catch((err) => {
+            console.error('[Foley] Playback error:', err);
+            stat.textContent = 'Playback failed - you can still answer';
+            playing = false;
+            unlockAnswers();
+            btn.disabled = false;
+          });
+        }
       });
 
       this._audioRef = a;
@@ -533,9 +652,9 @@ function createVisualTimeline(){
   return [intro, { timeline:[trial], timeline_variables: tv, randomize_order:true }];
 }
 
-/* ======================== SPATIAL SPAN (Corsi 3–6) - FIXED ======================== */
+/* ======================== SPATIAL SPAN (Corsi 3–5) - FIXED ======================== */
 function createSpatialSpanTimeline(){
-  const instr={ type:T('jsPsychHtmlButtonResponse'), choices:['Begin / 開始'], stimulus:'<h2>Spatial Span (Corsi) / 空間スパン</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p class="msg">Sequences length 3 → 6. Two errors at a given length ends the task.</p>' };
+  const instr={ type:T('jsPsychHtmlButtonResponse'), choices:['Begin / 開始'], stimulus:'<h2>Spatial Span (Corsi) / 空間スパン</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p class="msg">Sequences length 3 → 5. Two errors at a given length ends the task.</p>' };
 
   const gridCells=[0,1,2,3,4,5,6,7,8]; // 3x3
   function makeSequence(len){ const pool=gridCells.slice(); const seq=[]; for(let i=0;i<len;i++){ const pick = pool.splice(Math.floor(Math.random()*pool.length),1)[0]; seq.push(pick); } return seq; }
@@ -604,7 +723,7 @@ function createSpatialSpanTimeline(){
   }
 
   const trials=[]; let failAtLen=0;
-  for(let len=3; len<=6; len++){
+  for(let len=3; len<=5; len++){
     trials.push({ 
       type:T('jsPsychHtmlButtonResponse'), 
       choices:['Ready'], 
@@ -785,17 +904,16 @@ async function initializeExperiment(){
     const timeline=[];
     timeline.push({ type:T('jsPsychHtmlButtonResponse'), stimulus:'<h2>Pre-Test Starting</h2><p>Click to begin the experiment.</p>', choices:['Start'] });
 
-    // Surveys
+    // Surveys (Motion Sickness removed - use pre-screening instead)
     timeline.push(createParticipantInfo());
-    timeline.push(...createMotionSicknessQuestionnaire());
 
-    // Digit span (3–8, forward & backward)
+    // Digit span (3–6, forward & backward)
     timeline.push(createDigitSpanInstructions(true));
-    timeline.push({ timeline: generateDigitSpanTrials({forward:true,startLen:3,endLen:8}), randomize_order:false });
+    timeline.push({ timeline: generateDigitSpanTrials({forward:true,startLen:3,endLen:6}), randomize_order:false });
     timeline.push(createDigitSpanInstructions(false));
-    timeline.push({ timeline: generateDigitSpanTrials({forward:false,startLen:3,endLen:8}), randomize_order:false });
+    timeline.push({ timeline: generateDigitSpanTrials({forward:false,startLen:3,endLen:6}), randomize_order:false });
 
-    // Phoneme
+    // Phoneme (reduced to 4 trials)
     if((FILTERED_STIMULI.phoneme?.length||0)>0){
       timeline.push(createPhonemeInstructions());
       timeline.push({ timeline:[createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme.map(s=>({...s})), randomize_order:true });
@@ -804,7 +922,12 @@ async function initializeExperiment(){
     // LDT
     timeline.push(...createLDTTimeline());
 
-    // Picture naming (mic)
+    // 4AFC Receptive Vocabulary Baseline (NEW - Critical for pre/post comparison)
+    if((FILTERED_STIMULI.receptive?.length||0)>0){
+      timeline.push(...create4AFCReceptiveBaseline());
+    }
+
+    // Picture naming (mic) - reduced to 6 images
     if((FILTERED_STIMULI.picture?.length||0)>0 && have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse')){
       timeline.push(...createNamingTimeline());
     }
@@ -812,10 +935,10 @@ async function initializeExperiment(){
     // Foley
     if((FILTERED_STIMULI.foley?.length||0)>0){ timeline.push(...createFoleyTimeline()); }
 
-    // Visual iconicity
+    // Visual iconicity (kept as predictor)
     if((FILTERED_STIMULI.visual?.length||0)>0){ timeline.push(...createVisualTimeline()); }
 
-    // Spatial span
+    // Spatial span (3-5)
     timeline.push(...createSpatialSpanTimeline());
 
     // Procedural + Ideophone
