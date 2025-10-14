@@ -249,8 +249,6 @@ function createNamingTimeline(){
 }
 
 /* ======================== FOLEY / VISUAL ======================== */
-// Replace the createFoleyTimeline function with this fixed version:
-
 function createFoleyTimeline(){
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -265,7 +263,6 @@ function createFoleyTimeline(){
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () =>
       '<div>' +
-        // NOTE: not using .jspsych-btn here to avoid submitting the trial
         '<button id="play" class="play-btn" type="button">Play / 再生</button>' +
         '<p id="status" class="msg">Listen, then choose.</p>' +
       '</div>',
@@ -276,7 +273,6 @@ function createFoleyTimeline(){
     button_html: () => {
       const o = jsPsych.timelineVariable('options');
       const safe = Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
-      // These *are* jspsych response buttons (as intended)
       return safe.map(() => '<button class="jspsych-btn answer-btn" type="button">%choice%</button>');
     },
     post_trial_gap: 250,
@@ -290,7 +286,7 @@ function createFoleyTimeline(){
       const btn  = document.getElementById('play');
       const stat = document.getElementById('status');
       const a    = new Audio();
-      a.loop = false;               // be explicit
+      a.loop = false;
       a.preload = 'auto';
 
       let ready = false;
@@ -340,7 +336,6 @@ function createFoleyTimeline(){
       a.src = asset(src);
       btn.disabled = true;
 
-      // Prevent this button from bubbling to any jsPsych handlers
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -360,11 +355,9 @@ function createFoleyTimeline(){
         });
       });
 
-      // Save a ref for cleanup on finish
       this._audioRef = a;
     },
     on_finish: function(d){
-      // Cleanup audio to avoid stray playback/listeners
       const a = this._audioRef;
       try {
         if (a) {
@@ -394,7 +387,7 @@ function createVisualTimeline(){
   return [intro, { timeline:[trial], timeline_variables: tv, randomize_order:true }];
 }
 
-/* ======================== SPATIAL SPAN (Corsi 3–6) ======================== */
+/* ======================== SPATIAL SPAN (Corsi 3–6) - FIXED ======================== */
 function createSpatialSpanTimeline(){
   const instr={ type:T('jsPsychHtmlButtonResponse'), choices:['Begin / 開始'], stimulus:'<h2>Spatial Span (Corsi) / 空間スパン</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p class="msg">Sequences length 3 → 6. Two errors at a given length ends the task.</p>' };
 
@@ -431,14 +424,18 @@ function createSpatialSpanTimeline(){
 
   function responseCollector(seq, timeout=15000){
     return new Promise(resolve=>{
-      const chosen=[]; const cells=[...document.querySelectorAll('.corsi-cell')];
-      const m=document.getElementById('corsi-msg'); if(m) m.textContent='Click the sequence.';
+      const chosen=[]; 
+      const cells=[...document.querySelectorAll('.corsi-cell')];
+      const m=document.getElementById('corsi-msg'); 
+      if(m) m.textContent='Click the sequence.';
+      
       function clicker(e){
-        const i=Number(e.currentTarget.dataset.i);
+        const target = e.currentTarget; // FIX: Capture reference before setTimeout
+        const i=Number(target.dataset.i);
         if(Number.isFinite(i)){
           chosen.push(i);
-          e.currentTarget.classList.add('lit');
-          setTimeout(()=>e.currentTarget.classList.remove('lit'), 150);
+          target.classList.add('lit');
+          setTimeout(()=>target.classList.remove('lit'), 150); // FIX: Use captured reference
           if(chosen.length===seq.length){
             cleanup();
             const correct = chosen.every((v,j)=> v===seq[j]);
@@ -446,39 +443,70 @@ function createSpatialSpanTimeline(){
           }
         }
       }
-      function cleanup(){ cells.forEach(c=> c.removeEventListener('click', clicker)); }
+      
+      function cleanup(){ 
+        cells.forEach(c=> c.removeEventListener('click', clicker)); 
+      }
+      
       cells.forEach(c=> c.addEventListener('click', clicker));
-      setTimeout(()=>{ cleanup(); resolve({chosen, correct:false, timed_out:true}); }, timeout);
+      
+      setTimeout(()=>{ 
+        cleanup(); 
+        resolve({chosen, correct:false, timed_out:true}); 
+      }, timeout);
     });
   }
 
   const trials=[]; let failAtLen=0;
   for(let len=3; len<=6; len++){
-    trials.push({ type:T('jsPsychHtmlButtonResponse'), choices:['Ready'], stimulus:`<h3>Sequence length ${len}</h3><p class="msg">Press Ready, then watch carefully.</p>` });
+    trials.push({ 
+      type:T('jsPsychHtmlButtonResponse'), 
+      choices:['Ready'], 
+      stimulus:`<h3>Sequence length ${len}</h3><p class="msg">Press Ready, then watch carefully.</p>` 
+    });
+    
     trials.push({
       type:T('jsPsychHtmlKeyboardResponse'),
       choices:'NO_KEYS',
       trial_duration:null,
       stimulus: presentationHTML,
       data:{ task:'spatial_span_present', length: len },
-      // ⬇️ FIXED HERE
-      on_load: async function(){
-        const seq = makeSequence(len);
-        await playback(seq);
-        const res = await responseCollector(seq);
-        jsPsych.finishTrial({
-          sequence: JSON.stringify(seq),
-          chosen: JSON.stringify(res.chosen || []),
-          correct: !!res.correct,
-          timed_out: !!res.timed_out
+      // FIX: Handle async properly without async keyword
+      on_load: function(){
+        const currentLen = len; // Capture length
+        const seq = makeSequence(currentLen);
+        
+        // Run async operations without await in on_load
+        playback(seq).then(() => {
+          return responseCollector(seq);
+        }).then(res => {
+          jsPsych.finishTrial({
+            sequence: JSON.stringify(seq),
+            chosen: JSON.stringify(res.chosen || []),
+            correct: !!res.correct,
+            timed_out: !!res.timed_out,
+            length: currentLen
+          });
+        }).catch(err => {
+          console.error('[Spatial] Error:', err);
+          jsPsych.finishTrial({
+            sequence: JSON.stringify(seq),
+            chosen: '[]',
+            correct: false,
+            error: err.message,
+            length: currentLen
+          });
         });
       },
       on_finish: function(d){
         if(!d.correct){
-          if(failAtLen===len){ jsPsych.endCurrentTimeline(); }
-          else { failAtLen=len; }
+          if(failAtLen===d.length){ 
+            jsPsych.endCurrentTimeline(); 
+          } else { 
+            failAtLen=d.length; 
+          }
         } else {
-          if(failAtLen===len) failAtLen=0;
+          if(failAtLen===d.length) failAtLen=0;
         }
       }
     });
@@ -486,22 +514,35 @@ function createSpatialSpanTimeline(){
   return [instr, ...trials];
 }
 
-
-/* ======================== PROCEDURAL (Dropdown, unique) ======================== */
+/* ======================== PROCEDURAL (Dropdown, unique) - FIXED ======================== */
 const PROCEDURE_STEPS=['Crack eggs','Mix flour and eggs','Heat the pan','Pour batter on pan','Flip when ready'];
-const PROC_CONSTRAINTS=[ ['Crack eggs','Mix flour and eggs'], ['Mix flour and eggs','Pour batter on pan'], ['Heat the pan','Pour batter on pan'], ['Pour batter on pan','Flip when ready'] ];
+const PROC_CONSTRAINTS=[ 
+  ['Crack eggs','Mix flour and eggs'], 
+  ['Mix flour and eggs','Pour batter on pan'], 
+  ['Heat the pan','Pour batter on pan'], 
+  ['Pour batter on pan','Flip when ready'] 
+];
 
 function createProceduralTimeline(){
-  const instructions={ type:T('jsPsychHtmlButtonResponse'), stimulus:'<h3>Recipe Ordering / レシピの順序</h3><p>Assign 1–5 to each action. Each number can be used <b>once</b>.</p>', choices:['OK'] };
+  const instructions={ 
+    type:T('jsPsychHtmlButtonResponse'), 
+    stimulus:'<h3>Recipe Ordering / レシピの順序</h3><p>Assign 1–5 to each action. Each number can be used <b>once</b>.</p>', 
+    choices:['OK'] 
+  };
 
-  const steps=PROCEDURE_STEPS.slice(); for(let i=steps.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [steps[i],steps[j]]=[steps[j],steps[i]]; }
+  // Shuffle steps
+  const steps=PROCEDURE_STEPS.slice(); 
+  for(let i=steps.length-1;i>0;i--){ 
+    const j=Math.floor(Math.random()*(i+1)); 
+    [steps[i],steps[j]]=[steps[j],steps[i]]; 
+  }
 
   const formHTML = () => {
     const options = ['','1','2','3','4','5'];
     return `<form id="proc-form" style="text-align:left;max-width:520px;margin:0 auto;">
       ${steps.map((label,i)=>`<div style="display:flex;align-items:center;gap:10px;margin:8px 0;">
         <label style="flex:1;"><b>${label}</b></label>
-        <select data-i="${i}" class="proc-dd" required>
+        <select data-i="${i}" data-label="${label}" class="proc-dd" required>
           ${options.map(o=>`<option value="${o}">${o||'—'}</option>`).join('')}
         </select>
       </div>`).join('')}
@@ -509,15 +550,61 @@ function createProceduralTimeline(){
     </form>`;
   };
 
-  const test={ type:T('jsPsychHtmlButtonResponse'), choices:['Submit / 送信'], stimulus: formHTML, data:{ task:'procedural_knowledge', presented_order: steps }, on_load(){
+  const test={ 
+    type:T('jsPsychHtmlButtonResponse'), 
+    choices:['Submit / 送信'], 
+    stimulus: formHTML, 
+    data:{ task:'procedural_knowledge', presented_order: steps }, 
+    on_load(){
       const dds=[...document.querySelectorAll('.proc-dd')];
-      function refresh(){ const used = new Set(dds.map(dd=>dd.value).filter(Boolean)); dds.forEach(dd=>{ const cur=dd.value; [...dd.options].forEach(opt=>{ if(!opt.value) return; opt.disabled = used.has(opt.value) && opt.value!==cur; }); }); }
-      dds.forEach(dd=> dd.addEventListener('change', refresh)); refresh();
-    }, on_finish(d){
-      const realSelects = document.querySelectorAll('.proc-dd'); const pos2={}; steps.forEach((label,i)=> pos2[label] = realSelects[i].value? Number(realSelects[i].value): null );
-      let tot=0, ok=0, violations=[]; PROC_CONSTRAINTS.forEach(([a,b])=>{ if(pos2[a] && pos2[b]){ tot++; if(pos2[a] < pos2[b]) ok++; else violations.push(a+' -> '+b); } });
-      d.responses_positions = pos2; d.constraints_total=tot; d.constraints_satisfied=ok; d.partial_order_score= (tot>0)? ok/tot : null; d.violations=violations; }
+      function refresh(){ 
+        const used = new Set(dds.map(dd=>dd.value).filter(Boolean)); 
+        dds.forEach(dd=>{ 
+          const cur=dd.value; 
+          [...dd.options].forEach(opt=>{ 
+            if(!opt.value) return; 
+            opt.disabled = used.has(opt.value) && opt.value!==cur; 
+          }); 
+        }); 
+      }
+      dds.forEach(dd=> dd.addEventListener('change', refresh)); 
+      refresh();
+    }, 
+    on_finish(d){
+      // FIX: Safer element access with validation
+      const realSelects = document.querySelectorAll('.proc-dd'); 
+      const pos2={};
+      
+      // Build position map from actual DOM elements
+      realSelects.forEach((select) => {
+        const label = select.dataset.label; // Use data attribute instead of index
+        const value = select.value;
+        if(label) {
+          pos2[label] = value ? Number(value) : null;
+        }
+      });
+      
+      // Calculate constraint satisfaction
+      let tot=0, ok=0, violations=[];
+      PROC_CONSTRAINTS.forEach(([a,b])=>{ 
+        if(pos2[a] && pos2[b]){ 
+          tot++; 
+          if(pos2[a] < pos2[b]) {
+            ok++; 
+          } else {
+            violations.push(a+' -> '+b); 
+          }
+        } 
+      });
+      
+      d.responses_positions = pos2; 
+      d.constraints_total=tot; 
+      d.constraints_satisfied=ok; 
+      d.partial_order_score= (tot>0)? ok/tot : null; 
+      d.violations=violations;
+    }
   };
+  
   return [instructions, test];
 }
 
@@ -544,7 +631,7 @@ async function initializeExperiment(){
       on_trial_start:()=>{ try{ window.scrollTo(0,0);}catch{} },
       on_finish: ()=>{ const all=jsPsych.data.get().values(); console.log('[pretest] complete, trials:', all.length); saveData(all); }
     });
-    window.jsPsych = jsPsych; // <-- lets the HTML loader detect readiness and hide overlay
+    window.jsPsych = jsPsych;
 
     assignedCondition = assignCondition();
     await filterExistingStimuli();
