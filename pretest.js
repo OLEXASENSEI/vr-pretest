@@ -290,7 +290,6 @@ function createFoleyTimeline(){
       const a = new Audio();
       let ready = false;
       let unlocked = false;
-      let playTimeout = null;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
       
@@ -298,7 +297,6 @@ function createFoleyTimeline(){
         answerBtns.forEach(b => {
           b.disabled = lock;
           b.style.opacity = lock ? '.5' : '1';
-          b.style.pointerEvents = lock ? 'none' : 'auto';
         });
       }
       
@@ -306,9 +304,8 @@ function createFoleyTimeline(){
         if (!unlocked) {
           unlocked = true;
           lockAnswers(false);
-          stat.textContent = 'Choose an answer.';
-          btn.textContent = '🔁 Play again';
-          if (playTimeout) clearTimeout(playTimeout);
+          stat.textContent = 'Choose an answer / 答えを選択';
+          console.log('[Foley] Answers unlocked');
         }
       }
       
@@ -321,9 +318,9 @@ function createFoleyTimeline(){
       };
       
       const onErr = () => {
-        stat.textContent = 'Audio not available / 音声なし';
+        console.error('[Foley] Audio load error');
+        stat.textContent = 'Audio failed - you can still answer / 音声失敗 - 回答可能';
         btn.disabled = true;
-        // Unlock answers even if audio fails
         unlockAnswers();
       };
 
@@ -333,8 +330,26 @@ function createFoleyTimeline(){
       a.addEventListener('canplaythrough', onCan, { once: true });
       a.addEventListener('error', onErr, { once: true });
 
-      // Unlock when audio ends
-      a.addEventListener('ended', unlockAnswers, { once: true });
+      // CRITICAL FIX: Remove { once: true } so it fires every time
+      a.addEventListener('ended', () => {
+        console.log('[Foley] Audio ended');
+        unlockAnswers();
+        btn.disabled = false;
+        btn.textContent = '🔁 Play again / 再生';
+      });
+
+      // Also unlock on timeupdate as fallback (fires continuously during playback)
+      let lastTime = 0;
+      a.addEventListener('timeupdate', () => {
+        const current = a.currentTime;
+        const duration = a.duration;
+        
+        // If we're at the end (within 0.1s) or if playback has stopped progressing
+        if (duration && current > 0 && (duration - current < 0.1 || current === lastTime)) {
+          unlockAnswers();
+        }
+        lastTime = current;
+      });
 
       a.preload = 'auto';
       a.src = asset(src);
@@ -346,20 +361,8 @@ function createFoleyTimeline(){
         stat.textContent = 'Playing... / 再生中...';
         btn.disabled = true;
         
-        // Clear any existing timeout
-        if (playTimeout) clearTimeout(playTimeout);
-        
         a.currentTime = 0;
         a.play()
-          .then(() => {
-            // Fallback: unlock after duration + 500ms if 'ended' doesn't fire
-            const duration = a.duration || 3;
-            playTimeout = setTimeout(() => {
-              console.warn('[Foley] Audio ended event did not fire, using timeout fallback');
-              unlockAnswers();
-              btn.disabled = false;
-            }, (duration * 1000) + 500);
-          })
           .catch((err) => {
             console.error('[Foley] Playback error:', err);
             stat.textContent = 'Playback failed - you can still answer';
