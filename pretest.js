@@ -1,4 +1,4 @@
-// 6.2 pretest.js — VR Pre-Test Battery (Pure jsPsych)
+// 6.3 pretest.js — VR Pre-Test Battery (Pure jsPsych)
 // Includes: surveys, digit span (3–8, fwd/back), phoneme discrimination,
 // lexical decision, picture naming (mic), foley, visual iconicity,
 // spatial span (Corsi 3–6), procedural ordering (dropdown w/ uniqueness),
@@ -70,16 +70,135 @@ const visual_iconicity_stimuli=[
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
-function checkAudioExists(url){ return new Promise(resolve=>{ const a=new Audio(); const ok=()=>{cleanup(); resolve(true)}; const bad=()=>{cleanup(); resolve(false)}; const cleanup=()=>{ a.removeEventListener('canplaythrough', ok); a.removeEventListener('error', bad); a.src=''; }; a.addEventListener('canplaythrough', ok, {once:true}); a.addEventListener('error', bad, {once:true}); a.preload='auto'; a.src=asset(url); }); }
-function checkImageExists(url){ return new Promise(resolve=>{ const img=new Image(); img.onload=()=>resolve(true); img.onerror=()=>resolve(false); img.src=asset(url); }); }
+function checkAudioExists(url){ 
+  return new Promise(resolve=>{ 
+    const a=new Audio(); 
+    let resolved = false;
+    
+    const ok=()=>{
+      if(resolved) return;
+      resolved = true;
+      cleanup(); 
+      console.log('[Validation] ✓ Audio OK:', url);
+      resolve(true);
+    }; 
+    
+    const bad=()=>{
+      if(resolved) return;
+      resolved = true;
+      cleanup(); 
+      console.warn('[Validation] ✗ Audio FAILED:', url);
+      resolve(false);
+    }; 
+    
+    const cleanup=()=>{ 
+      a.removeEventListener('canplaythrough', ok); 
+      a.removeEventListener('error', bad); 
+      a.removeEventListener('loadedmetadata', ok);
+      a.src=''; 
+    }; 
+    
+    // Add timeout to catch hanging loads
+    setTimeout(() => {
+      if(!resolved) {
+        console.warn('[Validation] ⏱ Audio TIMEOUT:', url);
+        bad();
+      }
+    }, 5000);
+    
+    a.addEventListener('canplaythrough', ok, {once:true}); 
+    a.addEventListener('loadedmetadata', ok, {once:true}); 
+    a.addEventListener('error', bad, {once:true}); 
+    a.preload='auto'; 
+    a.src=asset(url); 
+  }); 
+}
+
+function checkImageExists(url){ 
+  return new Promise(resolve=>{ 
+    const img=new Image(); 
+    let resolved = false;
+    
+    const ok = () => {
+      if(resolved) return;
+      resolved = true;
+      console.log('[Validation] ✓ Image OK:', url);
+      resolve(true);
+    };
+    
+    const bad = () => {
+      if(resolved) return;
+      resolved = true;
+      console.warn('[Validation] ✗ Image FAILED:', url);
+      resolve(false);
+    };
+    
+    setTimeout(() => {
+      if(!resolved) {
+        console.warn('[Validation] ⏱ Image TIMEOUT:', url);
+        bad();
+      }
+    }, 5000);
+    
+    img.onload=ok; 
+    img.onerror=bad; 
+    img.src=asset(url); 
+  }); 
+}
 
 let PRELOAD_AUDIO=[]; let PRELOAD_IMAGES=[]; let FILTERED_STIMULI={phoneme:[], foley:[], picture:[], visual:[]};
 async function filterExistingStimuli(){
-  const phoneme=[]; for(const s of phoneme_discrimination_stimuli){ const ok1=await checkAudioExists(s.audio1); const ok2=await checkAudioExists(s.audio2); if(ok1&&ok2){ phoneme.push(s); PRELOAD_AUDIO.push(s.audio1,s.audio2);} }
-  const foley=[]; for(const s of foley_stimuli){ const ok=await checkAudioExists(s.audio); if(ok){ foley.push(s); PRELOAD_AUDIO.push(s.audio);} }
-  const picture=[]; for(const s of picture_naming_stimuli){ const ok=await checkImageExists(s.image); if(ok){ picture.push(s); PRELOAD_IMAGES.push(s.image);} }
-  const visual=[]; for(const s of visual_iconicity_stimuli){ const ok=await checkImageExists(s.shape); if(ok){ visual.push(s); PRELOAD_IMAGES.push(s.shape);} }
+  console.log('[Validation] Starting asset validation...');
+  
+  const phoneme=[]; 
+  console.log('[Validation] Checking phoneme stimuli...');
+  for(const s of phoneme_discrimination_stimuli){ 
+    const ok1=await checkAudioExists(s.audio1); 
+    const ok2=await checkAudioExists(s.audio2); 
+    if(ok1&&ok2){ 
+      phoneme.push(s); 
+      PRELOAD_AUDIO.push(s.audio1,s.audio2);
+    } 
+  }
+  console.log(`[Validation] Phoneme: ${phoneme.length}/${phoneme_discrimination_stimuli.length} trials valid`);
+  
+  const foley=[]; 
+  console.log('[Validation] Checking foley stimuli...');
+  for(const s of foley_stimuli){ 
+    const ok=await checkAudioExists(s.audio); 
+    if(ok){ 
+      foley.push(s); 
+      PRELOAD_AUDIO.push(s.audio);
+    } else {
+      console.warn('[Validation] Skipping foley trial with options:', s.options);
+    }
+  }
+  console.log(`[Validation] Foley: ${foley.length}/${foley_stimuli.length} trials valid`);
+  
+  const picture=[]; 
+  console.log('[Validation] Checking picture stimuli...');
+  for(const s of picture_naming_stimuli){ 
+    const ok=await checkImageExists(s.image); 
+    if(ok){ 
+      picture.push(s); 
+      PRELOAD_IMAGES.push(s.image);
+    } 
+  }
+  console.log(`[Validation] Picture: ${picture.length}/${picture_naming_stimuli.length} trials valid`);
+  
+  const visual=[]; 
+  console.log('[Validation] Checking visual stimuli...');
+  for(const s of visual_iconicity_stimuli){ 
+    const ok=await checkImageExists(s.shape); 
+    if(ok){ 
+      visual.push(s); 
+      PRELOAD_IMAGES.push(s.shape);
+    } 
+  }
+  console.log(`[Validation] Visual: ${visual.length}/${visual_iconicity_stimuli.length} trials valid`);
+  
   FILTERED_STIMULI={phoneme,foley,picture,visual};
+  console.log('[Validation] Asset validation complete');
 }
 
 /* ======================== SURVEYS ======================== */
@@ -286,12 +405,16 @@ function createFoleyTimeline(){
       const btn  = document.getElementById('play');
       const stat = document.getElementById('status');
       const a    = new Audio();
+      
+      // FORCE audio to not loop
       a.loop = false;
+      a.autoplay = false;
       a.preload = 'auto';
 
       let ready = false;
       let unlocked = false;
       let playing = false;
+      let hasLoaded = false;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
       function lockAnswers(lock = true) {
@@ -305,47 +428,70 @@ function createFoleyTimeline(){
           unlocked = true;
           lockAnswers(false);
           stat.textContent = 'Choose an answer / 答えを選択';
+          console.log('[Foley] Answers unlocked');
         }
       }
       lockAnswers(true);
 
       const onCan = () => {
+        if(hasLoaded) return; // Prevent duplicate calls
+        hasLoaded = true;
         ready = true;
         stat.textContent = 'Ready / 準備完了';
         btn.disabled = false;
+        console.log('[Foley] Audio ready:', src);
       };
-      const onErr = () => {
-        console.error('[Foley] Audio load error');
+      
+      const onErr = (e) => {
+        console.error('[Foley] Audio error for:', src, e);
         stat.textContent = 'Audio failed - you can still answer / 音声失敗 - 回答可能';
         btn.disabled = true;
         unlockAnswers();
       };
 
       const src = jsPsych.timelineVariable('audio');
-      if (!src) { onErr(); return; }
+      if (!src) { 
+        console.error('[Foley] No audio source provided');
+        onErr(new Error('No source')); 
+        return; 
+      }
 
+      // Listen for multiple load events (different browsers prefer different ones)
       a.addEventListener('canplaythrough', onCan, { once: true });
+      a.addEventListener('loadeddata', onCan, { once: true });
       a.addEventListener('error', onErr, { once: true });
+      
+      // CRITICAL: Handle ended event to stop playback
       a.addEventListener('ended', () => {
+        console.log('[Foley] Audio ended');
         playing = false;
+        a.pause(); // Extra safety: force pause
+        a.currentTime = 0; // Reset to beginning
         unlockAnswers();
         btn.disabled = false;
         btn.textContent = '🔁 Play again / 再生';
-      });
+      }, { once: false }); // NOT once, so it works for replay
 
       a.src = asset(src);
       btn.disabled = true;
 
+      // Play button handler
       btn.addEventListener('click', (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (!ready || playing) return;
+        if (!ready || playing) {
+          console.log('[Foley] Click ignored - ready:', ready, 'playing:', playing);
+          return;
+        }
 
+        console.log('[Foley] Playing audio:', src);
         stat.textContent = 'Playing... / 再生中...';
         btn.disabled = true;
         playing = true;
 
+        // Reset and play
         a.currentTime = 0;
+        a.loop = false; // Double-check loop is off
         a.play().catch((err) => {
           console.error('[Foley] Playback error:', err);
           stat.textContent = 'Playback failed - you can still answer';
