@@ -265,7 +265,8 @@ function createFoleyTimeline(){
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () =>
       '<div>' +
-        '<button id="play" class="jspsych-btn">Play / 再生</button>' +
+        // NOTE: not using .jspsych-btn here to avoid submitting the trial
+        '<button id="play" class="play-btn" type="button">Play / 再生</button>' +
         '<p id="status" class="msg">Listen, then choose.</p>' +
       '</div>',
     choices: () => {
@@ -275,7 +276,8 @@ function createFoleyTimeline(){
     button_html: () => {
       const o = jsPsych.timelineVariable('options');
       const safe = Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
-      return safe.map(() => '<button class="jspsych-btn answer-btn">%choice%</button>');
+      // These *are* jspsych response buttons (as intended)
+      return safe.map(() => '<button class="jspsych-btn answer-btn" type="button">%choice%</button>');
     },
     post_trial_gap: 250,
     data: () => ({
@@ -285,30 +287,30 @@ function createFoleyTimeline(){
       audio_file: jsPsych.timelineVariable('audio')
     }),
     on_load: function () {
-      const btn = document.getElementById('play');
+      const btn  = document.getElementById('play');
       const stat = document.getElementById('status');
-      const a = new Audio();
+      const a    = new Audio();
+      a.loop = false;               // be explicit
+      a.preload = 'auto';
+
       let ready = false;
       let unlocked = false;
+      let playing = false;
 
       const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
-      
       function lockAnswers(lock = true) {
         answerBtns.forEach(b => {
           b.disabled = lock;
           b.style.opacity = lock ? '.5' : '1';
         });
       }
-      
       function unlockAnswers() {
         if (!unlocked) {
           unlocked = true;
           lockAnswers(false);
           stat.textContent = 'Choose an answer / 答えを選択';
-          console.log('[Foley] Answers unlocked');
         }
       }
-      
       lockAnswers(true);
 
       const onCan = () => {
@@ -316,7 +318,6 @@ function createFoleyTimeline(){
         stat.textContent = 'Ready / 準備完了';
         btn.disabled = false;
       };
-      
       const onErr = () => {
         console.error('[Foley] Audio load error');
         stat.textContent = 'Audio failed - you can still answer / 音声失敗 - 回答可能';
@@ -329,49 +330,49 @@ function createFoleyTimeline(){
 
       a.addEventListener('canplaythrough', onCan, { once: true });
       a.addEventListener('error', onErr, { once: true });
-
-      // CRITICAL FIX: Remove { once: true } so it fires every time
       a.addEventListener('ended', () => {
-        console.log('[Foley] Audio ended');
+        playing = false;
         unlockAnswers();
         btn.disabled = false;
         btn.textContent = '🔁 Play again / 再生';
       });
 
-      // Also unlock on timeupdate as fallback (fires continuously during playback)
-      let lastTime = 0;
-      a.addEventListener('timeupdate', () => {
-        const current = a.currentTime;
-        const duration = a.duration;
-        
-        // If we're at the end (within 0.1s) or if playback has stopped progressing
-        if (duration && current > 0 && (duration - current < 0.1 || current === lastTime)) {
-          unlockAnswers();
-        }
-        lastTime = current;
-      });
-
-      a.preload = 'auto';
       a.src = asset(src);
       btn.disabled = true;
 
-      btn.addEventListener('click', () => {
-        if (!ready) return;
-        
+      // Prevent this button from bubbling to any jsPsych handlers
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (!ready || playing) return;
+
         stat.textContent = 'Playing... / 再生中...';
         btn.disabled = true;
-        
+        playing = true;
+
         a.currentTime = 0;
-        a.play()
-          .catch((err) => {
-            console.error('[Foley] Playback error:', err);
-            stat.textContent = 'Playback failed - you can still answer';
-            unlockAnswers();
-            btn.disabled = false;
-          });
+        a.play().catch((err) => {
+          console.error('[Foley] Playback error:', err);
+          stat.textContent = 'Playback failed - you can still answer';
+          playing = false;
+          unlockAnswers();
+          btn.disabled = false;
+        });
       });
+
+      // Save a ref for cleanup on finish
+      this._audioRef = a;
     },
-    on_finish: d => {
+    on_finish: function(d){
+      // Cleanup audio to avoid stray playback/listeners
+      const a = this._audioRef;
+      try {
+        if (a) {
+          a.pause();
+          a.src = '';
+          a.load();
+        }
+      } catch {}
       d.correct = (d.response === d.correct_answer);
     }
   };
