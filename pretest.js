@@ -43,7 +43,7 @@ async function saveData(data){
 const phoneme_discrimination_stimuli=[
   { audio1:'sounds/bowl.mp3',   audio2:'sounds/ball.mp3',   correct:'different', contrast:'l_r' },
   { audio1:'sounds/flip.mp3',   audio2:'sounds/frip.mp3',   correct:'different', contrast:'l_r' },
-  { audio1:'sounds/pan2.mp3',   audio2:'sounds/pan2.mp3',   correct:'same',      contrast:'control' }, // Use different file to avoid identical detection
+  { audio1:'sounds/pan.mp3',    audio2:'sounds/pan.mp3',    correct:'same',      contrast:'control' }, // Back to pan.mp3
   { audio1:'sounds/batter.mp3', audio2:'sounds/better.mp3', correct:'different', contrast:'vowel' },
 ];
 const foley_stimuli=[
@@ -226,49 +226,75 @@ async function filterExistingStimuli(){
 }
 
 /* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
+/* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
 function createParticipantInfo(){
   return {
-    type: T('jsPsychSurveyHtmlForm'),
-    preamble: '<h2>Participant Info / 参加者情報</h2><p>Please enter your information below. / 以下の情報を入力してください。</p>',
-    html: `
-      <div style="text-align: left; max-width: 500px; margin: auto;">
-        <p><b>Participant ID / 参加者ID</b><br>
-        <input name="participant_id" type="text" required placeholder="Enter ID"></p>
-        
-        <p><b>Age / 年齢</b><br>
-        <input name="age" type="number" min="18" max="100" required placeholder="e.g., 25"></p>
-        
-        <p><b>Native Language / 母語</b><br>
-        <select name="native_language" required>
-          <option value="">--Select--</option>
-          <option value="Japanese">Japanese / 日本語</option>
-          <option value="English">English / 英語</option>
-          <option value="Chinese">Chinese / 中国語</option>
-          <option value="Korean">Korean / 韓国語</option>
-          <option value="Other">Other / その他</option>
-        </select></p>
-        
-        <p><b>English Learning Years / 英語学習年数</b><br>
-        <input name="english_years" type="number" min="0" max="50" required placeholder="e.g., 5"></p>
-        
-        <p><b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b><br>
-        <input name="english_proficiency" type="text" placeholder="e.g., TOEIC 600, EIKEN Pre-1, N/A"></p>
-        
-        <p><b>VR Experience / VR経験</b><br>
-        <select name="vr_experience" required>
-          <option value="">--Select--</option>
-          <option value="None">None / なし</option>
-          <option value="1-2 times">1-2 times / 1-2回</option>
-          <option value="Several">Several / 数回</option>
-          <option value="Regular">Regular / 定期的</option>
-        </select></p>
-      </div>
-    `,
+    type: T('jsPsychSurveyText'),
+    preamble: `
+      <h2>Participant Info / 参加者情報</h2>
+      <p>Please enter your information below. / 以下の情報を入力してください。</p>
+      <div style="background-color:#fff3cd;padding:15px;border-radius:8px;margin-bottom:20px;">
+        <p><b>Format Guidelines / 記入形式:</b></p>
+        <ul style="text-align:left;">
+          <li>Age: Enter number only (e.g., 25)</li>
+          <li>English Years: Enter number only (e.g., 5)</li>
+          <li>Native Language: Japanese, English, Chinese, Korean, or Other</li>
+          <li>VR Experience: None, 1-2 times, Several, or Regular</li>
+        </ul>
+      </div>`,
+    questions:[
+      { 
+        prompt:'<b>Participant ID</b> / 参加者ID', 
+        name:'participant_id', 
+        required:true, 
+        placeholder:'Enter ID' 
+      },
+      { 
+        prompt:'<b>Age / 年齢</b> (number only)', 
+        name:'age', 
+        required:true,
+        placeholder:'e.g., 25'
+      },
+      { 
+        prompt:'<b>Native Language / 母語</b> (Japanese/English/Chinese/Korean/Other)', 
+        name:'native_language', 
+        required:true,
+        placeholder:'e.g., Japanese'
+      },
+      { 
+        prompt:'<b>English Learning Years / 英語学習年数</b> (number only)', 
+        name:'english_years', 
+        required:true,
+        placeholder:'e.g., 5'
+      },
+      { 
+        prompt:'<b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b>', 
+        name:'english_proficiency', 
+        required:false, 
+        placeholder:'e.g., TOEIC 600, EIKEN Pre-1, N/A' 
+      },
+      { 
+        prompt:'<b>VR Experience / VR経験</b> (None/1-2 times/Several/Regular)', 
+        name:'vr_experience', 
+        required:true,
+        placeholder:'e.g., None'
+      }
+    ],
     button_label: 'Continue / 続行',
     data: { task:'participant_info' },
     on_finish: (data)=>{ 
       const resp=asObject(data.response||data.responses); 
-      currentPID_value=resp.participant_id||'unknown'; 
+      currentPID_value=resp.participant_id||'unknown';
+      
+      // Validate age and years are numbers
+      const age = parseInt(resp.age);
+      const years = parseInt(resp.english_years);
+      if (isNaN(age) || age < 18 || age > 100) {
+        console.warn('[Validation] Invalid age:', resp.age);
+      }
+      if (isNaN(years) || years < 0 || years > 50) {
+        console.warn('[Validation] Invalid English years:', resp.english_years);
+      }
     }
   };
 }
