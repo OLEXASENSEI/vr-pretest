@@ -227,73 +227,112 @@ async function filterExistingStimuli(){
 
 /* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
 /* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
+/* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
 function createParticipantInfo(){
   return {
-    type: T('jsPsychSurveyText'),
-    preamble: `
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
       <h2>Participant Info / 参加者情報</h2>
       <p>Please enter your information below. / 以下の情報を入力してください。</p>
-      <div style="background-color:#fff3cd;padding:15px;border-radius:8px;margin-bottom:20px;">
-        <p><b>Format Guidelines / 記入形式:</b></p>
-        <ul style="text-align:left;">
-          <li>Age: Enter number only (e.g., 25)</li>
-          <li>English Years: Enter number only (e.g., 5)</li>
-          <li>Native Language: Japanese, English, Chinese, Korean, or Other</li>
-          <li>VR Experience: None, 1-2 times, Several, or Regular</li>
-        </ul>
-      </div>`,
-    questions:[
-      { 
-        prompt:'<b>Participant ID</b> / 参加者ID', 
-        name:'participant_id', 
-        required:true, 
-        placeholder:'Enter ID' 
-      },
-      { 
-        prompt:'<b>Age / 年齢</b> (number only)', 
-        name:'age', 
-        required:true,
-        placeholder:'e.g., 25'
-      },
-      { 
-        prompt:'<b>Native Language / 母語</b> (Japanese/English/Chinese/Korean/Other)', 
-        name:'native_language', 
-        required:true,
-        placeholder:'e.g., Japanese'
-      },
-      { 
-        prompt:'<b>English Learning Years / 英語学習年数</b> (number only)', 
-        name:'english_years', 
-        required:true,
-        placeholder:'e.g., 5'
-      },
-      { 
-        prompt:'<b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b>', 
-        name:'english_proficiency', 
-        required:false, 
-        placeholder:'e.g., TOEIC 600, EIKEN Pre-1, N/A' 
-      },
-      { 
-        prompt:'<b>VR Experience / VR経験</b> (None/1-2 times/Several/Regular)', 
-        name:'vr_experience', 
-        required:true,
-        placeholder:'e.g., None'
-      }
-    ],
-    button_label: 'Continue / 続行',
-    data: { task:'participant_info' },
-    on_finish: (data)=>{ 
-      const resp=asObject(data.response||data.responses); 
-      currentPID_value=resp.participant_id||'unknown';
       
-      // Validate age and years are numbers
-      const age = parseInt(resp.age);
-      const years = parseInt(resp.english_years);
-      if (isNaN(age) || age < 18 || age > 100) {
-        console.warn('[Validation] Invalid age:', resp.age);
-      }
-      if (isNaN(years) || years < 0 || years > 50) {
-        console.warn('[Validation] Invalid English years:', resp.english_years);
+      <form id="participant-form" style="text-align: left; max-width: 500px; margin: auto;">
+        <div style="margin-bottom: 15px;">
+          <label><b>Participant ID / 参加者ID</b></label><br>
+          <input name="participant_id" id="pid" type="text" required placeholder="Enter ID" style="width:100%;padding:5px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label><b>Age / 年齢</b></label><br>
+          <input name="age" id="age" type="number" min="18" max="100" required placeholder="e.g., 25" style="width:100%;padding:5px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label><b>Native Language / 母語</b></label><br>
+          <select name="native_language" id="native_lang" required style="width:100%;padding:5px;">
+            <option value="">--Select / 選択--</option>
+            <option value="Japanese">Japanese / 日本語</option>
+            <option value="English">English / 英語</option>
+            <option value="Chinese">Chinese / 中国語</option>
+            <option value="Korean">Korean / 韓国語</option>
+            <option value="Other">Other / その他</option>
+          </select>
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label><b>English Learning Years / 英語学習年数</b></label><br>
+          <input name="english_years" id="eng_years" type="number" min="0" max="50" required placeholder="e.g., 5" style="width:100%;padding:5px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label><b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b></label><br>
+          <input name="english_proficiency" id="prof" type="text" placeholder="e.g., TOEIC 600, EIKEN Pre-1, N/A" style="width:100%;padding:5px;">
+        </div>
+        
+        <div style="margin-bottom: 15px;">
+          <label><b>VR Experience / VR経験</b></label><br>
+          <select name="vr_experience" id="vr_exp" required style="width:100%;padding:5px;">
+            <option value="">--Select / 選択--</option>
+            <option value="None">None / なし</option>
+            <option value="1-2 times">1-2 times / 1-2回</option>
+            <option value="Several">Several / 数回</option>
+            <option value="Regular">Regular / 定期的</option>
+          </select>
+        </div>
+      </form>
+      
+      <div id="form-error" style="color:red;margin-top:10px;display:none;">
+        Please fill in all required fields correctly. / すべての必須項目を正しく入力してください。
+      </div>
+    `,
+    choices: ['Continue / 続行'],
+    data: { task:'participant_info' },
+    on_load: function() {
+      // Add form validation on button click
+      const btn = document.querySelector('.jspsych-btn');
+      const originalOnClick = btn.onclick;
+      
+      btn.onclick = function(e) {
+        const form = document.getElementById('participant-form');
+        const errorDiv = document.getElementById('form-error');
+        
+        // Check HTML5 validation
+        if (!form.checkValidity()) {
+          e.preventDefault();
+          e.stopPropagation();
+          errorDiv.style.display = 'block';
+          form.reportValidity();
+          return false;
+        }
+        
+        errorDiv.style.display = 'none';
+        
+        // Collect form data for jsPsych
+        const formData = new FormData(form);
+        const responses = {};
+        for (let [key, value] of formData.entries()) {
+          responses[key] = value;
+        }
+        
+        // Store in trial data
+        jsPsych.data.get().last(1).values()[0].responses = responses;
+        
+        // Continue with original button action
+        if (originalOnClick) {
+          return originalOnClick.call(this, e);
+        }
+      };
+    },
+    on_finish: (data) => {
+      // Extract responses from the form
+      const form = document.getElementById('participant-form');
+      if (form) {
+        const formData = new FormData(form);
+        const responses = {};
+        for (let [key, value] of formData.entries()) {
+          responses[key] = value;
+        }
+        data.responses = responses;
+        currentPID_value = responses.participant_id || 'unknown';
       }
     }
   };
