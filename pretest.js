@@ -1,7 +1,7 @@
-// 6.2 pretest.js — VR Pre-Test Battery (Pure jsPsych) — CORRECTED VERSION
+// 6.3 pretest.js — VR Pre-Test Battery (Pure jsPsych) — CORRECTED VERSION WITH PRACTICE
 // ~20 minutes duration with critical fixes based on user feedback
 // Includes: surveys with input validation, digit span, phoneme discrimination,
-// lexical decision with A/L keys, 4AFC receptive vocab, picture naming,
+// lexical decision with A/L keys, 4AFC receptive vocab, picture naming WITH PRACTICE,
 // foley with audio fix, visual iconicity, spatial span, procedural ordering,
 // ideophone mapping, and robust save.
 
@@ -221,12 +221,18 @@ async function filterExistingStimuli(){
   }
   console.log(`[Validation] Receptive: ${receptive.length}/${receptive_vocab_baseline_stimuli.length} trials valid`);
   
+  // Check for practice image
+  const practiceImageOk = await checkImageExists('img/park_scene.jpg');
+  if(practiceImageOk) {
+    PRELOAD_IMAGES.push('img/park_scene.jpg');
+  } else {
+    console.warn('[Validation] Practice image park_scene.jpg not found - using fallback');
+  }
+  
   FILTERED_STIMULI={phoneme,foley,picture,visual,receptive};
   console.log('[Validation] Asset validation complete');
 }
 
-/* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
-/* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
 /* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
 function createParticipantInfo(){
   return {
@@ -729,7 +735,7 @@ function create4AFCReceptiveBaseline(){
   ];
 }
 
-/* ======================== PICTURE NAMING WITH MIC ERROR HANDLING ======================== */
+/* ======================== PICTURE NAMING WITH MIC ERROR HANDLING & PRACTICE ======================== */
 function createNamingTimeline(){
   const intro={ 
     type:T('jsPsychHtmlButtonResponse'), 
@@ -740,7 +746,7 @@ function createNamingTimeline(){
       <p style="color:#666;">You will have <b>4 seconds</b> per picture. / 各画像<b>4秒間</b>です。</p>
       <p style="color:#666;">Pictures available / 利用可能な画像: ${FILTERED_STIMULI.picture?.length||0}</p>
     </div>`, 
-    choices:['Begin / 開始'], 
+    choices:['Continue / 続行'], 
     post_trial_gap:400 
   };
   
@@ -787,6 +793,94 @@ function createNamingTimeline(){
     } 
   } : null;
 
+  // PRACTICE SECTION
+  const practice_intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <div style="max-width:600px;margin:0 auto;">
+        <h3>Practice Recording / 録音練習</h3>
+        <p>Let's practice with an example image that's unrelated to cooking.</p>
+        <p>料理とは関係のない画像で練習しましょう。</p>
+        
+        <div style="background:#e3f2fd;padding:15px;border-radius:8px;margin-top:20px;">
+          <p><b>What to describe in 4 seconds:</b></p>
+          <ul style="text-align:left;">
+            <li>Objects you see / 見える物体</li>
+            <li>Actions happening / 起きている動作</li>
+            <li>Sounds you imagine / 想像される音</li>
+            <li>Smells you imagine / 想像される匂い</li>
+          </ul>
+        </div>
+        
+        <p style="margin-top:20px;"><b>Example:</b> "I see trees and grass. People walking. Birds chirping sounds. Fresh air smell."</p>
+      </div>`,
+    choices: ['Try Practice / 練習を試す'],
+    data: { task: 'picture_naming_practice_intro' }
+  };
+
+  // Use a fallback image if park_scene.jpg doesn't exist
+  const practiceImg = PRELOAD_IMAGES.includes('img/park_scene.jpg') ? 'img/park_scene.jpg' : 'img/example_scene.jpg';
+  
+  const practice_prepare = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <div>
+        <div style="background:#f0f4f8;padding:20px;border-radius:10px;max-width:400px;margin:0 auto 20px;">
+          <p style="margin:0;font-size:18px;color:#333;text-align:center;">
+            <b>Practice: Describe this scene</b><br>
+            <span style="font-size:14px;">練習：この場面を説明してください</span>
+          </p>
+        </div>
+        ${practiceImg ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>` : 
+          '<div style="width:350px;height:250px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><p>Park Scene</p></div>'}
+        <div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;">
+          <p><b>Remember:</b> Objects, Actions, Sounds, Smells (4 seconds)</p>
+        </div>
+        <p>Click when ready. / 準備ができたらクリック</p>
+      </div>`,
+    choices: ['Start Practice Recording / 練習録音開始'],
+    data: { task: 'picture_naming_practice_prepare' }
+  };
+
+  const practice_record = have('jsPsychHtmlAudioResponse') ? {
+    type: T('jsPsychHtmlAudioResponse'),
+    stimulus: `
+      <div>
+        ${practiceImg ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>` : 
+          '<div style="width:350px;height:250px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><p>Park Scene</p></div>'}
+        <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
+          <p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 PRACTICE Recording... / 練習録音中...</p>
+          <p style="margin:8px 0;font-size:14px;">4 seconds to describe!</p>
+        </div>
+      </div>`,
+    recording_duration: 4000,
+    show_done_button: false,
+    allow_playback: true,
+    data: { task: 'picture_naming_practice_record' }
+  } : null;
+
+  const practice_feedback = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <div style="max-width:600px;margin:0 auto;">
+        <h3 style="color:green">Practice Complete! / 練習完了！</h3>
+        <p>Good! Now you'll do the same with cooking-related pictures.</p>
+        <p>よくできました！次は料理関連の画像で同じことをします。</p>
+        
+        <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin-top:20px;">
+          <p><b>Remember for the real task:</b></p>
+          <ul style="text-align:left;">
+            <li>You have only 4 seconds / 4秒間のみ</li>
+            <li>Describe what you see and imagine / 見えるものと想像するものを説明</li>
+            <li>Speak clearly in English / 英語ではっきりと話す</li>
+          </ul>
+        </div>
+      </div>`,
+    choices: ['Begin Real Task / 本番開始'],
+    data: { task: 'picture_naming_practice_complete' }
+  };
+
+  // MAIN TASK
   const prepare={ 
     type:T('jsPsychHtmlButtonResponse'), 
     stimulus:()=>{ 
@@ -843,7 +937,15 @@ function createNamingTimeline(){
   const tv = FILTERED_STIMULI.picture.map(s=>({...s, imageUrl: asset(s.image)}));
   const tl=[intro]; 
   if(mic_request) tl.push(mic_request); 
-  if(mic_check) tl.push(mic_check); 
+  if(mic_check) tl.push(mic_check);
+  
+  // Add practice sequence
+  tl.push(practice_intro);
+  tl.push(practice_prepare);
+  if(practice_record) tl.push(practice_record);
+  tl.push(practice_feedback);
+  
+  // Main trials
   tl.push({ timeline: [prepare, record].filter(Boolean), timeline_variables: tv, randomize_order: true }); 
   return tl;
 }
@@ -1437,7 +1539,7 @@ async function initializeExperiment(){
       timeline.push(...create4AFCReceptiveBaseline());
     }
 
-    // Picture naming with microphone error handling
+    // Picture naming with microphone error handling AND PRACTICE
     if((FILTERED_STIMULI.picture?.length||0)>0 && have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse')){
       timeline.push(...createNamingTimeline());
     }
