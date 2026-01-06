@@ -735,6 +735,168 @@ function create4AFCReceptiveBaseline(){
   ];
 }
 
+/* ======================== CSS STYLES ======================== */
+function addCustomStyles() {
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .corsi-grid {
+      display: inline-grid;
+      grid-template-columns: repeat(3, 80px);
+      grid-gap: 10px;
+      padding: 20px;
+      background: #f5f5f5;
+      border-radius: 10px;
+    }
+    .corsi-cell {
+      width: 80px;
+      height: 80px;
+      background: white;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.3s;
+    }
+    .corsi-cell.playback {
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+    .corsi-cell.lit {
+      background: #4CAF50;
+      border-color: #45a049;
+      transform: scale(1.1);
+    }
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #333;
+      color: white;
+      padding: 15px 20px;
+      border-radius: 5px;
+      z-index: 1000;
+    }
+    .answer-btn {
+      margin: 0 10px;
+    }
+    .mic-error-msg {
+      background-color: #ffebee;
+      padding: 20px;
+      border-radius: 8px;
+      margin-top: 20px;
+    }
+  `;
+  document.head.appendChild(style);
+}
+
+/* ======================== MICROPHONE SETUP GATE (with level meter) ======================== */
+function buildMicSetupGate({ required = true } = {}) {
+  let streamRef = null;
+
+  const gate = {
+    type: T('jsPsychHtmlButtonResponse'),
+    choices: ['Continue / 続行', required ? 'Use Text Only / 文字で続行' : 'Skip'],
+    button_html: [
+      '<button class="jspsych-btn" id="mic-continue" disabled>%choice%</button>',
+      '<button class="jspsych-btn" id="mic-textonly">%choice%</button>'
+    ],
+    stimulus: `
+      <div style="max-width:720px;margin:0 auto;text-align:center;line-height:1.6">
+        <h2>Microphone Setup / マイクの設定</h2>
+        <p>Click <b>Enable Microphone</b> and allow access. Speak to test the level meter.</p>
+        <p><b>マイクを有効化</b>を押して許可してください。話してテストしてください。</p>
+
+        <div style="margin:16px 0;">
+          <button class="jspsych-btn" id="mic-enable">🎙️ Enable Microphone / マイクを有効化</button>
+        </div>
+
+        <div id="mic-status" style="margin:10px 0;color:#666;">Status: not initialized</div>
+
+        <div style="margin:10px auto;width:340px;height:14px;border-radius:7px;background:#eee;overflow:hidden;">
+          <div id="mic-level" style="height:100%;width:0%;background:#4caf50;transition:width .08s linear;"></div>
+        </div>
+
+        <div style="background:#f8f9fa;border:1px solid #ddd;border-radius:8px;padding:12px;text-align:left;margin-top:12px">
+          <b>Troubleshooting</b>
+          <ul style="margin:8px 0 0 18px">
+            <li>Use <b>HTTPS</b> page (required for mic)</li>
+            <li>If embedded in an <code>&lt;iframe&gt;</code>, add <code>allow="microphone *; camera *; autoplay *"</code></li>
+            <li>On iOS/Safari: tap the page first (user gesture), then enable</li>
+            <li>If blocked, check site permissions in the address bar</li>
+          </ul>
+        </div>
+      </div>
+    `,
+    data: { task: 'mic_gate' },
+    on_load: () => {
+      const enableBtn  = document.getElementById('mic-enable');
+      const contBtn    = document.getElementById('mic-continue');
+      const textOnly   = document.getElementById('mic-textonly');
+      const statusEl   = document.getElementById('mic-status');
+      const levelEl    = document.getElementById('mic-level');
+
+      async function startStream() {
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true }
+          });
+          streamRef = stream;
+
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const source = ctx.createMediaStreamSource(stream);
+          const analyser = ctx.createAnalyser();
+          analyser.fftSize = 2048;
+          source.connect(analyser);
+
+          const data = new Uint8Array(analyser.fftSize);
+          function tick() {
+            analyser.getByteTimeDomainData(data);
+            let sum = 0;
+            for (let i = 0; i < data.length; i++) {
+              const v = (data[i] - 128) / 128;
+              sum += v * v;
+            }
+            const rms = Math.sqrt(sum / data.length);
+            const pct = Math.min(100, Math.max(0, Math.round(rms * 220)));
+            levelEl.style.width = pct + '%';
+            requestAnimationFrame(tick);
+          }
+          tick();
+
+          statusEl.textContent = 'Status: microphone enabled ✔';
+          contBtn.disabled = false;
+          window.__mic_ok = true;
+        } catch (err) {
+          console.error('[mic] getUserMedia error:', err);
+          statusEl.textContent = 'Status: permission denied or device unavailable ✖';
+          contBtn.disabled = true;
+          window.__mic_ok = false;
+        }
+      }
+
+      enableBtn.addEventListener('click', startStream);
+      textOnly.addEventListener('click', () => { window.__mic_ok = false; });
+
+      window.addEventListener('beforeunload', () => {
+        try { streamRef?.getTracks()?.forEach(t => t.stop()); } catch {}
+      });
+    },
+    on_finish: () => {
+      microphoneAvailable = !!window.__mic_ok;
+    }
+  };
+
+  return {
+    timeline: [gate],
+    loop_function: () => {
+      if (!required) return false;
+      const last = jsPsych.data.get().last(1).values()[0] || {};
+      const pressedIndex = last.button_pressed; // "0" Continue, "1" Text-only
+      if (microphoneAvailable || pressedIndex === 1) return false;
+      return true;
+    }
+  };
+}
+
 /* ======================== PICTURE NAMING WITH MIC ERROR HANDLING & PRACTICE ======================== */
 function createNamingTimeline(){
   const intro={ 
@@ -750,7 +912,7 @@ function createNamingTimeline(){
     post_trial_gap:400 
   };
   
-  // Enhanced microphone permission handling
+  // Enhanced microphone permission handling (backup - the gate should have already set this)
   const mic_request = have('jsPsychInitializeMicrophone') ? { 
     type:T('jsPsychInitializeMicrophone'), 
     data:{ task:'microphone_initialization'},
@@ -1402,53 +1564,6 @@ function createIdeophoneTest(){
   return [intro, questions];
 }
 
-/* ======================== CSS STYLES ======================== */
-function addCustomStyles() {
-  const style = document.createElement('style');
-  style.innerHTML = `
-    .corsi-grid {
-      display: inline-grid;
-      grid-template-columns: repeat(3, 80px);
-      grid-gap: 10px;
-      padding: 20px;
-      background: #f5f5f5;
-      border-radius: 10px;
-    }
-    .corsi-cell {
-      width: 80px;
-      height: 80px;
-      background: white;
-      border: 2px solid #ccc;
-      border-radius: 8px;
-      cursor: pointer;
-      transition: all 0.3s;
-    }
-    .corsi-cell.playback {
-      cursor: not-allowed;
-      opacity: 0.7;
-    }
-    .corsi-cell.lit {
-      background: #4CAF50;
-      border-color: #45a049;
-      transform: scale(1.1);
-    }
-    .toast {
-      position: fixed;
-      bottom: 20px;
-      right: 20px;
-      background: #333;
-      color: white;
-      padding: 15px 20px;
-      border-radius: 5px;
-      z-index: 1000;
-    }
-    .answer-btn {
-      margin: 0 10px;
-    }
-  `;
-  document.head.appendChild(style);
-}
-
 /* ======================== HARDEN BUTTONS ======================== */
 function hardenButtons(nodes){ 
   for(const n of nodes){ 
@@ -1513,6 +1628,9 @@ async function initializeExperiment(){
 
     // Surveys with input validation
     timeline.push(createParticipantInfo());
+
+    // Microphone Setup Gate (with level meter) - Added before any audio tasks
+    timeline.push(buildMicSetupGate({ required: false }));
 
     // Digit span (3–6, forward & backward)
     timeline.push(createDigitSpanInstructions(true));
