@@ -93,9 +93,9 @@ const phoneme_discrimination_stimuli=[
 
 // FOLEY - GROUP A ONLY (crack, whisk from Group A)
 const foley_stimuli=[
-  { audio:'sounds/high_tinkle.mp3',   options:['small sugar granule','large mixing bowl'], correct:0, mapping_type:'size_pitch',  iconicity_rating: null },
-  { audio:'sounds/granular_pour.mp3', options:['milk','flour'],                              correct:1, mapping_type:'texture',     iconicity_rating: null },
-  { audio:'sounds/liquid_flow.mp3',   options:['sugar','milk'],                              correct:1, mapping_type:'texture',     iconicity_rating: null },
+  { audio:'sounds/high_tinkle.mp3',   options:['ice dropped into a bowl','sugar poured into a bowl'], correct:0, mapping_type:'size_pitch',  iconicity_rating: 5.5 },
+  { audio:'sounds/granular_pour.mp3', options:['milk','flour'],                              correct:1, mapping_type:'texture',     iconicity_rating: 3.6 },
+  { audio:'sounds/liquid_flow.mp3',   options:['sugar','milk'],                              correct:1, mapping_type:'texture',     iconicity_rating: 5.8 },
   { audio:'sounds/egg_crack.mp3',     options:['stirring','cracking'],                       correct:1, mapping_type:'action',      iconicity_rating: 5.40 },
 ];
 
