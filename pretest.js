@@ -1,9 +1,6 @@
-// 6.3 pretest.js — VR Pre-Test Battery (Pure jsPsych) — CORRECTED VERSION WITH PRACTICE
+// 6.3 pretest.js — VR Pre-Test Battery (CORRECTED - BALANCED 6×6 SPLIT-HALF DESIGN)
+// GROUP A WORDS ONLY: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration with critical fixes based on user feedback
-// Includes: surveys with input validation, digit span, phoneme discrimination,
-// lexical decision with A/L keys, 4AFC receptive vocab, picture naming WITH PRACTICE,
-// foley with audio fix, visual iconicity, spatial span, procedural ordering,
-// ideophone mapping, and robust save.
 
 /* ======================== GLOBAL / HELPERS ======================== */
 let jsPsych=null; let assignedCondition=null; let microphoneAvailable=false; let currentPID_value='unknown';
@@ -22,39 +19,48 @@ function assignCondition(){ return 'immediate'; }
 /* ======================== WORD CLASSIFICATION (EMPIRICAL RATINGS) ======================== */
 // Based on Winter et al. iconicity ratings database (scale 1-7)
 // Threshold: ≥4.5 = iconic, <4.5 = arbitrary
+// BALANCED 6×6 DESIGN - GROUP A (pre-test) + GROUP B (post-test)
+
 const WORD_CLASSIFICATION = {
-  // TRAINED TARGETS - ICONIC (rating ≥4.5)
-  'flip':    { iconic: true,  rating: 5.70, category: 'action' },
-  'crack':   { iconic: true,  rating: 5.40, category: 'action' },
-  'sizzle':  { iconic: true,  rating: 5.30, category: 'action' },
-  'mix':     { iconic: true,  rating: 5.10, category: 'action' },
-  'whisk':   { iconic: true,  rating: 4.55, category: 'action' },
+  // GROUP A - PRE-TEST ONLY (used in this file)
+  // ICONIC (rating ≥4.5)
+  'flip':    { iconic: true,  rating: 5.70, category: 'action', group: 'A' },
+  'crack':   { iconic: true,  rating: 5.40, category: 'action', group: 'A' },
+  'whisk':   { iconic: true,  rating: 4.55, category: 'action', group: 'A' },
   
-  // TRAINED TARGETS - ARBITRARY (rating <4.5)
-  'stir':    { iconic: false, rating: 4.30, category: 'action' },
-  'pour':    { iconic: false, rating: 3.60, category: 'action' },
-  'spatula': { iconic: false, rating: 3.91, category: 'utensil' },
-  'butter':  { iconic: false, rating: 3.50, category: 'ingredient' },
-  'pan':     { iconic: false, rating: 3.45, category: 'utensil' },
-  'bowl':    { iconic: false, rating: 3.00, category: 'utensil' },
-  'flour':   { iconic: false, rating: 3.00, category: 'ingredient' },
+  // ARBITRARY (rating <4.5)
+  'bowl':    { iconic: false, rating: 3.00, category: 'utensil', group: 'A' },
+  'spatula': { iconic: false, rating: 3.91, category: 'utensil', group: 'A' },
+  'pan':     { iconic: false, rating: 3.45, category: 'utensil', group: 'A' },
   
-  // FOILS - ICONIC
-  'glug':    { iconic: true,  rating: 6.20, category: 'sound' },
-  'splash':  { iconic: true,  rating: 6.09, category: 'action' },
-  'drizzle': { iconic: true,  rating: 6.00, category: 'action' },
+  // GROUP B - POST-TEST ONLY (not tested in pre-test, taught in training)
+  // ICONIC (rating ≥4.5)
+  'sizzle':   { iconic: true,  rating: 5.30, category: 'process', group: 'B' },
+  'mix':      { iconic: true,  rating: 5.10, category: 'action', group: 'B' },
+  'stirring': { iconic: true,  rating: 4.82, category: 'action', group: 'B' },
   
-  // FOILS - ARBITRARY
-  'fork':    { iconic: false, rating: 3.90, category: 'utensil' },
-  'cup':     { iconic: false, rating: 3.83, category: 'utensil' },
-  'sugar':   { iconic: false, rating: 3.36, category: 'ingredient' },
+  // ARBITRARY (rating <4.5)
+  'pour':    { iconic: false, rating: 3.60, category: 'action', group: 'B' },
+  'butter':  { iconic: false, rating: 3.50, category: 'ingredient', group: 'B' },
+  'flour':   { iconic: false, rating: 3.00, category: 'ingredient', group: 'B' },
+  
+  // FOILS - ICONIC (untrained, for recognition tests)
+  'glug':    { iconic: true,  rating: 6.20, category: 'sound', group: 'foil' },
+  'splash':  { iconic: true,  rating: 6.09, category: 'action', group: 'foil' },
+  'drizzle': { iconic: true,  rating: 6.00, category: 'action', group: 'foil' },
+  
+  // FOILS - ARBITRARY (untrained, for recognition tests)
+  'fork':    { iconic: false, rating: 3.90, category: 'utensil', group: 'foil' },
+  'cup':     { iconic: false, rating: 3.83, category: 'utensil', group: 'foil' },
+  'knife':   { iconic: false, rating: null, category: 'utensil', group: 'foil' },
+  'salt':    { iconic: false, rating: null, category: 'ingredient', group: 'foil' },
 };
 
 // Helper to get iconicity info for a word
 function getIconicity(word) {
-  const w = (word || '').toLowerCase().replace(/ing$/, ''); // Handle 'mixing' -> 'mix'
+  const w = (word || '').toLowerCase().replace(/ing$/, ''); // Handle 'flipping' -> 'flip'
   const info = WORD_CLASSIFICATION[w];
-  return info ? { iconic: info.iconic, rating: info.rating } : { iconic: null, rating: null };
+  return info ? { iconic: info.iconic, rating: info.rating, group: info.group } : { iconic: null, rating: null, group: null };
 }
 
 // Flexible save with download or POST
@@ -81,37 +87,42 @@ async function saveData(data){
 const phoneme_discrimination_stimuli=[
   { audio1:'sounds/bowl.mp3',   audio2:'sounds/ball.mp3',   correct:'different', contrast:'l_r' },
   { audio1:'sounds/flip.mp3',   audio2:'sounds/frip.mp3',   correct:'different', contrast:'l_r' },
-  { audio1:'sounds/pan.mp3',    audio2:'sounds/pan.mp3',    correct:'same',      contrast:'control' }, // Back to pan.mp3
+  { audio1:'sounds/pan.mp3',    audio2:'sounds/pan.mp3',    correct:'same',      contrast:'control' },
   { audio1:'sounds/batter.mp3', audio2:'sounds/better.mp3', correct:'different', contrast:'vowel' },
 ];
+
+// FOLEY - GROUP A ONLY (crack, whisk from Group A)
 const foley_stimuli=[
   { audio:'sounds/high_tinkle.mp3',   options:['small sugar granule','large mixing bowl'], correct:0, mapping_type:'size_pitch',  iconicity_rating: null },
   { audio:'sounds/granular_pour.mp3', options:['milk','flour'],                              correct:1, mapping_type:'texture',     iconicity_rating: null },
   { audio:'sounds/liquid_flow.mp3',   options:['sugar','milk'],                              correct:1, mapping_type:'texture',     iconicity_rating: null },
   { audio:'sounds/egg_crack.mp3',     options:['stirring','cracking'],                       correct:1, mapping_type:'action',      iconicity_rating: 5.40 },
 ];
+
+// PICTURE NAMING - GROUP A ONLY (flip, crack, whisk, bowl, spatula, pan)
 const picture_naming_stimuli=[
-  { image:'img/bowl.jpg',      target:'bowl',     category:'utensil',  iconic: false, rating: 3.00 },
-  { image:'img/spatula.jpg',   target:'spatula',  category:'utensil',  iconic: false, rating: 3.91 },
-  { image:'img/mixing.jpeg',   target:'mixing',   category:'action',   iconic: true,  rating: 5.10 },
-  { image:'img/cracking.jpeg', target:'cracking', category:'action',   iconic: true,  rating: 5.40 },
-  { image:'img/pouring.jpeg',  target:'pouring',  category:'action',   iconic: false, rating: 3.60 },
-  { image:'img/flipping.jpg',  target:'flipping', category:'action',   iconic: true,  rating: 5.70 },
+  { image:'img/bowl.jpg',      target:'bowl',     category:'utensil',  iconic: false, rating: 3.00, group: 'A' },
+  { image:'img/spatula.jpg',   target:'spatula',  category:'utensil',  iconic: false, rating: 3.91, group: 'A' },
+  { image:'img/pan.jpg',       target:'pan',      category:'utensil',  iconic: false, rating: 3.45, group: 'A' },
+  { image:'img/cracking.jpeg', target:'cracking', category:'action',   iconic: true,  rating: 5.40, group: 'A' },
+  { image:'img/flipping.jpg',  target:'flipping', category:'action',   iconic: true,  rating: 5.70, group: 'A' },
+  { image:'img/whisking.jpg',  target:'whisking', category:'action',   iconic: true,  rating: 4.55, group: 'A' },
 ];
+
 const visual_iconicity_stimuli=[
   { shape:'img/bowl_shape.svg',  words:['container','cutter'], expected:0, shape_type:'container' },
   { shape:'img/round_shape.svg', words:['maluma','takete'],    expected:0, shape_type:'round' },
   { shape:'img/spiky_shape.svg', words:['bouba','kiki'],       expected:1, shape_type:'spiky' },
 ];
 
-/* ======================== 4AFC RECEPTIVE VOCABULARY BASELINE ======================== */
+/* ======================== 4AFC RECEPTIVE VOCABULARY BASELINE - GROUP A ONLY ======================== */
 const receptive_vocab_baseline_stimuli=[
-  { word_audio:'sounds/bowl.mp3',     images:['img/bowl.jpg','img/spatula.jpg','img/mixing.jpeg','img/pouring.jpeg'], correct:0, target:'bowl',     iconic: false, rating: 3.00 },
-  { word_audio:'sounds/spatula.mp3',  images:['img/cracking.jpeg','img/spatula.jpg','img/flipping.jpg','img/bowl.jpg'], correct:1, target:'spatula',  iconic: false, rating: 3.91 },
-  { word_audio:'sounds/mixing.mp3',   images:['img/pouring.jpeg','img/cracking.jpeg','img/mixing.jpeg','img/flipping.jpg'], correct:2, target:'mixing',   iconic: true,  rating: 5.10 },
-  { word_audio:'sounds/cracking.mp3', images:['img/mixing.jpeg','img/flipping.jpg','img/bowl.jpg','img/cracking.jpeg'], correct:3, target:'cracking', iconic: true,  rating: 5.40 },
-  { word_audio:'sounds/pouring.mp3',  images:['img/pouring.jpeg','img/mixing.jpeg','img/spatula.jpg','img/cracking.jpeg'], correct:0, target:'pouring',  iconic: false, rating: 3.60 },
-  { word_audio:'sounds/flipping.mp3', images:['img/bowl.jpg','img/mixing.jpeg','img/flipping.jpg','img/spatula.jpg'], correct:2, target:'flipping', iconic: true,  rating: 5.70 },
+  { word_audio:'sounds/bowl.mp3',     images:['img/bowl.jpg','img/spatula.jpg','img/pan.jpg','img/cracking.jpeg'], correct:0, target:'bowl',     iconic: false, rating: 3.00, group: 'A' },
+  { word_audio:'sounds/spatula.mp3',  images:['img/cracking.jpeg','img/spatula.jpg','img/flipping.jpg','img/bowl.jpg'], correct:1, target:'spatula',  iconic: false, rating: 3.91, group: 'A' },
+  { word_audio:'sounds/pan.mp3',      images:['img/pan.jpg','img/bowl.jpg','img/spatula.jpg','img/whisking.jpg'], correct:0, target:'pan',      iconic: false, rating: 3.45, group: 'A' },
+  { word_audio:'sounds/cracking.mp3', images:['img/whisking.jpg','img/flipping.jpg','img/bowl.jpg','img/cracking.jpeg'], correct:3, target:'cracking', iconic: true,  rating: 5.40, group: 'A' },
+  { word_audio:'sounds/flipping.mp3', images:['img/bowl.jpg','img/pan.jpg','img/flipping.jpg','img/spatula.jpg'], correct:2, target:'flipping', iconic: true,  rating: 5.70, group: 'A' },
+  { word_audio:'sounds/whisking.mp3', images:['img/whisking.jpg','img/cracking.jpeg','img/spatula.jpg','img/pan.jpg'], correct:0, target:'whisking', iconic: true,  rating: 4.55, group: 'A' },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -196,6 +207,7 @@ function checkImageExists(url){
 let PRELOAD_AUDIO=[]; let PRELOAD_IMAGES=[]; let FILTERED_STIMULI={phoneme:[], foley:[], picture:[], visual:[], receptive:[]};
 async function filterExistingStimuli(){
   console.log('[Validation] Starting asset validation...');
+  console.log('[DESIGN] Using GROUP A words only (pre-test baseline)');
   
   const phoneme=[]; 
   console.log('[Validation] Checking phoneme stimuli...');
@@ -223,7 +235,7 @@ async function filterExistingStimuli(){
   console.log(`[Validation] Foley: ${foley.length}/${foley_stimuli.length} trials valid`);
   
   const picture=[]; 
-  console.log('[Validation] Checking picture stimuli...');
+  console.log('[Validation] Checking picture stimuli (GROUP A only)...');
   for(const s of picture_naming_stimuli){ 
     const ok=await checkImageExists(s.image); 
     if(ok){ 
@@ -231,7 +243,7 @@ async function filterExistingStimuli(){
       PRELOAD_IMAGES.push(s.image);
     } 
   }
-  console.log(`[Validation] Picture: ${picture.length}/${picture_naming_stimuli.length} trials valid`);
+  console.log(`[Validation] Picture (Group A): ${picture.length}/${picture_naming_stimuli.length} trials valid`);
   
   const visual=[]; 
   console.log('[Validation] Checking visual stimuli...');
@@ -245,7 +257,7 @@ async function filterExistingStimuli(){
   console.log(`[Validation] Visual: ${visual.length}/${visual_iconicity_stimuli.length} trials valid`);
   
   const receptive=[];
-  console.log('[Validation] Checking receptive vocab baseline...');
+  console.log('[Validation] Checking receptive vocab baseline (GROUP A only)...');
   for(const s of receptive_vocab_baseline_stimuli){
     const okAudio = await checkAudioExists(s.word_audio);
     const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
@@ -257,7 +269,7 @@ async function filterExistingStimuli(){
       console.warn('[Validation] Skipping receptive trial for:', s.target);
     }
   }
-  console.log(`[Validation] Receptive: ${receptive.length}/${receptive_vocab_baseline_stimuli.length} trials valid`);
+  console.log(`[Validation] Receptive (Group A): ${receptive.length}/${receptive_vocab_baseline_stimuli.length} trials valid`);
   
   // Check for practice image
   const practiceImageOk = await checkImageExists('img/park_scene.jpg');
@@ -269,6 +281,7 @@ async function filterExistingStimuli(){
   
   FILTERED_STIMULI={phoneme,foley,picture,visual,receptive};
   console.log('[Validation] Asset validation complete');
+  console.log('[DESIGN] Group A words: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)');
 }
 
 /* ======================== SURVEYS WITH INPUT VALIDATION ======================== */
@@ -538,31 +551,39 @@ function createPhonemeTrial(){
 }
 
 /* ======================== LDT WITH A/L KEYS AND KEYBOARD IMAGE ======================== */
+// LDT includes ALL trained words (both Group A and B) for word recognition baseline
 const ldt_stimuli=[
-  // Target words - ICONIC
-  { stimulus:'FLIP',    correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.70 },
-  { stimulus:'CRACK',   correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.40 },
-  { stimulus:'SIZZLE',  correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.30 },
-  { stimulus:'MIX',     correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.10 },
-  { stimulus:'WHISK',   correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 4.55 },
-  // Target words - ARBITRARY
-  { stimulus:'BOWL',    correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.00 },
-  { stimulus:'FLOUR',   correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.00 },
-  { stimulus:'SPATULA', correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.91 },
-  { stimulus:'PAN',     correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.45 },
-  { stimulus:'BUTTER',  correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.50 },
-  { stimulus:'POUR',    correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.60 },
-  { stimulus:'STIR',    correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 4.30 },
+  // GROUP A - Target words ICONIC (pre-test)
+  { stimulus:'FLIP',    correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.70, group: 'A' },
+  { stimulus:'CRACK',   correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.40, group: 'A' },
+  { stimulus:'WHISK',   correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 4.55, group: 'A' },
+  
+  // GROUP B - Target words ICONIC (post-test)
+  { stimulus:'SIZZLE',  correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.30, group: 'B' },
+  { stimulus:'MIX',     correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 5.10, group: 'B' },
+  { stimulus:'STIRRING',correct_response:'a', word_type:'target_iconic',    iconic: true,  rating: 4.82, group: 'B' },
+  
+  // GROUP A - Target words ARBITRARY (pre-test)
+  { stimulus:'BOWL',    correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.00, group: 'A' },
+  { stimulus:'SPATULA', correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.91, group: 'A' },
+  { stimulus:'PAN',     correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.45, group: 'A' },
+  
+  // GROUP B - Target words ARBITRARY (post-test)
+  { stimulus:'FLOUR',   correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.00, group: 'B' },
+  { stimulus:'POUR',    correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.60, group: 'B' },
+  { stimulus:'BUTTER',  correct_response:'a', word_type:'target_arbitrary', iconic: false, rating: 3.50, group: 'B' },
+  
   // Control words (not study targets)
-  { stimulus:'CHAIR',   correct_response:'a', word_type:'control_word',     iconic: null,  rating: null },
-  { stimulus:'WINDOW',  correct_response:'a', word_type:'control_word',     iconic: null,  rating: null },
+  { stimulus:'CHAIR',   correct_response:'a', word_type:'control_word',     iconic: null,  rating: null, group: 'control' },
+  { stimulus:'WINDOW',  correct_response:'a', word_type:'control_word',     iconic: null,  rating: null, group: 'control' },
+  
   // Nonwords
-  { stimulus:'FLUR',    correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
-  { stimulus:'SPATTLE', correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
-  { stimulus:'BOWLE',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
-  { stimulus:'CRECK',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
-  { stimulus:'MIXLE',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
-  { stimulus:'WHISP',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null },
+  { stimulus:'FLUR',    correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
+  { stimulus:'SPATTLE', correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
+  { stimulus:'BOWLE',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
+  { stimulus:'CRECK',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
+  { stimulus:'MIXLE',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
+  { stimulus:'WHISP',   correct_response:'l', word_type:'nonword',          iconic: null,  rating: null, group: 'nonword' },
 ];
 
 function createLDTPrimerWithImage(){
@@ -638,6 +659,7 @@ function createLDTTimeline(){
       word_type: jsPsych.timelineVariable('word_type'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      word_group: jsPsych.timelineVariable('group'),
       phase: 'pre'
     }),
     on_finish: d => {
@@ -704,6 +726,10 @@ function create4AFCReceptiveBaseline(){
       <div style="background-color:#e8f5e9;padding:15px;border-radius:8px;margin-top:20px;">
         <p><b>Important:</b> You must listen to the whole word before the pictures become clickable.</p>
         <p><b>重要:</b> 画像が選択可能になる前に、単語全体を聞く必要があります。</p>
+      </div>
+      <div style="background-color:#e3f2fd;padding:15px;border-radius:8px;margin-top:15px;">
+        <p><b>Design Note:</b> This test uses GROUP A words only (baseline assessment).</p>
+        <p><b>デザイン:</b> このテストはGROUP Aの単語のみを使用します（ベースライン評価）。</p>
       </div>`,
     choices: ['Begin / 開始']
   };
@@ -730,6 +756,7 @@ function create4AFCReceptiveBaseline(){
       correct_answer: jsPsych.timelineVariable('correct'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      word_group: jsPsych.timelineVariable('group'),
       phase: 'pre'
     }),
     on_load: function() {
@@ -965,6 +992,10 @@ function createNamingTimeline(){
       <p>Describe each picture in English. Mention objects, actions, sounds, and smells.</p>
       <p>各画像を英語で説明してください。物体、動作、音、匂いについて述べてください。</p>
       <p style="color:#666;">You will have <b>4 seconds</b> per picture. / 各画像<b>4秒間</b>です。</p>
+      <div style="background-color:#e3f2fd;padding:15px;border-radius:8px;margin-top:15px;">
+        <p><b>Design Note:</b> This test uses GROUP A words only (baseline assessment).</p>
+        <p><b>デザイン:</b> このテストはGROUP Aの単語のみを使用します（ベースライン評価）。</p>
+      </div>
       <p style="color:#666;">Pictures available / 利用可能な画像: ${FILTERED_STIMULI.picture?.length||0}</p>
     </div>`, 
     choices:['Continue / 続行'], 
@@ -1121,6 +1152,7 @@ function createNamingTimeline(){
       image_file:jsPsych.timelineVariable('image')||'none',
       iconic:jsPsych.timelineVariable('iconic'),
       iconicity_rating:jsPsych.timelineVariable('rating'),
+      word_group:jsPsych.timelineVariable('group'),
       phase: 'pre'
     }) 
   };
@@ -1144,6 +1176,7 @@ function createNamingTimeline(){
       image_file:jsPsych.timelineVariable('image')||'none', 
       iconic:jsPsych.timelineVariable('iconic'),
       iconicity_rating:jsPsych.timelineVariable('rating'),
+      word_group:jsPsych.timelineVariable('group'),
       phase:namingPhase(), 
       pid_snapshot: currentPID() 
     }),
@@ -1688,7 +1721,20 @@ async function initializeExperiment(){
     const timeline=[];
     timeline.push({ 
       type:T('jsPsychHtmlButtonResponse'), 
-      stimulus:'<h2>Pre-Test Starting / プリテスト開始</h2><p>Click to begin the experiment. / クリックして実験を開始</p>', 
+      stimulus:`<div style="text-align:center;">
+        <h2>Pre-Test Starting / プリテスト開始</h2>
+        <div style="background:#e3f2fd;padding:20px;border-radius:8px;margin:20px auto;max-width:600px;">
+          <h3>📊 BALANCED 6×6 DESIGN - GROUP A (Pre-Test)</h3>
+          <p><b>Iconic words (n=3):</b> flip, crack, whisk</p>
+          <p><b>Arbitrary words (n=3):</b> bowl, spatula, pan</p>
+          <p style="margin-top:15px;font-size:14px;color:#666;">
+            ✓ Perfect balance<br>
+            ✓ Split-half exposure design<br>
+            ✓ Group B words saved for post-test
+          </p>
+        </div>
+        <p>Click to begin the experiment. / クリックして実験を開始</p>
+      </div>`, 
       choices:['Start / 開始'] 
     });
 
@@ -1714,21 +1760,21 @@ async function initializeExperiment(){
       });
     }
 
-    // LDT with keyboard image primer and A/L keys
+    // LDT with keyboard image primer and A/L keys (includes ALL words for recognition baseline)
     timeline.push(createLDTPrimerWithImage());
     timeline.push(...createLDTTimeline());
 
-    // 4AFC Receptive Vocabulary Baseline
+    // 4AFC Receptive Vocabulary Baseline (GROUP A ONLY)
     if((FILTERED_STIMULI.receptive?.length||0)>0){
       timeline.push(...create4AFCReceptiveBaseline());
     }
 
-    // Picture naming with microphone error handling AND PRACTICE
+    // Picture naming with microphone error handling AND PRACTICE (GROUP A ONLY)
     if((FILTERED_STIMULI.picture?.length||0)>0 && have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse')){
       timeline.push(...createNamingTimeline());
     }
 
-    // Foley with audio fix
+    // Foley with audio fix (GROUP A sounds)
     if((FILTERED_STIMULI.foley?.length||0)>0){ 
       timeline.push(...createFoleyTimeline()); 
     }
@@ -1752,6 +1798,12 @@ async function initializeExperiment(){
         <h2>All done! / 完了！</h2>
         <p>Thank you for completing the pre-test.</p>
         <p>プリテストを完了していただきありがとうございます。</p>
+        <div style="background:#e8f5e9;padding:15px;border-radius:8px;margin:15px auto;max-width:500px;">
+          <p><b>✓ GROUP A Assessment Complete</b></p>
+          <p style="font-size:14px;">Tested: flip, crack, whisk, bowl, spatula, pan</p>
+          <p style="font-size:14px;">Next: Training session (all 12 words)</p>
+          <p style="font-size:14px;">Post-test will use GROUP B words only</p>
+        </div>
         <p>You can download your results now. / 結果をダウンロードできます。</p>`, 
       choices:['Download Results / 結果をダウンロード'], 
       on_finish: ()=> saveData() 
