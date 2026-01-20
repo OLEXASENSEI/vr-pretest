@@ -43,7 +43,18 @@ let assignedCondition = null;
 let microphoneAvailable = false;
 let currentPID_value = 'unknown';
 
-const have = (name) => typeof window[name] !== 'undefined';
+const PLACEHOLDER_IMG = `data:image/svg+xml,${encodeURIComponent(`
+  <svg xmlns="http://www.w3.org/2000/svg" width="320" height="240">
+    <rect width="320" height="240" fill="#e3f2fd"/>
+    <text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle"
+      font-family="sans-serif" font-size="26" fill="#1565c0">Image missing</text>
+  </svg>`)}`;
+
+const have = (name) => {
+  // Check both window and if it's a function/object
+  const val = window[name];
+  return val !== undefined && val !== null;
+};
 const T = (name) => window[name];
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 const q = Object.fromEntries(new URLSearchParams(location.search));
@@ -505,6 +516,15 @@ function createPhonemeTrial() {
       const btnSame = document.getElementById('btnSame');
       const btnDiff = document.getElementById('btnDiff');
       const status = document.getElementById('status');
+      const playA = document.getElementById('playA');
+      const playB = document.getElementById('playB');
+      
+      // Null check
+      if (!btnSame || !btnDiff || !status || !playA || !playB) {
+        console.error('[phoneme] Required DOM elements not found');
+        setTimeout(() => jsPsych.finishTrial({ error: 'dom_missing' }), 100);
+        return;
+      }
 
       function setAnswerLock(locked) {
         btnSame.disabled = locked;
@@ -523,13 +543,13 @@ function createPhonemeTrial() {
       a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once: true });
 
-      document.getElementById('playA').addEventListener('click', () => {
+      playA.addEventListener('click', () => {
         status.textContent = 'Playing Sound A...';
         a.currentTime = 0;
         a.play().catch(() => {});
       });
 
-      document.getElementById('playB').addEventListener('click', () => {
+      playB.addEventListener('click', () => {
         status.textContent = 'Playing Sound B...';
         b.currentTime = 0;
         b.play().catch(() => {});
@@ -574,9 +594,9 @@ function createLDTPrimerWithImage() {
 
 function createLDTTimeline() {
   const ldt_practice = [
-    { stimulus: 'TABLE', correct_response: 'a', word_type: 'practice_word' },
-    { stimulus: 'BLARP', correct_response: 'l', word_type: 'practice_nonword' },
-    { stimulus: 'WATER', correct_response: 'a', word_type: 'practice_word' }
+    { stimulus: 'TABLE', correct_response: 'a', word_type: 'practice_word', iconic: null, rating: null },
+    { stimulus: 'BLARP', correct_response: 'l', word_type: 'practice_nonword', iconic: null, rating: null },
+    { stimulus: 'WATER', correct_response: 'a', word_type: 'practice_word', iconic: null, rating: null }
   ];
 
   const fixation = {
@@ -593,13 +613,18 @@ function createLDTTimeline() {
     choices: ['a', 'l'],
     trial_duration: 2500,
     post_trial_gap: 250,
-    data: () => ({
-      task: 'lexical_decision',
-      correct_response: jsPsych.timelineVariable('correct_response'),
-      word_type: jsPsych.timelineVariable('word_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating')
-    }),
+    data: () => {
+      let iconic = null, rating = null;
+      try { iconic = jsPsych.timelineVariable('iconic'); } catch(e) {}
+      try { rating = jsPsych.timelineVariable('rating'); } catch(e) {}
+      return {
+        task: 'lexical_decision',
+        correct_response: jsPsych.timelineVariable('correct_response'),
+        word_type: jsPsych.timelineVariable('word_type'),
+        iconic: iconic,
+        iconicity_rating: rating
+      };
+    },
     on_finish: d => { d.correct = (d.response === d.correct_response); }
   };
 
@@ -637,7 +662,7 @@ function create4AFCReceptiveBaseline() {
     type: T('jsPsychHtmlKeyboardResponse'),
     choices: 'NO_KEYS',
     stimulus: () => {
-      const images = jsPsych.timelineVariable('images');
+      const images = jsPsych.timelineVariable('images') || [];
       const imgHTML = images.map((src, i) =>
         `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
           <img src="${asset(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;"/>
@@ -649,20 +674,33 @@ function create4AFCReceptiveBaseline() {
       </div>
       <div style="margin-top:20px;">${imgHTML}</div>`;
     },
-    data: () => ({
-      task: 'receptive_vocab_baseline',
-      target_word: jsPsych.timelineVariable('target'),
-      correct_answer: jsPsych.timelineVariable('correct'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating')
-    }),
+    data: () => {
+      // Safe access to timeline variables with defaults
+      let iconic = null, rating = null;
+      try { iconic = jsPsych.timelineVariable('iconic'); } catch(e) {}
+      try { rating = jsPsych.timelineVariable('rating'); } catch(e) {}
+      return {
+        task: 'receptive_vocab_baseline',
+        target_word: jsPsych.timelineVariable('target'),
+        correct_answer: jsPsych.timelineVariable('correct'),
+        iconic: iconic,
+        iconicity_rating: rating
+      };
+    },
     on_load: function() {
       const audioSrc = jsPsych.timelineVariable('word_audio');
       const playBtn = document.getElementById('play-word');
       const status = document.getElementById('receptive-status');
       const choices = document.querySelectorAll('.receptive-choice');
+      
+      // Null check for required elements
+      if (!playBtn || !status) {
+        console.error('[receptive] Required DOM elements not found');
+        setTimeout(() => jsPsych.finishTrial({ error: 'dom_missing' }), 100);
+        return;
+      }
+      
       const audio = new Audio(asset(audioSrc));
-
       let hasPlayed = false;
 
       choices.forEach(c => {
@@ -733,10 +771,19 @@ function createFoleyTimeline() {
       mapping_type: jsPsych.timelineVariable('mapping_type')
     }),
     on_load: function() {
-      const audio = new Audio(asset(jsPsych.timelineVariable('audio')));
+      const audioSrc = jsPsych.timelineVariable('audio');
+      const audio = new Audio(asset(audioSrc));
       audio.loop = false;
       const btn = document.getElementById('play');
       const stat = document.getElementById('status');
+      
+      // Null check
+      if (!btn || !stat) {
+        console.error('[foley] Required DOM elements not found');
+        setTimeout(() => jsPsych.finishTrial({ error: 'dom_missing' }), 100);
+        return;
+      }
+      
       const answerBtns = document.querySelectorAll('.jspsych-btn:not(#play)');
 
       answerBtns.forEach(b => { b.disabled = true; b.style.opacity = '.5'; });
@@ -760,6 +807,11 @@ function createFoleyTimeline() {
     }
   };
 
+  // Skip if no stimuli
+  if (!FILTERED_STIMULI.foley || FILTERED_STIMULI.foley.length === 0) {
+    return [];
+  }
+
   return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.foley, randomize_order: true }];
 }
 
@@ -774,24 +826,32 @@ function createVisualTimeline() {
     choices: ['Begin / 開始']
   };
 
+  const tv = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: asset(s.shape) }));
+  
+  // Skip if no stimuli
+  if (tv.length === 0) {
+    return [];
+  }
+
   const trial = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => {
+    stimulus: function() {
       const u = jsPsych.timelineVariable('shapeUrl');
-      return `<div><img src="${u}" style="width:200px;height:200px;"/>
+      return `<div><img src="${u}" style="width:200px;height:200px;" onerror="this.style.display='none'"/>
         <p style="margin-top:20px;">Which word matches? / どちらが合いますか？</p></div>`;
     },
-    choices: () => jsPsych.timelineVariable('words'),
+    choices: function() { return jsPsych.timelineVariable('words'); },
     post_trial_gap: 250,
-    data: () => ({
-      task: 'visual_iconicity',
-      correct_answer: jsPsych.timelineVariable('expected'),
-      shape_type: jsPsych.timelineVariable('shape_type')
-    }),
+    data: function() {
+      return {
+        task: 'visual_iconicity',
+        correct_answer: jsPsych.timelineVariable('expected'),
+        shape_type: jsPsych.timelineVariable('shape_type')
+      };
+    },
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
   };
 
-  const tv = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: asset(s.shape) }));
   return [intro, { timeline: [trial], timeline_variables: tv, randomize_order: true }];
 }
 
@@ -1048,7 +1108,12 @@ function buildMicSetupGate({ required = true } = {}) {
       }
 
       enableBtn.addEventListener('click', startStream);
-      document.getElementById('mic-textonly').addEventListener('click', () => { window.__mic_ok = false; });
+      
+      // Use optional chaining - button may not exist yet
+      const textOnlyBtn = document.getElementById('mic-textonly');
+      if (textOnlyBtn) {
+        textOnlyBtn.addEventListener('click', () => { window.__mic_ok = false; });
+      }
     },
     on_finish: () => { microphoneAvailable = !!window.__mic_ok; }
   };
@@ -1067,46 +1132,70 @@ function createNamingTimeline() {
     choices: ['Continue']
   };
 
+  // Pre-build timeline variables with all needed fields
+  const tv = FILTERED_STIMULI.picture.map(s => ({
+    imageUrl: asset(s.image),
+    target: s.target,
+    category: s.category,
+    iconic: s.iconic || false,
+    rating: s.rating || null
+  }));
+
+  // Skip if no pictures available
+  if (tv.length === 0) {
+    return [intro, {
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: '<p>No pictures available for this task.</p>',
+      choices: ['Continue']
+    }];
+  }
+
   const prepare = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => {
+    stimulus: function() {
       const u = jsPsych.timelineVariable('imageUrl');
-      return `<div><img src="${u}" style="width:350px;border-radius:8px;"/>
+      return `<div><img src="${u}" style="width:350px;border-radius:8px;" onerror="this.style.display='none'"/>
         <p>Click when ready (4 seconds recording).</p></div>`;
     },
     choices: ['Start Recording'],
-    data: () => ({
-      task: 'picture_naming_prepare',
-      target: jsPsych.timelineVariable('target'),
-      category: jsPsych.timelineVariable('category'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating')
-    })
+    data: function() {
+      return {
+        task: 'picture_naming_prepare',
+        target: jsPsych.timelineVariable('target'),
+        category: jsPsych.timelineVariable('category'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        phase: 'pre'
+      };
+    }
   };
 
   const record = have('jsPsychHtmlAudioResponse') ? {
     type: T('jsPsychHtmlAudioResponse'),
-    stimulus: () => {
+    stimulus: function() {
       const u = jsPsych.timelineVariable('imageUrl');
-      return `<div><img src="${u}" style="width:350px;border-radius:8px;"/>
+      return `<div><img src="${u}" style="width:350px;border-radius:8px;" onerror="this.style.display='none'"/>
         <p style="color:#d32f2f;font-weight:bold;">🔴 Recording... (4s)</p></div>`;
     },
     recording_duration: 4000,
     show_done_button: false,
     allow_playback: false,
-    data: () => ({
-      task: 'picture_naming_audio',
-      target: jsPsych.timelineVariable('target'),
-      category: jsPsych.timelineVariable('category'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      phase: 'pre'
-    })
+    data: function() {
+      return {
+        task: 'picture_naming_audio',
+        target: jsPsych.timelineVariable('target'),
+        category: jsPsych.timelineVariable('category'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        phase: 'pre'
+      };
+    }
   } : null;
 
-  const tv = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
   const tl = [intro];
-  if (record) tl.push({ timeline: [prepare, record], timeline_variables: tv, randomize_order: true });
+  if (record && tv.length > 0) {
+    tl.push({ timeline: [prepare, record], timeline_variables: tv, randomize_order: true });
+  }
   return tl;
 }
 
