@@ -1,5 +1,5 @@
-// pretest_clean.js — Clean complete pretest with iconicity features
-// Based on working incremental patterns, adds all required features
+// pretest_full.js — Complete pretest with all tasks including audio
+// Built on working clean version, adds audio tasks with safe patterns
 
 let jsPsych = null;
 let currentPID_value = 'unknown';
@@ -9,6 +9,13 @@ console.log('[pretest] Script loading...');
 
 const T = (name) => window[name];
 const have = (name) => typeof window[name] === 'function';
+
+// Asset path helper
+const ASSET_BUST = Math.floor(Math.random() * 100000);
+function asset(path) {
+  if (!path) return path;
+  return path + (path.includes('?') ? '&' : '?') + 'v=' + ASSET_BUST;
+}
 
 /* ======================== MASTER WORD CLASSIFICATION ======================== */
 const WORD_CLASSIFICATION = {
@@ -27,23 +34,37 @@ const WORD_CLASSIFICATION = {
   'pan':     { iconic: false, trained: true,  rating: 3.45, category: 'utensil' },
   'flour':   { iconic: false, trained: true,  rating: 3.00, category: 'ingredient' },
   'butter':  { iconic: false, trained: true,  rating: 3.50, category: 'ingredient' },
+  
+  // FOILS - ICONIC
+  'glug':    { iconic: true,  trained: false, rating: 6.20, category: 'sound' },
+  'splash':  { iconic: true,  trained: false, rating: 6.09, category: 'action' },
+  'drizzle': { iconic: true,  trained: false, rating: 6.00, category: 'action' },
+  
+  // FOILS - ARBITRARY  
+  'fork':    { iconic: false, trained: false, rating: 3.90, category: 'utensil' },
+  'cup':     { iconic: false, trained: false, rating: 3.83, category: 'utensil' },
+  'sugar':   { iconic: false, trained: false, rating: 3.36, category: 'ingredient' },
 };
 
-/* ======================== LDT STIMULI ======================== */
+/* ======================== STIMULI ======================== */
+
+// LDT stimuli with iconicity tags
 const ldt_stimuli = [
   // ICONIC real words
   { stimulus: 'FLIP', correct_response: 'a', word_type: 'target_iconic', iconic: true, rating: 5.70 },
   { stimulus: 'CRACK', correct_response: 'a', word_type: 'target_iconic', iconic: true, rating: 5.40 },
   { stimulus: 'MIX', correct_response: 'a', word_type: 'target_iconic', iconic: true, rating: 5.10 },
   { stimulus: 'SIZZLE', correct_response: 'a', word_type: 'target_iconic', iconic: true, rating: 5.30 },
+  { stimulus: 'WHISK', correct_response: 'a', word_type: 'target_iconic', iconic: true, rating: 4.55 },
   // ARBITRARY real words
   { stimulus: 'BOWL', correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00 },
   { stimulus: 'FLOUR', correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00 },
   { stimulus: 'SPATULA', correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.91 },
   { stimulus: 'PAN', correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.45 },
+  { stimulus: 'BUTTER', correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.50 },
   // Control words
-  { stimulus: 'CHAIR', correct_response: 'a', word_type: 'control_word', iconic: null, rating: null },
-  { stimulus: 'WINDOW', correct_response: 'a', word_type: 'control_word', iconic: null, rating: null },
+  { stimulus: 'CHAIR', correct_response: 'a', word_type: 'control', iconic: null, rating: null },
+  { stimulus: 'WINDOW', correct_response: 'a', word_type: 'control', iconic: null, rating: null },
   // Nonwords
   { stimulus: 'FLUR', correct_response: 'l', word_type: 'nonword', iconic: null, rating: null },
   { stimulus: 'SPATTLE', correct_response: 'l', word_type: 'nonword', iconic: null, rating: null },
@@ -51,12 +72,48 @@ const ldt_stimuli = [
   { stimulus: 'CRECK', correct_response: 'l', word_type: 'nonword', iconic: null, rating: null },
 ];
 
-/* ======================== BOUBA-KIKI STIMULI ======================== */
-const visual_iconicity_stimuli = [
+// Phoneme discrimination - tests L/R contrast etc
+const phoneme_stimuli = [
+  { pair: ['bowl', 'ball'], correct: 'different', contrast: 'vowel' },
+  { pair: ['pan', 'pan'], correct: 'same', contrast: 'control' },
+  { pair: ['flip', 'frip'], correct: 'different', contrast: 'l_r' },
+  { pair: ['crack', 'clack'], correct: 'different', contrast: 'r_l' },
+];
+
+// Foley sound matching - iconicity sensitivity
+const foley_stimuli = [
+  { description: 'High-pitched tinkle', options: ['Small object (sugar grain)', 'Large object (mixing bowl)'], correct: 0, mapping: 'size_pitch' },
+  { description: 'Granular pouring sound', options: ['Liquid (milk)', 'Powder (flour)'], correct: 1, mapping: 'texture' },
+  { description: 'Smooth flowing sound', options: ['Sugar', 'Milk'], correct: 1, mapping: 'texture' },
+  { description: 'Sharp cracking sound', options: ['Stirring', 'Breaking egg'], correct: 1, mapping: 'action' },
+];
+
+// Visual iconicity (bouba-kiki)
+const visual_stimuli = [
   { words: ['maluma', 'takete'], expected: 0, shape_type: 'round', 
-    shape_svg: '<svg width="200" height="200"><ellipse cx="100" cy="100" rx="80" ry="60" fill="#90caf9"/></svg>' },
+    svg: '<svg width="200" height="200"><ellipse cx="100" cy="100" rx="80" ry="60" fill="#90caf9" stroke="#1976d2" stroke-width="3"/></svg>' },
   { words: ['bouba', 'kiki'], expected: 1, shape_type: 'spiky',
-    shape_svg: '<svg width="200" height="200"><polygon points="100,20 120,80 180,80 130,120 150,180 100,140 50,180 70,120 20,80 80,80" fill="#90caf9"/></svg>' },
+    svg: '<svg width="200" height="200"><polygon points="100,10 115,70 180,70 125,110 145,175 100,135 55,175 75,110 20,70 85,70" fill="#90caf9" stroke="#1976d2" stroke-width="3"/></svg>' },
+  { words: ['lula', 'titi'], expected: 0, shape_type: 'curved',
+    svg: '<svg width="200" height="200"><path d="M30,100 Q100,20 170,100 Q100,180 30,100" fill="#90caf9" stroke="#1976d2" stroke-width="3"/></svg>' },
+];
+
+// Picture naming stimuli (paths - will check if exist)
+const picture_stimuli = [
+  { image: 'img/mixing.jpeg', target: 'mixing', iconic: true, rating: 5.10 },
+  { image: 'img/cracking.jpeg', target: 'cracking', iconic: true, rating: 5.40 },
+  { image: 'img/flipping.jpg', target: 'flipping', iconic: true, rating: 5.70 },
+  { image: 'img/bowl.jpg', target: 'bowl', iconic: false, rating: 3.00 },
+  { image: 'img/spatula.jpg', target: 'spatula', iconic: false, rating: 3.91 },
+  { image: 'img/pouring.jpeg', target: 'pouring', iconic: false, rating: 3.60 },
+];
+
+// 4AFC receptive vocab
+const receptive_stimuli = [
+  { word: 'mixing', images: ['img/pouring.jpeg', 'img/cracking.jpeg', 'img/mixing.jpeg', 'img/flipping.jpg'], correct: 2, iconic: true, rating: 5.10 },
+  { word: 'cracking', images: ['img/mixing.jpeg', 'img/flipping.jpg', 'img/bowl.jpg', 'img/cracking.jpeg'], correct: 3, iconic: true, rating: 5.40 },
+  { word: 'bowl', images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/mixing.jpeg', 'img/pouring.jpeg'], correct: 0, iconic: false, rating: 3.00 },
+  { word: 'pouring', images: ['img/pouring.jpeg', 'img/mixing.jpeg', 'img/spatula.jpg', 'img/cracking.jpeg'], correct: 0, iconic: false, rating: 3.60 },
 ];
 
 /* ======================== PARTICIPANT INFO ======================== */
@@ -68,7 +125,7 @@ function createParticipantInfo() {
       <form id="participant-form" style="text-align:left;max-width:500px;margin:auto;">
         <div style="margin-bottom:15px;">
           <label><b>Participant ID / 参加者ID</b></label><br>
-          <input name="participant_id" id="pid" type="text" required placeholder="Enter ID" style="width:100%;padding:8px;box-sizing:border-box;">
+          <input name="participant_id" type="text" required placeholder="Enter ID" style="width:100%;padding:8px;box-sizing:border-box;">
         </div>
         <div style="margin-bottom:15px;">
           <label><b>Age / 年齢</b></label><br>
@@ -80,8 +137,6 @@ function createParticipantInfo() {
             <option value="">--Select--</option>
             <option value="Japanese">Japanese / 日本語</option>
             <option value="English">English / 英語</option>
-            <option value="Chinese">Chinese / 中国語</option>
-            <option value="Korean">Korean / 韓国語</option>
             <option value="Other">Other / その他</option>
           </select>
         </div>
@@ -91,7 +146,7 @@ function createParticipantInfo() {
         </div>
         <div style="margin-bottom:15px;">
           <label><b>TOEIC/EIKEN Score (optional)</b></label><br>
-          <input name="english_proficiency" type="text" placeholder="e.g., TOEIC 600, EIKEN Pre-1" style="width:100%;padding:8px;box-sizing:border-box;">
+          <input name="english_proficiency" type="text" placeholder="e.g., TOEIC 600" style="width:100%;padding:8px;box-sizing:border-box;">
         </div>
         <div style="margin-bottom:15px;">
           <label><b>VR Experience / VR経験</b></label><br>
@@ -121,22 +176,18 @@ function createParticipantInfo() {
 function createDigitSpanBlock(forward) {
   const trials = [];
   const direction = forward ? 'forward' : 'backward';
-  const instruction = forward 
-    ? 'Remember numbers in the SAME order' 
-    : 'Enter numbers in REVERSE order';
+  const instruction = forward ? 'Enter numbers in SAME order' : 'Enter numbers in REVERSE order';
   
   trials.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<h2>Number Memory (${direction})</h2><p>${instruction}</p>`,
+    stimulus: `<h2>Number Memory (${direction})</h2><p>${instruction}</p><p>${forward ? '同じ順番で入力' : '逆順で入力'}</p>`,
     choices: ['Begin / 開始']
   });
   
-  // 4 trials of increasing length
   for (let length = 3; length <= 6; length++) {
     const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
     const correctAnswer = forward ? digits.join('') : digits.slice().reverse().join('');
     
-    // Show digits
     trials.push({
       type: T('jsPsychHtmlKeyboardResponse'),
       stimulus: '<div style="font-size:48px;letter-spacing:12px;">' + digits.join(' ') + '</div>',
@@ -145,19 +196,60 @@ function createDigitSpanBlock(forward) {
       data: { task: 'digit_span_present', digits: digits.join(''), length, direction }
     });
     
-    // Recall
     trials.push({
       type: T('jsPsychSurveyText'),
-      questions: [{ 
-        prompt: instruction + ':<br>' + (forward ? '同じ順番で入力' : '逆順で入力'), 
-        name: 'response', 
-        required: true 
-      }],
+      questions: [{ prompt: instruction + ':', name: 'response', required: true }],
       data: { task: 'digit_span_response', correct_answer: correctAnswer, length, direction },
       on_finish: function(d) {
         const resp = (d.response?.response || '').replace(/\s/g, '');
         d.entered = resp;
         d.correct = (resp === d.correct_answer);
+      }
+    });
+  }
+  
+  return trials;
+}
+
+/* ======================== PHONEME DISCRIMINATION ======================== */
+// Uses button response instead of keyboard + on_load (safer pattern)
+function createPhonemeBlock() {
+  const trials = [];
+  
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <h2>Sound Discrimination / 音の識別</h2>
+      <p>You will see two words. Decide if they sound the SAME or DIFFERENT in English.</p>
+      <p>2つの単語を見て、英語で同じ発音か違う発音かを判断してください。</p>
+      <p style="color:#666;font-size:14px;">(Note: Audio files not required for this version)</p>`,
+    choices: ['Begin / 開始']
+  });
+  
+  for (const item of phoneme_stimuli) {
+    trials.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `
+        <div style="text-align:center;">
+          <div style="font-size:32px;margin:30px 0;">
+            <span style="background:#e3f2fd;padding:10px 20px;border-radius:8px;margin:0 10px;">${item.pair[0]}</span>
+            <span style="color:#666;">vs</span>
+            <span style="background:#e3f2fd;padding:10px 20px;border-radius:8px;margin:0 10px;">${item.pair[1]}</span>
+          </div>
+          <p>Do these words sound the SAME or DIFFERENT?</p>
+        </div>`,
+      choices: ['Same / 同じ', 'Different / 違う'],
+      data: { 
+        task: 'phoneme_discrimination', 
+        word1: item.pair[0], 
+        word2: item.pair[1], 
+        correct_answer: item.correct,
+        contrast_type: item.contrast
+      },
+      on_finish: function(d) {
+        const response = d.response === 0 ? 'same' : 'different';
+        d.response_label = response;
+        d.correct = (response === d.correct_answer);
       }
     });
   }
@@ -197,7 +289,6 @@ function createLDTBlock() {
     }
   };
 
-  // Practice items
   const practice = [
     { stimulus: 'TABLE', correct_response: 'a', word_type: 'practice', iconic: null, rating: null },
     { stimulus: 'BLARP', correct_response: 'l', word_type: 'practice', iconic: null, rating: null },
@@ -208,48 +299,80 @@ function createLDTBlock() {
     stimulus: function() {
       const last = jsPsych.data.get().last(1).values()[0] || {};
       return last.correct
-        ? '<h3 style="color:green">✓ Correct!</h3><p>Press SPACE to continue</p>'
+        ? '<h3 style="color:green">✓ Correct!</h3><p>Press SPACE</p>'
         : '<h3 style="color:red">✗ Incorrect</h3><p>A = Word, L = Non-word</p><p>Press SPACE</p>';
     },
     choices: [' ']
   };
 
   return [
-    { 
-      type: T('jsPsychHtmlButtonResponse'), 
-      stimulus: `
-        <h2>Word Recognition / 単語認識</h2>
-        <p>Press <b>A</b> for real English words, <b>L</b> for non-words.</p>
-        <p>実在する英単語なら<b>A</b>、そうでなければ<b>L</b>を押してください。</p>`,
-      choices: ['Begin / 開始'] 
-    },
-    { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h3>Practice (2 trials)</h3>', choices: ['Start Practice'] },
+    { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h2>Word Recognition / 単語認識</h2><p>Press <b>A</b> for real words, <b>L</b> for non-words.</p>', choices: ['Begin / 開始'] },
+    { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h3>Practice (2 trials)</h3>', choices: ['Start'] },
     { timeline: [fixation, ldtTrial, practiceFeedback], timeline_variables: practice },
-    { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h3>Main Task</h3><p>No more feedback. Go as fast as you can!</p>', choices: ['Start'] },
+    { type: T('jsPsychHtmlButtonResponse'), stimulus: '<h3>Main Task</h3><p>No feedback. Go fast!</p>', choices: ['Start'] },
     { timeline: [fixation, ldtTrial], timeline_variables: ldt_stimuli, randomize_order: true }
   ];
 }
 
+/* ======================== FOLEY MATCHING (NO AUDIO) ======================== */
+function createFoleyBlock() {
+  const trials = [];
+  
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <h2>Sound-Meaning Matching / 音と意味のマッチング</h2>
+      <p>Imagine hearing a sound. What does it represent?</p>
+      <p>音を想像してください。何を表していますか？</p>`,
+    choices: ['Begin / 開始']
+  });
+  
+  for (const item of foley_stimuli) {
+    trials.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `
+        <div style="text-align:center;">
+          <div style="background:#fff3cd;padding:20px;border-radius:12px;margin-bottom:20px;">
+            <p style="font-size:20px;margin:0;">🔊 Imagine: <b>"${item.description}"</b></p>
+          </div>
+          <p>What does this sound represent?</p>
+        </div>`,
+      choices: item.options,
+      data: { 
+        task: 'foley_matching', 
+        description: item.description, 
+        correct: item.correct,
+        mapping_type: item.mapping
+      },
+      on_finish: function(d) {
+        d.correct = (d.response === d.correct);
+      }
+    });
+  }
+  
+  return trials;
+}
+
 /* ======================== VISUAL ICONICITY (BOUBA-KIKI) ======================== */
-function createVisualIconicityBlock() {
+function createVisualBlock() {
   const trials = [];
   
   trials.push({
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: `
       <h2>Shape-Word Matching / 形と言葉</h2>
-      <p>Which word best matches the shape?</p>
+      <p>Which made-up word best matches the shape?</p>
       <p>この形に合う言葉はどちらですか？</p>`,
     choices: ['Begin / 開始']
   });
   
-  for (const item of visual_iconicity_stimuli) {
+  for (const item of visual_stimuli) {
     trials.push({
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `
         <div style="text-align:center;">
-          ${item.shape_svg}
-          <p style="margin-top:20px;">Which word matches this shape?</p>
+          ${item.svg}
+          <p style="margin-top:20px;font-size:18px;">Which word matches this shape?</p>
         </div>`,
       choices: item.words,
       data: { task: 'visual_iconicity', shape_type: item.shape_type, correct: item.expected },
@@ -262,90 +385,48 @@ function createVisualIconicityBlock() {
   return trials;
 }
 
-/* ======================== PROCEDURAL KNOWLEDGE ======================== */
-const PROCEDURE_STEPS = ['Crack eggs', 'Mix flour and eggs', 'Heat the pan', 'Pour batter', 'Flip when ready'];
-
-function createProceduralBlock() {
-  return [{
-    type: T('jsPsychSurveyText'),
-    preamble: `
-      <h3>Recipe Knowledge / レシピの知識</h3>
-      <p>List the steps to make a pancake in order:</p>
-      <p>パンケーキを作る手順を順番に書いてください：</p>`,
-    questions: PROCEDURE_STEPS.map((_, i) => ({
-      prompt: `Step ${i + 1}:`,
-      name: `step_${i + 1}`,
-      rows: 2,
-      required: i < 3  // First 3 required
-    })),
-    button_label: 'Submit / 送信',
-    data: { task: 'procedural_knowledge' }
-  }];
-}
-
-/* ======================== SPATIAL SPAN (Simplified) ======================== */
-function createSpatialSpanBlock() {
+/* ======================== SPATIAL SPAN ======================== */
+function createSpatialBlock() {
   const trials = [];
+  const patterns = [[0, 4, 8], [1, 4, 7], [0, 1, 2, 5], [2, 4, 6, 8]];
   
   trials.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Spatial Memory / 空間記憶</h2>
-      <p>Watch the pattern and remember it.</p>
-      <p>パターンを見て覚えてください。</p>`,
+    stimulus: '<h2>Spatial Memory / 空間記憶</h2><p>Watch and remember the pattern.</p>',
     choices: ['Begin / 開始']
   });
   
-  // Generate a simple pattern for demo
-  const patterns = [
-    [0, 4, 8],      // Diagonal
-    [1, 4, 7],      // Vertical middle
-    [0, 1, 2, 5],   // L-shape
-  ];
-  
-  for (let trial = 0; trial < patterns.length; trial++) {
-    const pattern = patterns[trial];
-    
-    // Show pattern
+  for (const pattern of patterns) {
+    // Show
     trials.push({
       type: T('jsPsychHtmlKeyboardResponse'),
       stimulus: function() {
         let grid = '<div style="display:grid;grid-template-columns:repeat(3,80px);gap:10px;justify-content:center;">';
         for (let i = 0; i < 9; i++) {
-          const lit = pattern.includes(i);
-          grid += `<div style="width:80px;height:80px;background:${lit ? '#90caf9' : '#e0e0e0'};border-radius:8px;"></div>`;
+          grid += `<div style="width:80px;height:80px;background:${pattern.includes(i) ? '#90caf9' : '#e0e0e0'};border-radius:8px;"></div>`;
         }
-        grid += '</div>';
-        return grid + '<p style="margin-top:20px;">Remember this pattern...</p>';
+        return grid + '</div><p>Remember this pattern...</p>';
       },
       choices: 'NO_KEYS',
-      trial_duration: 1500 + (pattern.length * 300),
-      data: { task: 'spatial_span_show', pattern: pattern.join(','), length: pattern.length }
+      trial_duration: 1500 + pattern.length * 300,
+      data: { task: 'spatial_show', pattern: pattern.join(','), length: pattern.length }
     });
     
-    // Recall (simplified - just show and ask to confirm)
-    trials.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: function() {
-        let grid = '<div style="display:grid;grid-template-columns:repeat(3,80px);gap:10px;justify-content:center;">';
-        for (let i = 0; i < 9; i++) {
-          grid += `<div style="width:80px;height:80px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;">${i + 1}</div>`;
-        }
-        grid += '</div>';
-        return grid + '<p style="margin-top:20px;">Type the numbers that were highlighted (in order):</p>';
-      },
-      choices: ['Continue'],
-      data: { task: 'spatial_span_recall_prompt', pattern: pattern.join(',') }
-    });
-    
+    // Recall
     trials.push({
       type: T('jsPsychSurveyText'),
-      questions: [{ prompt: 'Enter the numbers (e.g., 1 5 9):', name: 'response', required: true }],
-      data: { task: 'spatial_span_recall', correct_answer: pattern.map(i => i + 1).join(' ') },
+      preamble: function() {
+        let grid = '<div style="display:grid;grid-template-columns:repeat(3,80px);gap:10px;justify-content:center;margin-bottom:20px;">';
+        for (let i = 0; i < 9; i++) {
+          grid += `<div style="width:80px;height:80px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:24px;font-weight:bold;">${i + 1}</div>`;
+        }
+        return grid + '</div>';
+      },
+      questions: [{ prompt: 'Enter the highlighted numbers in order (e.g., 1 5 9):', name: 'response', required: true }],
+      data: { task: 'spatial_recall', correct_answer: pattern.map(i => i + 1).join(' ') },
       on_finish: function(d) {
-        const resp = (d.response?.response || '').replace(/[,\s]+/g, ' ').trim();
-        d.entered = resp;
-        d.correct = (resp === d.correct_answer);
+        d.entered = (d.response?.response || '').replace(/[,\s]+/g, ' ').trim();
+        d.correct = (d.entered === d.correct_answer);
       }
     });
   }
@@ -353,25 +434,82 @@ function createSpatialSpanBlock() {
   return trials;
 }
 
+/* ======================== PROCEDURAL KNOWLEDGE ======================== */
+function createProceduralBlock() {
+  return [{
+    type: T('jsPsychSurveyText'),
+    preamble: '<h3>Recipe Knowledge / レシピの知識</h3><p>List the steps to make a pancake:</p>',
+    questions: [
+      { prompt: 'Step 1:', name: 'step1', rows: 2, required: true },
+      { prompt: 'Step 2:', name: 'step2', rows: 2, required: true },
+      { prompt: 'Step 3:', name: 'step3', rows: 2, required: true },
+      { prompt: 'Step 4:', name: 'step4', rows: 2 },
+      { prompt: 'Step 5:', name: 'step5', rows: 2 }
+    ],
+    button_label: 'Submit / 送信',
+    data: { task: 'procedural_knowledge' }
+  }];
+}
+
 /* ======================== IDEOPHONE TEST ======================== */
 function createIdeophoneBlock() {
   return [{
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Japanese Sound Words / 擬音語</h2>
-      <p>Match the Japanese onomatopoeia to cooking actions.</p>`,
+    stimulus: '<h2>Japanese Sound Words / 擬音語</h2><p>Match sounds to cooking actions.</p>',
     choices: ['Begin / 開始']
   }, {
     type: T('jsPsychSurveyLikert'),
     preamble: '<h3>Which sound represents each action?</h3>',
     questions: [
-      { prompt: '<b>Egg frying sound / 卵が焼ける音</b>', name: 'frying', labels: ['ジュージュー', 'パラパラ', 'グルグル'], required: true },
+      { prompt: '<b>Frying sound / 焼ける音</b>', name: 'frying', labels: ['ジュージュー', 'パラパラ', 'グルグル'], required: true },
       { prompt: '<b>Stirring sound / かき混ぜる音</b>', name: 'stirring', labels: ['ジュージュー', 'パラパラ', 'グルグル'], required: true },
-      { prompt: '<b>Sprinkling powder / 粉をまく音</b>', name: 'sprinkling', labels: ['ジュージュー', 'パラパラ', 'グルグル'], required: true }
+      { prompt: '<b>Sprinkling / 粉をまく音</b>', name: 'sprinkling', labels: ['ジュージュー', 'パラパラ', 'グルグル'], required: true }
     ],
     button_label: 'Submit / 送信',
     data: { task: 'ideophone_mapping' }
   }];
+}
+
+/* ======================== PICTURE NAMING (OPTIONAL) ======================== */
+function createPictureNamingBlock() {
+  // Only include if mic is available
+  if (!have('jsPsychHtmlAudioResponse')) {
+    return [{
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: '<p style="color:#666;">Picture naming skipped (audio plugin not available).</p>',
+      choices: ['Continue']
+    }];
+  }
+  
+  const trials = [];
+  
+  trials.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `
+      <h2>Picture Description / 絵の説明</h2>
+      <p>Describe what you see in English (4 seconds).</p>
+      <p>見えるものを英語で説明してください（4秒）。</p>`,
+    choices: ['Begin / 開始']
+  });
+  
+  // Use text fallback if no mic
+  for (const item of picture_stimuli.slice(0, 4)) {
+    trials.push({
+      type: T('jsPsychSurveyText'),
+      preamble: `
+        <div style="text-align:center;">
+          <img src="${asset(item.image)}" style="max-width:300px;border-radius:8px;" 
+               onerror="this.style.display='none';this.nextElementSibling.style.display='block';">
+          <div style="display:none;background:#f5f5f5;padding:40px;border-radius:8px;">
+            <p>Image: ${item.target}</p>
+          </div>
+        </div>`,
+      questions: [{ prompt: 'Describe this image in English:', name: 'description', rows: 3, required: true }],
+      data: { task: 'picture_naming', target: item.target, iconic: item.iconic, iconicity_rating: item.rating }
+    });
+  }
+  
+  return trials;
 }
 
 /* ======================== MAIN ======================== */
@@ -383,19 +521,11 @@ async function initializeExperiment() {
     const required = ['initJsPsych', 'jsPsychHtmlButtonResponse', 'jsPsychHtmlKeyboardResponse', 'jsPsychSurveyText', 'jsPsychSurveyLikert'];
     for (const name of required) {
       if (!have(name)) {
-        console.error('[pretest] Missing:', name);
         alert('Missing plugin: ' + name);
         return;
       }
     }
-    console.log('[pretest] All plugins found');
-    
-    // Check display element
-    const target = document.getElementById('jspsych-target');
-    if (!target) {
-      alert('Display element not found');
-      return;
-    }
+    console.log('[pretest] All required plugins found');
     
     // Initialize jsPsych
     jsPsych = window.initJsPsych({
@@ -405,7 +535,6 @@ async function initializeExperiment() {
       on_finish: function() {
         const filename = 'pretest_' + currentPID_value + '_' + new Date().toISOString().slice(0,10) + '.json';
         jsPsych.data.get().localSave('json', filename);
-        console.log('[pretest] Data saved as', filename);
       }
     });
     window.jsPsych = jsPsych;
@@ -419,60 +548,35 @@ async function initializeExperiment() {
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `
         <h1>VR Pre-Test / VRプリテスト</h1>
-        <p>This test measures your baseline English vocabulary and cognitive abilities.</p>
-        <p>このテストは英語語彙と認知能力のベースラインを測定します。</p>
-        <p style="margin-top:20px;color:#666;">Estimated time: 15-20 minutes / 所要時間: 15-20分</p>`,
+        <p>This test measures baseline English vocabulary and cognitive abilities.</p>
+        <p style="color:#666;">Estimated: 20-25 minutes</p>`,
       choices: ['Start / 開始']
     });
     
-    // Participant info
-    console.log('[pretest] Adding participant info...');
+    // Sections
+    console.log('[pretest] Building timeline...');
+    
     timeline.push(createParticipantInfo());
-    
-    // Digit span forward
-    console.log('[pretest] Adding digit span forward...');
     timeline.push(...createDigitSpanBlock(true));
-    
-    // Digit span backward
-    console.log('[pretest] Adding digit span backward...');
     timeline.push(...createDigitSpanBlock(false));
-    
-    // LDT
-    console.log('[pretest] Adding LDT...');
+    timeline.push(...createPhonemeBlock());
     timeline.push(...createLDTBlock());
-    
-    // Visual iconicity
-    console.log('[pretest] Adding visual iconicity...');
-    timeline.push(...createVisualIconicityBlock());
-    
-    // Spatial span
-    console.log('[pretest] Adding spatial span...');
-    timeline.push(...createSpatialSpanBlock());
-    
-    // Procedural
-    console.log('[pretest] Adding procedural...');
+    timeline.push(...createFoleyBlock());
+    timeline.push(...createVisualBlock());
+    timeline.push(...createSpatialBlock());
     timeline.push(...createProceduralBlock());
-    
-    // Ideophone
-    console.log('[pretest] Adding ideophone...');
     timeline.push(...createIdeophoneBlock());
+    timeline.push(...createPictureNamingBlock());
     
     // Exit
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `
-        <h2>All done! / 完了！</h2>
-        <p>Thank you for completing the pre-test.</p>
-        <p>プリテストを完了していただきありがとうございます。</p>
-        <p style="margin-top:20px;">Your results will be saved automatically.</p>`,
-      choices: ['Download Results / 結果をダウンロード']
+      stimulus: '<h2>All done! / 完了！</h2><p>Thank you! Your results will be saved.</p>',
+      choices: ['Download Results']
     });
     
     console.log('[pretest] Timeline built with', timeline.length, 'items');
-    
-    // Run
     jsPsych.run(timeline);
-    console.log('[pretest] Experiment started');
     
   } catch (e) {
     console.error('[pretest] Error:', e);
@@ -481,11 +585,8 @@ async function initializeExperiment() {
 }
 
 // Auto-start
-console.log('[pretest] Setting up auto-start...');
 if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', function() {
-    setTimeout(initializeExperiment, 100);
-  });
+  document.addEventListener('DOMContentLoaded', function() { setTimeout(initializeExperiment, 100); });
 } else {
   setTimeout(initializeExperiment, 100);
 }
