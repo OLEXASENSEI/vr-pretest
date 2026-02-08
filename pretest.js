@@ -122,7 +122,7 @@ const foley_stimuli = [
   { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',      iconicity_rating: 5.40 },
 ];
 
-// PICTURE NAMING — Group A only
+// PICTURE NAMING — Group A only (pretest img/ uses single-file naming)
 const picture_naming_stimuli = [
   { image: 'img/bowl.jpg',      target: 'bowl',     category: 'utensil', iconic: false, rating: 3.00, group: 'A' },
   { image: 'img/spatula.jpg',   target: 'spatula',  category: 'utensil', iconic: false, rating: 3.91, group: 'A' },
@@ -1254,6 +1254,15 @@ async function initializeExperiment() {
     if (!have('initJsPsych')) { alert('jsPsych core not loaded.'); return; }
 
     addCustomStyles();
+
+    // Ensure display element exists — jsPsych crashes if getElementById returns null
+    let displayEl = document.getElementById('jspsych-target');
+    if (!displayEl) {
+      displayEl = document.createElement('div');
+      displayEl.id = 'jspsych-target';
+      document.body.appendChild(displayEl);
+      console.warn('[pretest] Created missing #jspsych-target element');
+    }
 
     jsPsych = T('initJsPsych')({
       display_element: 'jspsych-target',
