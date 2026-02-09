@@ -337,26 +337,36 @@ function createParticipantInfo() {
     choices: ['Continue / 続行'],
     data: { task: 'participant_info' },
     on_load: function () {
-      const btn = document.querySelector('.jspsych-btn');
-      btn.addEventListener('click', function handler(e) {
-        const form = document.getElementById('participant-form');
-        const errorDiv = document.getElementById('form-error');
-        if (!form.checkValidity()) {
-          e.preventDefault();
-          e.stopImmediatePropagation();
-          errorDiv.style.display = 'block';
-          form.reportValidity();
+      // FIX: Add timeout and null check for button
+      setTimeout(() => {
+        const buttons = document.querySelectorAll('.jspsych-btn');
+        const btn = buttons[buttons.length - 1]; // Get the last button (Continue button)
+        
+        if (!btn) {
+          console.error('[participant_info] Button not found');
           return;
         }
-        errorDiv.style.display = 'none';
-        // Capture form data NOW while DOM still exists
-        const formData = new FormData(form);
-        capturedResponses = {};
-        for (const [key, value] of formData.entries()) {
-          capturedResponses[key] = value;
-        }
-        currentPID_value = capturedResponses.participant_id || 'unknown';
-      }, { capture: true });
+        
+        btn.addEventListener('click', function handler(e) {
+          const form = document.getElementById('participant-form');
+          const errorDiv = document.getElementById('form-error');
+          if (!form.checkValidity()) {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            errorDiv.style.display = 'block';
+            form.reportValidity();
+            return;
+          }
+          errorDiv.style.display = 'none';
+          // Capture form data NOW while DOM still exists
+          const formData = new FormData(form);
+          capturedResponses = {};
+          for (const [key, value] of formData.entries()) {
+            capturedResponses[key] = value;
+          }
+          currentPID_value = capturedResponses.participant_id || 'unknown';
+        }, { capture: true });
+      }, 50); // Small delay to ensure DOM is ready
     },
     on_finish: (data) => {
       // Use closure-captured data (DOM may be gone)
