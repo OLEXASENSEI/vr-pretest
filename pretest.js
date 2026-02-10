@@ -201,37 +201,30 @@ const ldt_stimuli = [
 
 /* ======================== ASSET VALIDATION ======================== */
 function checkAudioExists(url) {
-  return new Promise(resolve => {
-    const a = new Audio();
-    let resolved = false;
-    const ok = () => { if (resolved) return; resolved = true; cleanup(); resolve(true); };
-    const bad = () => { if (resolved) return; resolved = true; cleanup(); console.warn('[Validation] ✗ Audio FAILED:', url); resolve(false); };
-    const cleanup = () => {
-      a.removeEventListener('canplaythrough', ok);
-      a.removeEventListener('error', bad);
-      a.removeEventListener('loadedmetadata', ok);
-      try { if (!a.paused) a.pause(); a.src = ''; } catch (e) {}
-    };
-    setTimeout(() => { if (!resolved) bad(); }, 5000);
-    a.addEventListener('canplaythrough', ok, { once: true });
-    a.addEventListener('loadedmetadata', ok, { once: true });
-    a.addEventListener('error', bad, { once: true });
-    a.preload = 'auto';
-    a.src = asset(url);
-  });
+  // Use fetch HEAD instead of Audio element — avoids browser autoplay blocking
+  return fetch(asset(url), { method: 'HEAD' })
+    .then(r => {
+      if (r.ok) return true;
+      console.warn('[Validation] ✗ Audio FAILED (HTTP ' + r.status + '):', url);
+      return false;
+    })
+    .catch(() => {
+      console.warn('[Validation] ✗ Audio FAILED (network):', url);
+      return false;
+    });
 }
 
 function checkImageExists(url) {
-  return new Promise(resolve => {
-    const img = new Image();
-    let resolved = false;
-    const ok = () => { if (resolved) return; resolved = true; resolve(true); };
-    const bad = () => { if (resolved) return; resolved = true; console.warn('[Validation] ✗ Image FAILED:', url); resolve(false); };
-    setTimeout(() => { if (!resolved) bad(); }, 5000);
-    img.onload = ok;
-    img.onerror = bad;
-    img.src = asset(url);
-  });
+  return fetch(asset(url), { method: 'HEAD' })
+    .then(r => {
+      if (r.ok) return true;
+      console.warn('[Validation] ✗ Image FAILED (HTTP ' + r.status + '):', url);
+      return false;
+    })
+    .catch(() => {
+      console.warn('[Validation] ✗ Image FAILED (network):', url);
+      return false;
+    });
 }
 
 let PRELOAD_AUDIO = [];
@@ -744,10 +737,6 @@ function buildMicSetupGate({ required = true } = {}) {
   const gate = {
     type: T('jsPsychHtmlButtonResponse'),
     choices: ['Continue / 続行', 'Use Text Only / 文字で続行'],
-    button_html: [
-      '<button class="jspsych-btn" id="mic-continue" disabled>%choice%</button>',
-      '<button class="jspsych-btn" id="mic-textonly">%choice%</button>'
-    ],
     stimulus: `
       <div style="max-width:720px;margin:0 auto;text-align:center;line-height:1.6">
         <h2>Microphone Setup / マイクの設定</h2>
@@ -773,9 +762,15 @@ function buildMicSetupGate({ required = true } = {}) {
     data: { task: 'mic_gate' },
     on_load: () => {
       const enableBtn = document.getElementById('mic-enable');
-      const contBtn   = document.getElementById('mic-continue');
-      const statusEl  = document.getElementById('mic-status');
-      const levelEl   = document.getElementById('mic-level');
+      // jsPsych renders buttons in order — first is Continue, second is Text Only
+      const allBtns = document.querySelectorAll('.jspsych-btn');
+      const contBtn = allBtns[allBtns.length - 2];  // Continue
+      const textBtn = allBtns[allBtns.length - 1];  // Text Only
+      const statusEl = document.getElementById('mic-status');
+      const levelEl = document.getElementById('mic-level');
+
+      // Disable Continue until mic is enabled
+      if (contBtn) { contBtn.disabled = true; contBtn.style.opacity = '0.5'; }
 
       async function startStream() {
         try {
@@ -795,16 +790,16 @@ function buildMicSetupGate({ required = true } = {}) {
             requestAnimationFrame(tick);
           })();
           statusEl.textContent = 'Microphone enabled ✔';
-          contBtn.disabled = false;
+          if (contBtn) { contBtn.disabled = false; contBtn.style.opacity = '1'; }
           window.__mic_ok = true;
         } catch (err) {
           statusEl.textContent = 'Permission denied or unavailable ✖';
-          contBtn.disabled = true;
+          if (contBtn) { contBtn.disabled = true; contBtn.style.opacity = '0.5'; }
           window.__mic_ok = false;
         }
       }
       enableBtn.addEventListener('click', startStream);
-      document.getElementById('mic-textonly').addEventListener('click', () => { window.__mic_ok = false; });
+      if (textBtn) textBtn.addEventListener('click', () => { window.__mic_ok = false; });
     },
     on_finish: () => { microphoneAvailable = !!window.__mic_ok; }
   };
