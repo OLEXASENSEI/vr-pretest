@@ -1045,7 +1045,7 @@ function createFoleyTimeline() {
       const o = jsPsych.timelineVariable('options');
       return Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
     },
-    button_html: (choice) => '<button class="jspsych-btn answer-btn" type="button">' + choice + '</button>',
+    // button_html removed — let jsPsych 7.3 use its default
     post_trial_gap: 250,
     data: () => ({
       task: 'foley_iconicity',
@@ -1361,29 +1361,9 @@ function createIdeophoneTest() {
 }
 
 /* ======================== BUTTON HARDENING ======================== */
-// v4 FIX: jsPsych 7.3+ requires button_html to be a FUNCTION, not a string template.
-// The old %choice% string format was removed in 7.3.
-const DEFAULT_BUTTON_FN = (choice) => '<button class="jspsych-btn">' + choice + '</button>';
-
-function hardenButtons(nodes) {
-  for (const n of nodes) {
-    if (!n || typeof n !== 'object') continue;
-    if (Array.isArray(n.timeline)) hardenButtons(n.timeline);
-    const tn = n.type && n.type.info && n.type.info.name;
-    if (tn !== 'html-button-response') continue;
-    if (typeof n.choices === 'function') {
-      // Dynamic choices — ensure button_html is a function too
-      if (typeof n.button_html !== 'function') n.button_html = DEFAULT_BUTTON_FN;
-      continue;
-    }
-    let choices = n.choices;
-    if (!Array.isArray(choices) || choices.length === 0) { choices = ['Continue']; n.choices = choices; }
-    // If button_html is a string or array (old format), replace with function
-    if (typeof n.button_html !== 'function') {
-      n.button_html = DEFAULT_BUTTON_FN;
-    }
-  }
-}
+// REMOVED in v4: hardenButtons was written for jsPsych 7.0–7.2 where button_html
+// used %choice% string templates. In 7.3+ button_html is a function and the plugin
+// handles defaults correctly. Manually setting button_html causes rendering issues.
 
 /* ======================== BOOTSTRAP ======================== */
 async function initializeExperiment() {
@@ -1494,7 +1474,7 @@ async function initializeExperiment() {
       on_finish: () => saveData()
     });
 
-    hardenButtons(timeline);
+    // hardenButtons removed — jsPsych 7.3+ handles button_html defaults correctly
     jsPsych.run(timeline);
   } catch (e) {
     console.error('[pretest] Initialization error:', e);
