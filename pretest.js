@@ -1045,7 +1045,7 @@ function createFoleyTimeline() {
       const o = jsPsych.timelineVariable('options');
       return Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
     },
-    button_html: '<button class="jspsych-btn answer-btn" type="button">%choice%</button>',
+    button_html: (choice) => '<button class="jspsych-btn answer-btn" type="button">' + choice + '</button>',
     post_trial_gap: 250,
     data: () => ({
       task: 'foley_iconicity',
@@ -1361,6 +1361,10 @@ function createIdeophoneTest() {
 }
 
 /* ======================== BUTTON HARDENING ======================== */
+// v4 FIX: jsPsych 7.3+ requires button_html to be a FUNCTION, not a string template.
+// The old %choice% string format was removed in 7.3.
+const DEFAULT_BUTTON_FN = (choice) => '<button class="jspsych-btn">' + choice + '</button>';
+
 function hardenButtons(nodes) {
   for (const n of nodes) {
     if (!n || typeof n !== 'object') continue;
@@ -1368,13 +1372,15 @@ function hardenButtons(nodes) {
     const tn = n.type && n.type.info && n.type.info.name;
     if (tn !== 'html-button-response') continue;
     if (typeof n.choices === 'function') {
-      if (Array.isArray(n.button_html)) n.button_html = '<button class="jspsych-btn">%choice%</button>';
+      // Dynamic choices — ensure button_html is a function too
+      if (typeof n.button_html !== 'function') n.button_html = DEFAULT_BUTTON_FN;
       continue;
     }
     let choices = n.choices;
     if (!Array.isArray(choices) || choices.length === 0) { choices = ['Continue']; n.choices = choices; }
-    if (Array.isArray(n.button_html) && n.button_html.length !== choices.length) {
-      n.button_html = choices.map(() => '<button class="jspsych-btn">%choice%</button>');
+    // If button_html is a string or array (old format), replace with function
+    if (typeof n.button_html !== 'function') {
+      n.button_html = DEFAULT_BUTTON_FN;
     }
   }
 }
