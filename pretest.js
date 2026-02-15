@@ -50,27 +50,19 @@ function namingPhase() { return 'pre'; }
 function assignCondition() { return 'immediate'; }
 
 /* ======================== WORD CLASSIFICATION ======================== */
-// Based on Winter et al. iconicity ratings (scale 1-7)
-// Threshold: ≥4.5 = iconic, <4.5 = arbitrary
-
 const WORD_CLASSIFICATION = {
-  // GROUP A — PRE-TEST (this file)
   'flip':    { iconic: true,  rating: 5.70, category: 'action',  group: 'A' },
   'crack':   { iconic: true,  rating: 5.40, category: 'action',  group: 'A' },
   'whisk':   { iconic: true,  rating: 4.55, category: 'action',  group: 'A' },
   'bowl':    { iconic: false, rating: 3.00, category: 'utensil', group: 'A' },
   'spatula': { iconic: false, rating: 3.91, category: 'utensil', group: 'A' },
   'pan':     { iconic: false, rating: 3.45, category: 'utensil', group: 'A' },
-
-  // GROUP B — POST-TEST (not baseline-tested here; taught in training)
   'sizzle':   { iconic: true,  rating: 5.30, category: 'process',    group: 'B' },
   'mix':      { iconic: true,  rating: 5.10, category: 'action',     group: 'B' },
   'stirring': { iconic: true,  rating: 4.82, category: 'action',     group: 'B' },
   'pour':     { iconic: false, rating: 3.60, category: 'action',     group: 'B' },
   'butter':   { iconic: false, rating: 3.50, category: 'ingredient', group: 'B' },
   'flour':    { iconic: false, rating: 3.00, category: 'ingredient', group: 'B' },
-
-  // FOILS — untrained, for recognition tests
   'glug':    { iconic: true,  rating: 6.20, category: 'sound',   group: 'foil' },
   'splash':  { iconic: true,  rating: 6.09, category: 'action',  group: 'foil' },
   'drizzle': { iconic: true,  rating: 6.00, category: 'action',  group: 'foil' },
@@ -117,7 +109,6 @@ async function saveData(data) {
 }
 
 /* ======================== STIMULI ======================== */
-// PHONEME DISCRIMINATION — expanded from 4 to 6 trials using available audio
 const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'l_r' },
   { audio1: 'sounds/flip.mp3',   audio2: 'sounds/frip.mp3',   correct: 'different', contrast: 'l_r' },
@@ -127,21 +118,17 @@ const phoneme_discrimination_stimuli = [
   { audio1: 'sounds/stir.mp3',   audio2: 'sounds/star.mp3',   correct: 'different', contrast: 'vowel' },
 ];
 
-// FOLEY — expanded from 4 to 8 trials using previously unused audio
 const foley_stimuli = [
-  // Original 4
   { audio: 'sounds/high_tinkle.mp3',   options: ['ice dropped into a bowl', 'sugar poured into a bowl'], correct: 0, mapping_type: 'size_pitch',     iconicity_rating: 5.5 },
   { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 3.6 },
   { audio: 'sounds/liquid_flow.mp3',   options: ['sugar', 'milk'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 5.8 },
   { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',         iconicity_rating: 5.40 },
-  // New trials using previously unused audio assets
   { audio: 'sounds/circular_whir.mp3', options: ['whisking', 'pouring'],                                 correct: 0, mapping_type: 'motion_sound',   iconicity_rating: 4.8 },
   { audio: 'sounds/sharp_crack.mp3',   options: ['cracking an egg', 'stirring a bowl'],                  correct: 0, mapping_type: 'impact',         iconicity_rating: 5.6 },
   { audio: 'sounds/low_thud.mp3',      options: ['heavy pan on stove', 'light spoon in bowl'],           correct: 0, mapping_type: 'size_pitch',     iconicity_rating: 4.2 },
   { audio: 'sounds/sizzle.mp3',        options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound',  iconicity_rating: 5.30 },
 ];
 
-// PICTURE NAMING — Group A only
 const picture_naming_stimuli = [
   { image: 'img/bowl.jpg',      target: 'bowl',     category: 'utensil', iconic: false, rating: 3.00, group: 'A' },
   { image: 'img/spatula.jpg',   target: 'spatula',  category: 'utensil', iconic: false, rating: 3.91, group: 'A' },
@@ -157,8 +144,6 @@ const visual_iconicity_stimuli = [
   { shape: 'img/spiky_shape.svg', words: ['bouba', 'kiki'],       expected: 1, shape_type: 'spiky' },
 ];
 
-/* ======================== 4AFC RECEPTIVE VOCABULARY — GROUP A ======================== */
-// Expanded: egg.jpg and spoon.jpg added as distractor images for harder discrimination
 const receptive_vocab_baseline_stimuli = [
   { word_audio: 'sounds/bowl.mp3',     images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg', 'img/egg.jpg'],        correct: 0, target: 'bowl',     iconic: false, rating: 3.00, group: 'A' },
   { word_audio: 'sounds/spatula.mp3',  images: ['img/spoon.jpg', 'img/spatula.jpg', 'img/flipping.jpg', 'img/bowl.jpg'], correct: 1, target: 'spatula',  iconic: false, rating: 3.91, group: 'A' },
@@ -168,29 +153,21 @@ const receptive_vocab_baseline_stimuli = [
   { word_audio: 'sounds/whisking.mp3', images: ['img/whisking.jpg', 'img/cracking.jpeg', 'img/spoon.jpg', 'img/pan.jpg'], correct: 0, target: 'whisking', iconic: true,  rating: 4.55, group: 'A' },
 ];
 
-/* ======================== LDT STIMULI ======================== */
-// Includes ALL 12 trained words (Groups A + B) for word-recognition baseline
 const ldt_stimuli = [
-  // Group A — iconic
   { stimulus: 'FLIP',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.70, group: 'A' },
   { stimulus: 'CRACK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.40, group: 'A' },
   { stimulus: 'WHISK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.55, group: 'A' },
-  // Group B — iconic
   { stimulus: 'SIZZLE',   correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.30, group: 'B' },
   { stimulus: 'MIX',      correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.10, group: 'B' },
   { stimulus: 'STIR',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.82, group: 'B' },
-  // Group A — arbitrary
   { stimulus: 'BOWL',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'A' },
   { stimulus: 'SPATULA',  correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.91, group: 'A' },
   { stimulus: 'PAN',      correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.45, group: 'A' },
-  // Group B — arbitrary
   { stimulus: 'FLOUR',    correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'B' },
   { stimulus: 'POUR',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.60, group: 'B' },
   { stimulus: 'BUTTER',   correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.50, group: 'B' },
-  // Controls
   { stimulus: 'CHAIR',    correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
   { stimulus: 'WINDOW',   correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
-  // Nonwords
   { stimulus: 'FLUR',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
   { stimulus: 'SPATTLE',  correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
   { stimulus: 'BOWLE',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
@@ -201,7 +178,6 @@ const ldt_stimuli = [
 
 /* ======================== ASSET VALIDATION ======================== */
 function checkAudioExists(url) {
-  // Use fetch HEAD instead of Audio element — avoids browser autoplay blocking
   return fetch(asset(url), { method: 'HEAD' })
     .then(r => {
       if (r.ok) return true;
@@ -384,8 +360,6 @@ function createParticipantInfo() {
 }
 
 /* ======================== DIGIT SPAN (3–6) — FIXED v3 ======================== */
-// FIX: Stopping rule now tracks failures per length, not globally.
-// Stops when participant fails 2 trials at the SAME length.
 function createDigitSpanInstructions(forward = true) {
   const title = forward
     ? '<h2>Number Memory Test / 数字記憶テスト</h2>'
@@ -402,11 +376,9 @@ function createDigitSpanInstructions(forward = true) {
 
 function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
   const trials = [];
-  // Track failures per length: { length: failCount }
   const failsAtLength = {};
 
   for (let length = startLen; length <= endLen; length++) {
-    // Two trials per length so stopping rule can trigger
     for (let attempt = 0; attempt < 2; attempt++) {
       const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
 
@@ -452,7 +424,6 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
           d.entered_response = entered;
           d.correct = (entered === d.correct_answer);
 
-          // Track failures per length
           if (!d.correct) {
             failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1;
             if (failsAtLength[d.length] >= 2) {
@@ -510,6 +481,15 @@ function createPhonemeTrial() {
       const btnSame = document.getElementById('btnSame');
       const btnDiff = document.getElementById('btnDiff');
       const status = document.getElementById('status');
+      const playA = document.getElementById('playA');
+      const playB = document.getElementById('playB');
+
+      // v4 FIX: Guard all DOM element access
+      if (!btnSame || !btnDiff || !status || !playA || !playB) {
+        console.error('[phoneme] DOM elements not found, finishing trial');
+        jsPsych.finishTrial({ response_label: null, dom_error: true });
+        return;
+      }
 
       function setLock(locked) {
         btnSame.disabled = locked;
@@ -528,12 +508,12 @@ function createPhonemeTrial() {
       a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once: true });
 
-      document.getElementById('playA').addEventListener('click', () => {
+      playA.addEventListener('click', () => {
         status.textContent = 'Playing Sound A…';
         a.currentTime = 0;
         a.play().catch(() => {});
       });
-      document.getElementById('playB').addEventListener('click', () => {
+      playB.addEventListener('click', () => {
         status.textContent = 'Playing Sound B…';
         b.currentTime = 0;
         b.play().catch(() => {});
@@ -694,6 +674,14 @@ function create4AFCReceptiveBaseline() {
       const playBtn = document.getElementById('play-word');
       const status = document.getElementById('receptive-status');
       const choices = document.querySelectorAll('.receptive-choice');
+
+      // v4 FIX: Guard all DOM element access
+      if (!playBtn || !status) {
+        console.error('[receptive] DOM elements not found, finishing trial');
+        jsPsych.finishTrial({ response: -1, dom_error: true });
+        return;
+      }
+
       const audio = new Audio(asset(audioSrc));
       let hasPlayed = false;
 
@@ -728,7 +716,7 @@ function create4AFCReceptiveBaseline() {
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
   };
 
-  return [intro, { timeline: [trial], timeline_variables: receptive_vocab_baseline_stimuli, randomize_order: true }];
+  return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.receptive, randomize_order: true }];
 }
 
 /* ======================== MIC SETUP GATE ======================== */
@@ -762,12 +750,24 @@ function buildMicSetupGate({ required = true } = {}) {
     data: { task: 'mic_gate' },
     on_load: () => {
       const enableBtn = document.getElementById('mic-enable');
-      // jsPsych renders buttons in order — first is Continue, second is Text Only
-      const allBtns = document.querySelectorAll('.jspsych-btn');
-      const contBtn = allBtns[allBtns.length - 2];  // Continue
-      const textBtn = allBtns[allBtns.length - 1];  // Text Only
       const statusEl = document.getElementById('mic-status');
       const levelEl = document.getElementById('mic-level');
+
+      // v4 FIX: Guard all DOM element access — find jsPsych-rendered buttons by
+      // excluding the stimulus-embedded mic-enable button
+      const allBtns = [...document.querySelectorAll('.jspsych-btn')];
+      // jsPsych choice buttons are rendered OUTSIDE the stimulus container;
+      // the mic-enable button is INSIDE. Filter to only jspsych-generated ones.
+      const choiceBtns = allBtns.filter(b => b.id !== 'mic-enable');
+      const contBtn = choiceBtns.length >= 2 ? choiceBtns[choiceBtns.length - 2] : null;
+      const textBtn = choiceBtns.length >= 1 ? choiceBtns[choiceBtns.length - 1] : null;
+
+      if (!enableBtn || !statusEl || !levelEl) {
+        console.error('[mic_gate] DOM elements not found');
+        // Still allow proceeding — don't block the experiment
+        window.__mic_ok = false;
+        return;
+      }
 
       // Disable Continue until mic is enabled
       if (contBtn) { contBtn.disabled = true; contBtn.style.opacity = '0.5'; }
@@ -809,13 +809,13 @@ function buildMicSetupGate({ required = true } = {}) {
     loop_function: () => {
       if (!required) return false;
       const last = jsPsych.data.get().last(1).values()[0] || {};
-      return !(microphoneAvailable || last.button_pressed === 1);
+      // v4 FIX: jsPsych 7 uses 'response' (integer), not 'button_pressed'
+      return !(microphoneAvailable || last.response === 1);
     }
   };
 }
 
 /* ======================== PICTURE NAMING (with text fallback) ======================== */
-// FIX v3: Added text fallback when mic unavailable (previously silently skipped)
 function createNamingTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -861,7 +861,9 @@ function createNamingTimeline() {
     data: { task: 'picture_naming_practice_prepare' }
   };
 
-  const practiceRecord = hasMicPlugins && microphoneAvailable ? {
+  // v4 FIX: practiceRecord now uses conditional_function instead of eager
+  // evaluation of microphoneAvailable (which is always false at creation time)
+  const practiceRecord = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
     stimulus: `<div>${practiceImgTag}
       <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
@@ -988,9 +990,15 @@ function createNamingTimeline() {
   const tv = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
   const tl = [intro];
 
-  // Practice
+  // Practice — v4 FIX: wrap practiceRecord in conditional_function so it
+  // evaluates microphoneAvailable at RUNTIME, not at timeline-creation time
   tl.push(practiceIntro, practicePrepare);
-  if (practiceRecord) tl.push(practiceRecord);
+  if (practiceRecord) {
+    tl.push({
+      timeline: [practiceRecord],
+      conditional_function: () => microphoneAvailable
+    });
+  }
   tl.push(practiceFeedback);
 
   // Main block — audio path (mic available + plugins loaded)
@@ -1051,6 +1059,13 @@ function createFoleyTimeline() {
       const btn = document.getElementById('foley-play');
       const stat = document.getElementById('foley-status');
       const audioSrc = jsPsych.timelineVariable('audio');
+
+      // v4 FIX: Guard all DOM element access
+      if (!btn || !stat) {
+        console.error('[foley] DOM elements not found, answers unlocked');
+        // Don't block — let user answer anyway
+        return;
+      }
 
       if (!audioSrc) { stat.textContent = 'Audio missing'; return; }
 
@@ -1127,7 +1142,6 @@ function createVisualTimeline() {
 }
 
 /* ======================== SPATIAL SPAN (Corsi 3–5) — FIXED v3 ======================== */
-// FIX: Now generates 2 trials per length so the stopping rule can actually trigger.
 function createSpatialSpanTimeline() {
   const instr = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -1199,7 +1213,6 @@ function createSpatialSpanTimeline() {
   }
 
   const trials = [];
-  // Track failures per length for stopping rule
   const failsAtLength = {};
 
   for (let len = 3; len <= 5; len++) {
@@ -1209,7 +1222,6 @@ function createSpatialSpanTimeline() {
       stimulus: `<h3>Sequence length: ${len} / 系列長: ${len}</h3><p>You will have 2 trials at this length. / この長さで2試行あります。</p><p>Press Ready, then watch carefully.</p>`
     });
 
-    // Two trials per length
     for (let attempt = 0; attempt < 2; attempt++) {
       trials.push({
         type: T('jsPsychHtmlKeyboardResponse'),
@@ -1241,7 +1253,6 @@ function createSpatialSpanTimeline() {
 }
 
 /* ======================== PROCEDURAL ORDERING — FIXED v3 ======================== */
-// FIX: Captures dropdown data in closure before DOM is cleared
 const PROCEDURE_STEPS = ['Crack eggs', 'Mix flour and eggs', 'Heat the pan', 'Pour batter on pan', 'Flip when ready'];
 const PROC_CONSTRAINTS = [
   ['Crack eggs', 'Mix flour and eggs'],
@@ -1266,7 +1277,6 @@ function createProceduralTimeline() {
     [steps[i], steps[j]] = [steps[j], steps[i]];
   }
 
-  // Closure variable to capture form data before DOM is cleared
   let capturedPositions = null;
 
   const test = {
@@ -1296,7 +1306,6 @@ function createProceduralTimeline() {
       dds.forEach(dd => dd.addEventListener('change', refresh));
       refresh();
 
-      // Capture data on submit button click BEFORE jsPsych clears DOM
       setTimeout(() => {
         const buttons = document.querySelectorAll('.jspsych-btn');
         const submitBtn = buttons[buttons.length - 1];
@@ -1314,7 +1323,6 @@ function createProceduralTimeline() {
       }, 50);
     },
     on_finish(d) {
-      // Use closure-captured data (DOM may be gone)
       const pos = capturedPositions || {};
       let tot = 0, ok = 0, violations = [];
       PROC_CONSTRAINTS.forEach(([a, b]) => {
@@ -1424,13 +1432,13 @@ async function initializeExperiment() {
     // Mic gate
     timeline.push(buildMicSetupGate({ required: false }));
 
-    // Digit span forward & backward (now 2 trials per length)
+    // Digit span forward & backward
     timeline.push(createDigitSpanInstructions(true));
     timeline.push({ timeline: generateDigitSpanTrials({ forward: true, startLen: 3, endLen: 6 }), randomize_order: false });
     timeline.push(createDigitSpanInstructions(false));
     timeline.push({ timeline: generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }), randomize_order: false });
 
-    // Phoneme discrimination (now 6 trials)
+    // Phoneme discrimination
     if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
       timeline.push(createPhonemeInstructions());
       timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order: true });
@@ -1440,17 +1448,17 @@ async function initializeExperiment() {
     timeline.push(createLDTPrimerWithImage());
     timeline.push(...createLDTTimeline());
 
-    // 4AFC Receptive vocab (now with egg/spoon distractors)
+    // 4AFC Receptive vocab
     if ((FILTERED_STIMULI.receptive?.length || 0) > 0) {
       timeline.push(...create4AFCReceptiveBaseline());
     }
 
-    // Picture naming (now with text fallback when mic unavailable)
+    // Picture naming
     if ((FILTERED_STIMULI.picture?.length || 0) > 0) {
       timeline.push(...createNamingTimeline());
     }
 
-    // Foley (now 8 trials)
+    // Foley
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
     }
@@ -1460,7 +1468,7 @@ async function initializeExperiment() {
       timeline.push(...createVisualTimeline());
     }
 
-    // Spatial span (now 2 trials per length)
+    // Spatial span
     timeline.push(...createSpatialSpanTimeline());
 
     // Procedural + Ideophone
