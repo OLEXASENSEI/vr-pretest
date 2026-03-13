@@ -1,16 +1,18 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v3)
+// pretest.js — VR Pre-Test Battery (CORRECTED v4)
 // GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration
 //
-// v3 CHANGES:
-//  1. Digit span: Fixed stopping rule to track failures per-length (not global)
-//  2. Spatial span: Added 2 trials per length so stopping rule can trigger
-//  3. Procedural ordering: Fixed DOM-access-in-on_finish with closure capture
-//  4. Foley: Expanded from 4 to 8 trials using previously unused audio assets
-//  5. Phoneme: Expanded from 4 to 6 trials using previously unused audio
-//  6. Picture naming: Added text fallback when mic unavailable
-//  7. Preload: Added jsPsych preload step for reliable asset caching
-//  8. 4AFC: Added egg/spoon as visual distractors for harder discrimination
+// v4 CHANGES (bug fixes over v3):
+//  1. BUG FIX: finishTrial() in on_load now deferred via setTimeout(fn,0) to
+//     prevent null.addEventListener crash in jsPsych's post-load setup
+//     (phoneme trial + receptive 4AFC trial)
+//  2. BUG FIX: Foley answer button locking now uses
+//     '.jspsych-html-button-response-button button' selector since .answer-btn
+//     class no longer exists in jsPsych 7.3
+//  3. BUG FIX: Participant info button query hardened with fallback selector
+//  4. BUG FIX: endCurrentTimeline() now works correctly — digit span and
+//     spatial span inner trials are wrapped in a nested { timeline: [...] }
+//     node so endCurrentTimeline() terminates the right level
 
 /* ======================== GLOBAL / HELPERS ======================== */
 let jsPsych = null;
@@ -265,7 +267,6 @@ function addCustomStyles() {
     .corsi-cell.playback { cursor:not-allowed; opacity:.7; }
     .corsi-cell.lit { background:#4CAF50; border-color:#45a049; transform:scale(1.1); }
     .toast { position:fixed; bottom:20px; right:20px; background:#333; color:white; padding:15px 20px; border-radius:5px; z-index:1000; }
-    .answer-btn { margin:0 10px; }
     .mic-error-msg { background-color:#ffebee; padding:20px; border-radius:8px; margin-top:20px; }
   `;
   document.head.appendChild(style);
@@ -326,8 +327,11 @@ function createParticipantInfo() {
     data: { task: 'participant_info' },
     on_load: function () {
       setTimeout(() => {
-        const buttons = document.querySelectorAll('.jspsych-btn');
-        const btn = buttons[buttons.length - 1];
+        // FIX v4: Use a more robust selector with a fallback so the button is
+        // always found regardless of jsPsych's internal button container markup
+        const btn =
+          document.querySelector('.jspsych-html-button-response-button button') ||
+          document.querySelector('.jspsych-btn');
         if (!btn) { console.error('[participant_info] Button not found'); return; }
 
         btn.addEventListener('click', function handler(e) {
@@ -359,7 +363,7 @@ function createParticipantInfo() {
   };
 }
 
-/* ======================== DIGIT SPAN (3–6) — FIXED v3 ======================== */
+/* ======================== DIGIT SPAN (3–6) ======================== */
 function createDigitSpanInstructions(forward = true) {
   const title = forward
     ? '<h2>Number Memory Test / 数字記憶テスト</h2>'
@@ -375,14 +379,17 @@ function createDigitSpanInstructions(forward = true) {
 }
 
 function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
-  const trials = [];
+  // FIX v4: failsAtLength must be scoped per-call so forward and backward
+  // runs don't share state, and trials are returned wrapped in a nested
+  // timeline node so endCurrentTimeline() terminates the right level.
+  const innerTrials = [];
   const failsAtLength = {};
 
   for (let length = startLen; length <= endLen; length++) {
     for (let attempt = 0; attempt < 2; attempt++) {
       const digits = Array.from({ length }, () => Math.floor(Math.random() * 10));
 
-      trials.push({
+      innerTrials.push({
         type: T('jsPsychHtmlKeyboardResponse'),
         stimulus: '<div style="font-size:48px;padding:20px 24px;">' + digits.join(' ') + '</div>',
         choices: 'NO_KEYS',
@@ -396,7 +403,7 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
         }
       });
 
-      trials.push({
+      innerTrials.push({
         type: T('jsPsychSurveyText'),
         questions: [{
           prompt: forward
@@ -427,6 +434,8 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
           if (!d.correct) {
             failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1;
             if (failsAtLength[d.length] >= 2) {
+              // FIX v4: endCurrentTimeline() now correctly ends the nested
+              // { timeline: innerTrials } node returned below, not the top level
               jsPsych.endCurrentTimeline();
             }
           }
@@ -434,7 +443,9 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
       });
     }
   }
-  return trials;
+
+  // FIX v4: wrap in a nested node so endCurrentTimeline() has a valid target
+  return { timeline: innerTrials, randomize_order: false };
 }
 
 /* ======================== PHONEME DISCRIMINATION ======================== */
@@ -480,14 +491,15 @@ function createPhonemeTrial() {
       let aEnded = false, bEnded = false;
       const btnSame = document.getElementById('btnSame');
       const btnDiff = document.getElementById('btnDiff');
-      const status = document.getElementById('status');
-      const playA = document.getElementById('playA');
-      const playB = document.getElementById('playB');
+      const status  = document.getElementById('status');
+      const playA   = document.getElementById('playA');
+      const playB   = document.getElementById('playB');
 
-      // v4 FIX: Guard all DOM element access
+      // FIX v4: Guard DOM access but defer finishTrial via setTimeout so
+      // jsPsych finishes its own post-load setup before we end the trial
       if (!btnSame || !btnDiff || !status || !playA || !playB) {
-        console.error('[phoneme] DOM elements not found, finishing trial');
-        jsPsych.finishTrial({ response_label: null, dom_error: true });
+        console.error('[phoneme] DOM elements not found, skipping trial');
+        setTimeout(() => jsPsych.finishTrial({ response_label: null, dom_error: true }), 0);
         return;
       }
 
@@ -672,13 +684,14 @@ function create4AFCReceptiveBaseline() {
     on_load: function () {
       const audioSrc = jsPsych.timelineVariable('word_audio');
       const playBtn = document.getElementById('play-word');
-      const status = document.getElementById('receptive-status');
+      const status  = document.getElementById('receptive-status');
       const choices = document.querySelectorAll('.receptive-choice');
 
-      // v4 FIX: Guard all DOM element access
+      // FIX v4: Guard DOM access but defer finishTrial via setTimeout so
+      // jsPsych finishes its own post-load setup before we end the trial
       if (!playBtn || !status) {
-        console.error('[receptive] DOM elements not found, finishing trial');
-        jsPsych.finishTrial({ response: -1, dom_error: true });
+        console.error('[receptive] DOM elements not found, skipping trial');
+        setTimeout(() => jsPsych.finishTrial({ response: -1, dom_error: true }), 0);
         return;
       }
 
@@ -750,26 +763,20 @@ function buildMicSetupGate({ required = true } = {}) {
     data: { task: 'mic_gate' },
     on_load: () => {
       const enableBtn = document.getElementById('mic-enable');
-      const statusEl = document.getElementById('mic-status');
-      const levelEl = document.getElementById('mic-level');
+      const statusEl  = document.getElementById('mic-status');
+      const levelEl   = document.getElementById('mic-level');
 
-      // v4 FIX: Guard all DOM element access — find jsPsych-rendered buttons by
-      // excluding the stimulus-embedded mic-enable button
-      const allBtns = [...document.querySelectorAll('.jspsych-btn')];
-      // jsPsych choice buttons are rendered OUTSIDE the stimulus container;
-      // the mic-enable button is INSIDE. Filter to only jspsych-generated ones.
+      const allBtns   = [...document.querySelectorAll('.jspsych-btn')];
       const choiceBtns = allBtns.filter(b => b.id !== 'mic-enable');
-      const contBtn = choiceBtns.length >= 2 ? choiceBtns[choiceBtns.length - 2] : null;
-      const textBtn = choiceBtns.length >= 1 ? choiceBtns[choiceBtns.length - 1] : null;
+      const contBtn   = choiceBtns.length >= 2 ? choiceBtns[choiceBtns.length - 2] : null;
+      const textBtn   = choiceBtns.length >= 1 ? choiceBtns[choiceBtns.length - 1] : null;
 
       if (!enableBtn || !statusEl || !levelEl) {
         console.error('[mic_gate] DOM elements not found');
-        // Still allow proceeding — don't block the experiment
         window.__mic_ok = false;
         return;
       }
 
-      // Disable Continue until mic is enabled
       if (contBtn) { contBtn.disabled = true; contBtn.style.opacity = '0.5'; }
 
       async function startStream() {
@@ -809,7 +816,6 @@ function buildMicSetupGate({ required = true } = {}) {
     loop_function: () => {
       if (!required) return false;
       const last = jsPsych.data.get().last(1).values()[0] || {};
-      // v4 FIX: jsPsych 7 uses 'response' (integer), not 'button_pressed'
       return !(microphoneAvailable || last.response === 1);
     }
   };
@@ -830,7 +836,6 @@ function createNamingTimeline() {
 
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 
-  // Practice
   const practiceImg = PRELOAD_IMAGES.includes('img/park_scene.jpg') ? 'img/park_scene.jpg' : null;
   const practiceImgTag = practiceImg
     ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>`
@@ -861,8 +866,6 @@ function createNamingTimeline() {
     data: { task: 'picture_naming_practice_prepare' }
   };
 
-  // v4 FIX: practiceRecord now uses conditional_function instead of eager
-  // evaluation of microphoneAvailable (which is always false at creation time)
   const practiceRecord = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
     stimulus: `<div>${practiceImgTag}
@@ -883,7 +886,6 @@ function createNamingTimeline() {
     data: { task: 'picture_naming_practice_complete' }
   };
 
-  // Main trial — audio version
   const prepareAudio = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => {
@@ -940,7 +942,6 @@ function createNamingTimeline() {
     }
   } : null;
 
-  // Main trial — text fallback version
   const prepareText = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => {
@@ -990,8 +991,6 @@ function createNamingTimeline() {
   const tv = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
   const tl = [intro];
 
-  // Practice — v4 FIX: wrap practiceRecord in conditional_function so it
-  // evaluates microphoneAvailable at RUNTIME, not at timeline-creation time
   tl.push(practiceIntro, practicePrepare);
   if (practiceRecord) {
     tl.push({
@@ -1001,7 +1000,6 @@ function createNamingTimeline() {
   }
   tl.push(practiceFeedback);
 
-  // Main block — audio path (mic available + plugins loaded)
   if (hasMicPlugins) {
     tl.push({
       timeline: [prepareAudio, recordAudio].filter(Boolean),
@@ -1011,7 +1009,6 @@ function createNamingTimeline() {
     });
   }
 
-  // Main block — text fallback path (no mic)
   tl.push({
     timeline: [prepareText, recordText],
     timeline_variables: tv,
@@ -1045,7 +1042,6 @@ function createFoleyTimeline() {
       const o = jsPsych.timelineVariable('options');
       return Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
     },
-    // button_html removed — let jsPsych 7.3 use its default
     post_trial_gap: 250,
     data: () => ({
       task: 'foley_iconicity',
@@ -1056,14 +1052,12 @@ function createFoleyTimeline() {
       phase: 'pre'
     }),
     on_load: function () {
-      const btn = document.getElementById('foley-play');
+      const btn  = document.getElementById('foley-play');
       const stat = document.getElementById('foley-status');
       const audioSrc = jsPsych.timelineVariable('audio');
 
-      // v4 FIX: Guard all DOM element access
       if (!btn || !stat) {
         console.error('[foley] DOM elements not found, answers unlocked');
-        // Don't block — let user answer anyway
         return;
       }
 
@@ -1074,8 +1068,14 @@ function createFoleyTimeline() {
       audioEl.preload = 'auto';
       window.__foley_audio = audioEl;
 
+      // FIX v4: .answer-btn class no longer exists in jsPsych 7.3 since
+      // button_html was removed. Query the actual rendered choice buttons
+      // using the plugin's container class, excluding the play button.
+      const answerBtns = Array.from(
+        document.querySelectorAll('.jspsych-html-button-response-button button')
+      );
+
       let ready = false, unlocked = false, playing = false;
-      const answerBtns = Array.from(document.querySelectorAll('.answer-btn'));
 
       function lockAnswers(lock) {
         answerBtns.forEach(b => { b.disabled = lock; b.style.opacity = lock ? '.5' : '1'; });
@@ -1141,7 +1141,7 @@ function createVisualTimeline() {
   return [intro, { timeline: [trial], timeline_variables: tv, randomize_order: true }];
 }
 
-/* ======================== SPATIAL SPAN (Corsi 3–5) — FIXED v3 ======================== */
+/* ======================== SPATIAL SPAN (Corsi 3–5) ======================== */
 function createSpatialSpanTimeline() {
   const instr = {
     type: T('jsPsychHtmlButtonResponse'),
@@ -1212,18 +1212,21 @@ function createSpatialSpanTimeline() {
     });
   }
 
-  const trials = [];
+  // FIX v4: failsAtLength scoped here (not inside the for-loop) and all span
+  // trials collected into innerTrials then wrapped in a { timeline: innerTrials }
+  // node so endCurrentTimeline() terminates the right level.
+  const innerTrials = [];
   const failsAtLength = {};
 
   for (let len = 3; len <= 5; len++) {
-    trials.push({
+    innerTrials.push({
       type: T('jsPsychHtmlButtonResponse'),
       choices: ['Ready / 準備完了'],
       stimulus: `<h3>Sequence length: ${len} / 系列長: ${len}</h3><p>You will have 2 trials at this length. / この長さで2試行あります。</p><p>Press Ready, then watch carefully.</p>`
     });
 
     for (let attempt = 0; attempt < 2; attempt++) {
-      trials.push({
+      innerTrials.push({
         type: T('jsPsychHtmlKeyboardResponse'),
         choices: 'NO_KEYS',
         trial_duration: null,
@@ -1242,6 +1245,8 @@ function createSpatialSpanTimeline() {
           if (!d.correct) {
             failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1;
             if (failsAtLength[d.length] >= 2) {
+              // FIX v4: endCurrentTimeline() now correctly ends the nested
+              // { timeline: innerTrials } node returned below
               jsPsych.endCurrentTimeline();
             }
           }
@@ -1249,10 +1254,11 @@ function createSpatialSpanTimeline() {
       });
     }
   }
-  return [instr, ...trials];
+
+  return [instr, { timeline: innerTrials }];
 }
 
-/* ======================== PROCEDURAL ORDERING — FIXED v3 ======================== */
+/* ======================== PROCEDURAL ORDERING ======================== */
 const PROCEDURE_STEPS = ['Crack eggs', 'Mix flour and eggs', 'Heat the pan', 'Pour batter on pan', 'Flip when ready'];
 const PROC_CONSTRAINTS = [
   ['Crack eggs', 'Mix flour and eggs'],
@@ -1360,13 +1366,13 @@ function createIdeophoneTest() {
   ];
 }
 
-/* ======================== BUTTON HARDENING ======================== */
-// REMOVED in v4: hardenButtons was written for jsPsych 7.0–7.2 where button_html
-// used %choice% string templates. In 7.3+ button_html is a function and the plugin
-// handles defaults correctly. Manually setting button_html causes rendering issues.
-
 /* ======================== BOOTSTRAP ======================== */
 async function initializeExperiment() {
+  // Global error catcher — logs full stack to console for easier debugging
+  window.addEventListener('error', (e) => {
+    console.error('[pretest] Uncaught error:', e.message, '\nStack:', e.error?.stack);
+  });
+
   try {
     if (!have('initJsPsych')) { alert('jsPsych core not loaded.'); return; }
 
@@ -1418,11 +1424,12 @@ async function initializeExperiment() {
     // Mic gate
     timeline.push(buildMicSetupGate({ required: false }));
 
-    // Digit span forward & backward
+    // FIX v4: generateDigitSpanTrials now returns a { timeline: [...] } node
+    // directly, so just push it — no extra wrapping needed
     timeline.push(createDigitSpanInstructions(true));
-    timeline.push({ timeline: generateDigitSpanTrials({ forward: true, startLen: 3, endLen: 6 }), randomize_order: false });
+    timeline.push(generateDigitSpanTrials({ forward: true,  startLen: 3, endLen: 6 }));
     timeline.push(createDigitSpanInstructions(false));
-    timeline.push({ timeline: generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }), randomize_order: false });
+    timeline.push(generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }));
 
     // Phoneme discrimination
     if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
@@ -1454,7 +1461,7 @@ async function initializeExperiment() {
       timeline.push(...createVisualTimeline());
     }
 
-    // Spatial span
+    // FIX v4: createSpatialSpanTimeline returns [instr, { timeline: innerTrials }]
     timeline.push(...createSpatialSpanTimeline());
 
     // Procedural + Ideophone
@@ -1474,7 +1481,6 @@ async function initializeExperiment() {
       on_finish: () => saveData()
     });
 
-    // hardenButtons removed — jsPsych 7.3+ handles button_html defaults correctly
     jsPsych.run(timeline);
   } catch (e) {
     console.error('[pretest] Initialization error:', e);
