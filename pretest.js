@@ -1,6 +1,14 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v4)
+// pretest.js — VR Pre-Test Battery (CORRECTED v5)
 // GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration
+//
+// v5 CHANGES (bug fixes over v4):
+//  1. BUG FIX: Added jsPsychInitializeMicrophone trial after mic gate so
+//     jsPsychHtmlAudioResponse has an initialized recorder (raw getUserMedia
+//     in the mic gate is not sufficient — the plugin needs its own init trial)
+//  2. BUG FIX: Text fallback conditional in createNamingTimeline() now also
+//     fires when hasMicPlugins is false, preventing a freeze when mic is
+//     granted but recording plugins aren't loaded
 //
 // v4 CHANGES (bug fixes over v3):
 //  1. BUG FIX: finishTrial() in on_load now deferred via setTimeout(fn,0) to
@@ -836,6 +844,12 @@ function createNamingTimeline() {
 
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
 
+  // FIX v5: Compute whether audio recording is actually viable — both plugins
+  // must be loaded AND the user must have granted mic permission. This is used
+  // in conditional_function checks below to avoid the freeze where neither the
+  // audio path nor the text path would execute.
+  const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
+
   const practiceImg = PRELOAD_IMAGES.includes('img/park_scene.jpg') ? 'img/park_scene.jpg' : null;
   const practiceImgTag = practiceImg
     ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>`
@@ -995,7 +1009,9 @@ function createNamingTimeline() {
   if (practiceRecord) {
     tl.push({
       timeline: [practiceRecord],
-      conditional_function: () => microphoneAvailable
+      // FIX v5: Use canRecordAudio() so practice recording only runs when
+      // both mic plugins are loaded AND mic permission was granted
+      conditional_function: canRecordAudio
     });
   }
   tl.push(practiceFeedback);
@@ -1005,7 +1021,8 @@ function createNamingTimeline() {
       timeline: [prepareAudio, recordAudio].filter(Boolean),
       timeline_variables: tv,
       randomize_order: true,
-      conditional_function: () => microphoneAvailable
+      // FIX v5: Use canRecordAudio() — requires both plugins AND mic permission
+      conditional_function: canRecordAudio
     });
   }
 
@@ -1013,7 +1030,10 @@ function createNamingTimeline() {
     timeline: [prepareText, recordText],
     timeline_variables: tv,
     randomize_order: true,
-    conditional_function: () => !microphoneAvailable
+    // FIX v5: Text fallback fires when mic is unavailable OR when mic plugins
+    // aren't loaded. This prevents the freeze where neither path executes
+    // (hasMicPlugins=false but microphoneAvailable=true would skip both).
+    conditional_function: () => !canRecordAudio()
   });
 
   return tl;
@@ -1423,6 +1443,20 @@ async function initializeExperiment() {
 
     // Mic gate
     timeline.push(buildMicSetupGate({ required: false }));
+
+    // FIX v5: Run jsPsychInitializeMicrophone as a proper jsPsych trial after
+    // the mic gate. jsPsychHtmlAudioResponse requires this plugin to have run
+    // first — it stores the MediaStream/device internally. The raw getUserMedia
+    // call in the mic gate only gets browser permission but does NOT satisfy
+    // the plugin's internal initialization requirement.
+    if (have('jsPsychInitializeMicrophone')) {
+      timeline.push({
+        timeline: [{
+          type: T('jsPsychInitializeMicrophone')
+        }],
+        conditional_function: () => microphoneAvailable
+      });
+    }
 
     // FIX v4: generateDigitSpanTrials now returns a { timeline: [...] } node
     // directly, so just push it — no extra wrapping needed
