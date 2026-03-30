@@ -1,18 +1,16 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v6)
+// pretest.js — VR Pre-Test Battery (CORRECTED v7)
 // GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration
 //
-// v6 CHANGES (validity fixes over v5):
-//  1. FIX: Removed Group B words (SIZZLE, MIX, STIR, FLOUR, POUR, BUTTER)
-//     from LDT to prevent orthographic priming / contamination of treatment
-//     targets. Replaced with foil words + matching nonwords.
-//  2. FIX: Replaced pancake procedural ordering with tea-making sequence
-//     to avoid priming the cooking procedure taught in the treatment.
-//  3. FIX: Updated all iconicity ratings to match Winter et al. database
-//     values. Fixed knife (5.29, iconic), salt (4.62, iconic), added
-//     ratings for spoon, plate, spread, sugar, egg.
-//  4. NOTE: "stir" = 4.30, "stirring" = 4.82 in database. Using -ing form
-//     (4.82) throughout for consistency with posttest. Document in methods.
+// v7 CHANGES (task redesign over v6):
+//  1. REDESIGN: 4AFC split into Objects block and Actions block to prevent
+//     category giveaway (previously mixing objects and actions let participants
+//     eliminate by category instead of vocabulary knowledge)
+//  2. REDESIGN: Picture naming replaced with 3-stage progressive task:
+//     Stage 1 — Object naming: "What is this?" → name → hear model → repeat
+//     Stage 2 — Action naming: "What is happening?" → name → hear model → repeat
+//     Stage 3 — Scene description: see cooking scene → 8s free description
+//  3. NEW ASSETS: chopping.jpg (action distractor), scene_prep.jpg, scene_cooking.jpg
 //
 // v5 CHANGES (bug fixes over v4):
 //  1. BUG FIX: Added jsPsychInitializeMicrophone trial after mic gate so
@@ -166,28 +164,47 @@ const foley_stimuli = [
   { audio: 'sounds/sizzle.mp3',        options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound',  iconicity_rating: 5.30 },
 ];
 
-const picture_naming_stimuli = [
-  { image: 'img/bowl.jpg',      target: 'bowl',     category: 'utensil', iconic: false, rating: 3.00, group: 'A' },
-  { image: 'img/spatula.jpg',   target: 'spatula',  category: 'utensil', iconic: false, rating: 3.91, group: 'A' },
-  { image: 'img/pan.jpg',       target: 'pan',      category: 'utensil', iconic: false, rating: 3.45, group: 'A' },
-  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action',  iconic: true,  rating: 5.40, group: 'A' },
-  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action',  iconic: true,  rating: 5.70, group: 'A' },
-  { image: 'img/whisking.jpg',  target: 'whisking', category: 'action',  iconic: true,  rating: 4.55, group: 'A' },
+// v7: Split into objects and actions for both 4AFC and naming
+const object_stimuli = [
+  { image: 'img/bowl.jpg',    target: 'bowl',    category: 'object', iconic: false, rating: 3.00, group: 'A', model_audio: 'sounds/bowl.mp3' },
+  { image: 'img/spatula.jpg', target: 'spatula', category: 'object', iconic: false, rating: 3.91, group: 'A', model_audio: 'sounds/spatula.mp3' },
+  { image: 'img/pan.jpg',     target: 'pan',     category: 'object', iconic: false, rating: 3.45, group: 'A', model_audio: 'sounds/pan.mp3' },
+];
+
+const action_stimuli = [
+  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action', iconic: true,  rating: 5.40, group: 'A', model_audio: 'sounds/cracking.mp3' },
+  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action', iconic: true,  rating: 5.70, group: 'A', model_audio: 'sounds/flipping.mp3' },
+  { image: 'img/whisking.jpg',  target: 'whisking', category: 'action', iconic: true,  rating: 4.55, group: 'A', model_audio: 'sounds/whisking.mp3' },
+];
+
+// v7: Scene images for Stage 3 free description
+const scene_stimuli = [
+  { image: 'img/scene_prep.jpg',    scene: 'kitchen_prep',    description: 'Kitchen counter with ingredients' },
+  { image: 'img/scene_cooking.jpg', scene: 'cooking_active',  description: 'Pan on stove with spatula' },
+];
+
+// v7: 4AFC distractors — objects only (same-category, no action giveaway)
+const object_distractor_images = ['img/spoon.jpg', 'img/egg.jpg'];
+// v7: 4AFC distractors — actions only (same-category, no object giveaway)
+const action_distractor_images = ['img/chopping.jpg'];
+
+// v7: 4AFC split into object block and action block
+const receptive_objects_stimuli = [
+  { word_audio: 'sounds/bowl.mp3',    images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg', 'img/spoon.jpg'],  correct: 0, target: 'bowl',    iconic: false, rating: 3.00, group: 'A', category: 'object' },
+  { word_audio: 'sounds/spatula.mp3', images: ['img/spatula.jpg', 'img/bowl.jpg', 'img/pan.jpg', 'img/egg.jpg'],    correct: 0, target: 'spatula', iconic: false, rating: 3.91, group: 'A', category: 'object' },
+  { word_audio: 'sounds/pan.mp3',     images: ['img/pan.jpg', 'img/spoon.jpg', 'img/bowl.jpg', 'img/egg.jpg'],      correct: 0, target: 'pan',     iconic: false, rating: 3.45, group: 'A', category: 'object' },
+];
+
+const receptive_actions_stimuli = [
+  { word_audio: 'sounds/cracking.mp3', images: ['img/cracking.jpeg', 'img/flipping.jpg', 'img/whisking.jpg', 'img/chopping.jpg'], correct: 0, target: 'cracking', iconic: true,  rating: 5.40, group: 'A', category: 'action' },
+  { word_audio: 'sounds/flipping.mp3', images: ['img/flipping.jpg', 'img/cracking.jpeg', 'img/chopping.jpg', 'img/whisking.jpg'], correct: 0, target: 'flipping', iconic: true,  rating: 5.70, group: 'A', category: 'action' },
+  { word_audio: 'sounds/whisking.mp3', images: ['img/whisking.jpg', 'img/chopping.jpg', 'img/cracking.jpeg', 'img/flipping.jpg'], correct: 0, target: 'whisking', iconic: true,  rating: 4.55, group: 'A', category: 'action' },
 ];
 
 const visual_iconicity_stimuli = [
   { shape: 'img/bowl_shape.svg',  words: ['container', 'cutter'], expected: 0, shape_type: 'container' },
   { shape: 'img/round_shape.svg', words: ['maluma', 'takete'],    expected: 0, shape_type: 'round' },
   { shape: 'img/spiky_shape.svg', words: ['bouba', 'kiki'],       expected: 1, shape_type: 'spiky' },
-];
-
-const receptive_vocab_baseline_stimuli = [
-  { word_audio: 'sounds/bowl.mp3',     images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg', 'img/egg.jpg'],        correct: 0, target: 'bowl',     iconic: false, rating: 3.00, group: 'A' },
-  { word_audio: 'sounds/spatula.mp3',  images: ['img/spoon.jpg', 'img/spatula.jpg', 'img/flipping.jpg', 'img/bowl.jpg'], correct: 1, target: 'spatula',  iconic: false, rating: 3.91, group: 'A' },
-  { word_audio: 'sounds/pan.mp3',      images: ['img/pan.jpg', 'img/bowl.jpg', 'img/egg.jpg', 'img/whisking.jpg'],       correct: 0, target: 'pan',      iconic: false, rating: 3.45, group: 'A' },
-  { word_audio: 'sounds/cracking.mp3', images: ['img/whisking.jpg', 'img/flipping.jpg', 'img/spoon.jpg', 'img/cracking.jpeg'], correct: 3, target: 'cracking', iconic: true,  rating: 5.40, group: 'A' },
-  { word_audio: 'sounds/flipping.mp3', images: ['img/egg.jpg', 'img/pan.jpg', 'img/flipping.jpg', 'img/spatula.jpg'],    correct: 2, target: 'flipping', iconic: true,  rating: 5.70, group: 'A' },
-  { word_audio: 'sounds/whisking.mp3', images: ['img/whisking.jpg', 'img/cracking.jpeg', 'img/spoon.jpg', 'img/pan.jpg'], correct: 0, target: 'whisking', iconic: true,  rating: 4.55, group: 'A' },
 ];
 
 // v6 FIX: LDT now contains ONLY Group A targets + foil words + controls + nonwords.
@@ -275,11 +292,35 @@ async function filterExistingStimuli() {
   }
   console.log(`[Validation] Foley: ${foley.length}/${foley_stimuli.length}`);
 
-  const picture = [];
-  for (const s of picture_naming_stimuli) {
-    if (await checkImageExists(s.image)) { picture.push(s); PRELOAD_IMAGES.push(s.image); }
+  // v7: Validate objects, actions, and scenes separately
+  const objects = [];
+  for (const s of object_stimuli) {
+    const okImg = await checkImageExists(s.image);
+    const okAudio = await checkAudioExists(s.model_audio);
+    if (okImg) { objects.push(s); PRELOAD_IMAGES.push(s.image); }
+    if (okAudio) { PRELOAD_AUDIO.push(s.model_audio); }
   }
-  console.log(`[Validation] Picture: ${picture.length}/${picture_naming_stimuli.length}`);
+  console.log(`[Validation] Objects: ${objects.length}/${object_stimuli.length}`);
+
+  const actions = [];
+  for (const s of action_stimuli) {
+    const okImg = await checkImageExists(s.image);
+    const okAudio = await checkAudioExists(s.model_audio);
+    if (okImg) { actions.push(s); PRELOAD_IMAGES.push(s.image); }
+    if (okAudio) { PRELOAD_AUDIO.push(s.model_audio); }
+  }
+  console.log(`[Validation] Actions: ${actions.length}/${action_stimuli.length}`);
+
+  // Validate distractor images
+  for (const img of [...object_distractor_images, ...action_distractor_images]) {
+    if (await checkImageExists(img)) { PRELOAD_IMAGES.push(img); }
+  }
+
+  const scenes = [];
+  for (const s of scene_stimuli) {
+    if (await checkImageExists(s.image)) { scenes.push(s); PRELOAD_IMAGES.push(s.image); }
+  }
+  console.log(`[Validation] Scenes: ${scenes.length}/${scene_stimuli.length}`);
 
   const visual = [];
   for (const s of visual_iconicity_stimuli) {
@@ -287,23 +328,36 @@ async function filterExistingStimuli() {
   }
   console.log(`[Validation] Visual: ${visual.length}/${visual_iconicity_stimuli.length}`);
 
-  const receptive = [];
-  for (const s of receptive_vocab_baseline_stimuli) {
+  // v7: Validate split 4AFC stimuli
+  const receptiveObjects = [];
+  for (const s of receptive_objects_stimuli) {
     const okAudio = await checkAudioExists(s.word_audio);
     const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
     if (okAudio && okImages.every(ok => ok)) {
-      receptive.push(s);
+      receptiveObjects.push(s);
       PRELOAD_AUDIO.push(s.word_audio);
       s.images.forEach(img => { if (!PRELOAD_IMAGES.includes(img)) PRELOAD_IMAGES.push(img); });
     }
   }
-  console.log(`[Validation] Receptive: ${receptive.length}/${receptive_vocab_baseline_stimuli.length}`);
+  console.log(`[Validation] 4AFC Objects: ${receptiveObjects.length}/${receptive_objects_stimuli.length}`);
+
+  const receptiveActions = [];
+  for (const s of receptive_actions_stimuli) {
+    const okAudio = await checkAudioExists(s.word_audio);
+    const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
+    if (okAudio && okImages.every(ok => ok)) {
+      receptiveActions.push(s);
+      PRELOAD_AUDIO.push(s.word_audio);
+      s.images.forEach(img => { if (!PRELOAD_IMAGES.includes(img)) PRELOAD_IMAGES.push(img); });
+    }
+  }
+  console.log(`[Validation] 4AFC Actions: ${receptiveActions.length}/${receptive_actions_stimuli.length}`);
 
   if (await checkImageExists('img/park_scene.jpg')) {
     PRELOAD_IMAGES.push('img/park_scene.jpg');
   }
 
-  FILTERED_STIMULI = { phoneme, foley, picture, visual, receptive };
+  FILTERED_STIMULI = { phoneme, foley, objects, actions, scenes, visual, receptiveObjects, receptiveActions };
   console.log('[Validation] Complete');
 }
 
@@ -682,91 +736,114 @@ function createLDTTimeline() {
   ];
 }
 
-/* ======================== 4AFC RECEPTIVE VOCABULARY ======================== */
+/* ======================== 4AFC RECEPTIVE VOCABULARY (SPLIT) ======================== */
+// v7: Split into Objects block and Actions block to prevent category giveaway
 function create4AFCReceptiveBaseline() {
-  const intro = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Word-Picture Matching / 単語と画像のマッチング</h2>
-      <p>Listen to the word, then click the matching picture.</p>
-      <p>単語を聞いて、対応する画像をクリックしてください。</p>
-      <p style="color:#888;">You must listen to the whole word before pictures become clickable.</p>`,
-    choices: ['Begin / 開始']
-  };
+  function make4AFCTrial() {
+    return {
+      type: T('jsPsychHtmlKeyboardResponse'),
+      choices: 'NO_KEYS',
+      stimulus: () => {
+        const images = jsPsych.timelineVariable('images');
+        const imgHTML = images.map((src, i) =>
+          `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
+            <img src="${asset(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;"/>
+          </div>`
+        ).join('');
+        return `
+          <div style="margin-bottom:20px;">
+            <button id="play-word" class="jspsych-btn" style="font-size:18px;">▶ Play Word / 音声を再生</button>
+            <p id="receptive-status" style="color:#666;margin-top:10px;">Click play to hear the word.</p>
+          </div>
+          <div style="margin-top:20px;">${imgHTML}</div>`;
+      },
+      data: () => ({
+        task: 'receptive_vocab_baseline',
+        target_word: jsPsych.timelineVariable('target'),
+        correct_answer: jsPsych.timelineVariable('correct'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        word_group: jsPsych.timelineVariable('group'),
+        stimulus_category: jsPsych.timelineVariable('category'),
+        phase: 'pre'
+      }),
+      on_load: function () {
+        const audioSrc = jsPsych.timelineVariable('word_audio');
+        const playBtn = document.getElementById('play-word');
+        const status  = document.getElementById('receptive-status');
+        const choices = document.querySelectorAll('.receptive-choice');
 
-  const trial = {
-    type: T('jsPsychHtmlKeyboardResponse'),
-    choices: 'NO_KEYS',
-    stimulus: () => {
-      const images = jsPsych.timelineVariable('images');
-      const imgHTML = images.map((src, i) =>
-        `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
-          <img src="${asset(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;"/>
-        </div>`
-      ).join('');
-      return `
-        <div style="margin-bottom:20px;">
-          <button id="play-word" class="jspsych-btn" style="font-size:18px;">▶ Play Word / 音声を再生</button>
-          <p id="receptive-status" style="color:#666;margin-top:10px;">Click play to hear the word.</p>
-        </div>
-        <div style="margin-top:20px;">${imgHTML}</div>`;
-    },
-    data: () => ({
-      task: 'receptive_vocab_baseline',
-      target_word: jsPsych.timelineVariable('target'),
-      correct_answer: jsPsych.timelineVariable('correct'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre'
-    }),
-    on_load: function () {
-      const audioSrc = jsPsych.timelineVariable('word_audio');
-      const playBtn = document.getElementById('play-word');
-      const status  = document.getElementById('receptive-status');
-      const choices = document.querySelectorAll('.receptive-choice');
+        if (!playBtn || !status) {
+          console.error('[receptive] DOM elements not found, skipping trial');
+          setTimeout(() => jsPsych.finishTrial({ response: -1, dom_error: true }), 0);
+          return;
+        }
 
-      if (!playBtn || !status) {
-        console.error('[receptive] DOM elements not found, skipping trial');
-        setTimeout(() => jsPsych.finishTrial({ response: -1, dom_error: true }), 0);
-        return;
-      }
+        const audio = new Audio(asset(audioSrc));
+        let hasPlayed = false;
 
-      const audio = new Audio(asset(audioSrc));
-      let hasPlayed = false;
+        choices.forEach(c => { c.style.opacity = '0.5'; c.style.pointerEvents = 'none'; });
 
-      choices.forEach(c => { c.style.opacity = '0.5'; c.style.pointerEvents = 'none'; });
+        playBtn.addEventListener('click', () => {
+          status.textContent = 'Playing… / 再生中…';
+          playBtn.disabled = true;
+          audio.currentTime = 0;
+          audio.play().catch(() => {
+            status.textContent = 'Audio failed — please try again';
+            playBtn.disabled = false;
+          });
+        });
 
-      playBtn.addEventListener('click', () => {
-        status.textContent = 'Playing… / 再生中…';
-        playBtn.disabled = true;
-        audio.currentTime = 0;
-        audio.play().catch(() => {
-          status.textContent = 'Audio failed — please try again';
+        audio.addEventListener('ended', () => {
+          hasPlayed = true;
+          status.textContent = 'Click the matching picture. / 対応する画像をクリック';
           playBtn.disabled = false;
+          playBtn.textContent = '🔁 Play Again / もう一度';
+          choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
         });
-      });
 
-      audio.addEventListener('ended', () => {
-        hasPlayed = true;
-        status.textContent = 'Click the matching picture. / 対応する画像をクリック';
-        playBtn.disabled = false;
-        playBtn.textContent = '🔁 Play Again / もう一度';
-        choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
-      });
-
-      choices.forEach(choice => {
-        choice.addEventListener('click', () => {
-          if (!hasPlayed) return;
-          audio.pause(); audio.currentTime = 0;
-          jsPsych.finishTrial({ response: parseInt(choice.dataset.choice) });
+        choices.forEach(choice => {
+          choice.addEventListener('click', () => {
+            if (!hasPlayed) return;
+            audio.pause(); audio.currentTime = 0;
+            jsPsych.finishTrial({ response: parseInt(choice.dataset.choice) });
+          });
         });
-      });
-    },
-    on_finish: d => { d.correct = (d.response === d.correct_answer); }
-  };
+      },
+      on_finish: d => { d.correct = (d.response === d.correct_answer); }
+    };
+  }
 
-  return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.receptive, randomize_order: true }];
+  const trial = make4AFCTrial();
+
+  const tl = [];
+
+  // Objects block
+  if ((FILTERED_STIMULI.receptiveObjects?.length || 0) > 0) {
+    tl.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h2>Word-Picture Matching: Objects / 物の名前</h2>
+        <p>Listen to the word, then click the matching picture.</p>
+        <p>単語を聞いて、対応する画像をクリックしてください。</p>
+        <p style="color:#888;">You must listen to the whole word before pictures become clickable.</p>`,
+      choices: ['Begin / 開始']
+    });
+    tl.push({ timeline: [trial], timeline_variables: FILTERED_STIMULI.receptiveObjects, randomize_order: true });
+  }
+
+  // Actions block
+  if ((FILTERED_STIMULI.receptiveActions?.length || 0) > 0) {
+    tl.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h2>Word-Picture Matching: Actions / 動作の名前</h2>
+        <p>Listen to the word, then click the matching picture.</p>
+        <p>単語を聞いて、対応する画像をクリックしてください。</p>`,
+      choices: ['Begin / 開始']
+    });
+    tl.push({ timeline: [trial], timeline_variables: FILTERED_STIMULI.receptiveActions, randomize_order: true });
+  }
+
+  return tl;
 }
 
 /* ======================== MIC SETUP GATE ======================== */
@@ -868,19 +945,12 @@ function buildMicSetupGate({ required = true } = {}) {
   };
 }
 
-/* ======================== PICTURE NAMING (with text fallback) ======================== */
-function createNamingTimeline() {
-  const intro = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Picture Description / 絵の説明</h2>
-      <p>Describe each picture in English. Mention objects, actions, sounds, and smells.</p>
-      <p>各画像を英語で説明してください。物体、動作、音、匂いについて述べてください。</p>
-      <p style="color:#666;">You will have <b>4 seconds</b> per picture. / 各画像<b>4秒間</b>です。</p>`,
-    choices: ['Continue / 続行'],
-    post_trial_gap: 400
-  };
-
+/* ======================== PROGRESSIVE NAMING (3-stage) ======================== */
+// v7: Replaced single "describe" prompt with progressive gradient:
+//   Stage 1 — Object naming: "What is this?" → name → hear model → repeat
+//   Stage 2 — Action naming: "What is happening?" → name → hear model → repeat
+//   Stage 3 — Scene description: see cooking scene → 8s free description
+function createProgressiveNamingTimeline() {
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
   const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
 
@@ -889,88 +959,281 @@ function createNamingTimeline() {
     ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>`
     : '<div style="width:350px;height:250px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><p>Park Scene</p></div>';
 
-  const practiceIntro = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<h3>Practice Recording / 録音練習</h3><p>Let's practice with an unrelated image.</p><p>料理とは関係のない画像で練習しましょう。</p>
-      <div style="background:#e3f2fd;padding:15px;border-radius:8px;margin-top:20px;"><p><b>What to describe in 4 seconds:</b></p><p>Objects / Actions / Sounds / Smells</p><p>物体 / 動作 / 音 / 匂い</p></div>`,
-    choices: ['Try Practice / 練習を試す'],
-    data: { task: 'picture_naming_practice_intro' }
-  };
+  const tl = [];
 
-  const practicePrepare = {
+  // ---- PRACTICE ----
+  tl.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<div>${practiceImgTag}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Remember:</b> Objects, Actions, Sounds, Smells (4 seconds)</p></div><p>Click when ready. / 準備ができたらクリック</p></div>`,
+    stimulus: `<h2>Naming & Description / 名前と説明</h2>
+      <p>This section has 3 parts:</p>
+      <p>このセクションは3部構成です：</p>
+      <ol style="text-align:left;max-width:500px;margin:0 auto;">
+        <li><b>Name objects</b> — What is this? / これは何？</li>
+        <li><b>Name actions</b> — What is happening? / 何をしている？</li>
+        <li><b>Describe a scene</b> — What do you see, hear, smell? / 何が見える、聞こえる、匂う？</li>
+      </ol>
+      <p style="color:#666;margin-top:15px;">Let's practice recording first. / まず録音の練習をしましょう。</p>`,
+    choices: ['Continue / 続行'],
+    data: { task: 'progressive_naming_intro' }
+  });
+
+  tl.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `<div style="text-align:center;">${practiceImgTag}
+      <p style="margin-top:15px;"><b>Practice:</b> What do you see in this picture?</p>
+      <p>練習：この写真に何が見えますか？</p></div>`,
     choices: ['Start Practice Recording / 練習録音開始'],
-    data: { task: 'picture_naming_practice_prepare' }
-  };
+    data: { task: 'naming_practice_prepare' }
+  });
 
-  const practiceRecord = hasMicPlugins ? {
-    type: T('jsPsychHtmlAudioResponse'),
-    stimulus: `<div>${practiceImgTag}<div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;"><p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 PRACTICE Recording… / 練習録音中…</p><p style="margin:8px 0;font-size:14px;">4 seconds!</p></div></div>`,
-    recording_duration: 4000, show_done_button: false, allow_playback: true,
-    data: { task: 'picture_naming_practice_record' }
-  } : null;
+  if (hasMicPlugins) {
+    tl.push({
+      timeline: [{
+        type: T('jsPsychHtmlAudioResponse'),
+        stimulus: `<div style="text-align:center;">${practiceImgTag}
+          <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
+            <p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 PRACTICE Recording… / 練習録音中…</p>
+            <p style="margin:8px 0;font-size:14px;">4 seconds!</p>
+          </div></div>`,
+        recording_duration: 4000, show_done_button: false, allow_playback: true,
+        data: { task: 'naming_practice_record' }
+      }],
+      conditional_function: canRecordAudio
+    });
+  }
 
-  const practiceFeedback = {
+  tl.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: '<h3 style="color:green">Practice Complete! / 練習完了！</h3><p>Now the real task with cooking pictures. / 次は料理画像で本番です。</p>',
-    choices: ['Begin Real Task / 本番開始'],
-    data: { task: 'picture_naming_practice_complete' }
-  };
+    stimulus: '<h3 style="color:green">Practice Complete! / 練習完了！</h3>',
+    choices: ['Continue / 続行'],
+    data: { task: 'naming_practice_done' }
+  });
 
-  const prepareAudio = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => {
-      const u = jsPsych.timelineVariable('imageUrl');
-      const img = u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : '<p style="color:#c00">Missing image.</p>';
-      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Describe:</b> Objects, Actions, Sounds, Smells</p></div><p>Click when ready. / 準備ができたらクリック</p></div>`;
-    },
-    choices: ['Start Recording / 録音開始'],
-    post_trial_gap: 150,
-    data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre' })
-  };
+  // ---- Helper: build naming trials for a stimulus set ----
+  function buildNamingBlock(stimuli, prompt, promptJP, stageName) {
+    const items = stimuli.map(s => ({ ...s, imageUrl: asset(s.image) }));
+    const trials = [];
 
-  const recordAudio = hasMicPlugins ? {
-    type: T('jsPsychHtmlAudioResponse'),
-    stimulus: () => {
-      const u = jsPsych.timelineVariable('imageUrl');
-      return `<div>${u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : ''}<div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;"><p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 Recording… / 録音中…</p><p style="margin:8px 0;font-size:14px;">Objects, Actions, Sounds, Smells</p></div></div>`;
-    },
-    recording_duration: 4000, show_done_button: false, allow_playback: false,
-    data: () => ({ task: 'picture_naming_audio', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre', modality: 'audio', pid_snapshot: currentPID() }),
-    on_finish: (d) => { const pid = d.pid_snapshot || currentPID(); const tgt = (d.target || 'unknown').toLowerCase(); const idx = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x'; d.audio_filename = `pre_${pid}_${tgt}_${idx}.wav`; }
-  } : null;
+    // Step A: See image → name it (spontaneous)
+    const nameAttempt = hasMicPlugins ? {
+      type: T('jsPsychHtmlAudioResponse'),
+      stimulus: () => {
+        const u = jsPsych.timelineVariable('imageUrl');
+        return `<div style="text-align:center;">
+          <img src="${u}" style="width:300px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
+          <p style="color:#666;">${promptJP}</p>
+          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
+            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Recording… 4 seconds</p>
+          </div></div>`;
+      },
+      recording_duration: 4000, show_done_button: false, allow_playback: false,
+      data: () => ({
+        task: `naming_${stageName}_spontaneous`, target: jsPsych.timelineVariable('target'),
+        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
+        phase: 'pre', modality: 'audio', stage: stageName
+      }),
+      on_finish: (d) => {
+        const pid = currentPID(); const tgt = (d.target || 'x').toLowerCase();
+        d.audio_filename = `pre_${pid}_${tgt}_spontaneous.wav`;
+      }
+    } : null;
 
-  const prepareText = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => {
-      const u = jsPsych.timelineVariable('imageUrl');
-      const img = u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : '<p style="color:#c00">Missing image.</p>';
-      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Describe:</b> Objects, Actions, Sounds, Smells</p></div></div>`;
-    },
-    choices: ['Describe / 説明する'],
-    post_trial_gap: 150,
-    data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre' })
-  };
+    const nameAttemptText = {
+      type: T('jsPsychSurveyText'),
+      preamble: () => {
+        const u = jsPsych.timelineVariable('imageUrl');
+        return `<div style="text-align:center;">
+          <img src="${u}" style="width:300px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
+          <p style="color:#666;">${promptJP}</p>
+          <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your answer. / 回答を入力してください。</div></div>`;
+      },
+      questions: [{ prompt: '', name: 'response', rows: 1, required: true }],
+      data: () => ({
+        task: `naming_${stageName}_spontaneous`, target: jsPsych.timelineVariable('target'),
+        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
+        phase: 'pre', modality: 'text', stage: stageName
+      })
+    };
 
-  const recordText = {
-    type: T('jsPsychSurveyText'),
-    preamble: () => {
-      const u = jsPsych.timelineVariable('imageUrl');
-      const img = u ? `<img src="${u}" style="width:300px;border-radius:8px;"/>` : '';
-      return `<div style="text-align:center">${img}<div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Mic unavailable; type your description.<br><b>注意：</b>マイクが使用できません。説明を入力してください。</div></div>`;
-    },
-    questions: [{ prompt: 'Describe: Objects, Actions, Sounds, Smells / 物・動作・音・匂い', name: 'description', rows: 3, required: true }],
-    data: () => ({ task: 'picture_naming_text', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre', modality: 'text' })
-  };
+    // Step B: Hear model audio → repeat (pronunciation baseline)
+    const hearModel = {
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: () => {
+        const u = jsPsych.timelineVariable('imageUrl');
+        const target = jsPsych.timelineVariable('target');
+        return `<div style="text-align:center;">
+          <img src="${u}" style="width:250px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <p style="margin-top:15px;">Now listen to the correct word: / 正しい単語を聞いてください：</p>
+          <p style="font-size:24px;font-weight:bold;color:#1a237e;">${target}</p>
+          <button id="model-play" class="jspsych-btn" style="font-size:18px;margin-top:10px;">▶ Play / 再生</button>
+          <p id="model-status" style="color:#666;margin-top:8px;">Click play to hear the word.</p>
+        </div>`;
+      },
+      choices: ['Repeat Now / 繰り返す'],
+      data: () => ({ task: `naming_${stageName}_model`, target: jsPsych.timelineVariable('target'), phase: 'pre', stage: stageName }),
+      on_load: function () {
+        const audioSrc = jsPsych.timelineVariable('model_audio');
+        const playBtn = document.getElementById('model-play');
+        const status = document.getElementById('model-status');
+        const choiceBtns = [...document.querySelectorAll('.jspsych-html-button-response-button button')];
+        const repeatBtn = choiceBtns[0];
 
-  const tv = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
-  const tl = [intro];
-  tl.push(practiceIntro, practicePrepare);
-  if (practiceRecord) { tl.push({ timeline: [practiceRecord], conditional_function: canRecordAudio }); }
-  tl.push(practiceFeedback);
-  if (hasMicPlugins) { tl.push({ timeline: [prepareAudio, recordAudio].filter(Boolean), timeline_variables: tv, randomize_order: true, conditional_function: canRecordAudio }); }
-  tl.push({ timeline: [prepareText, recordText], timeline_variables: tv, randomize_order: true, conditional_function: () => !canRecordAudio() });
+        if (repeatBtn) { repeatBtn.disabled = true; repeatBtn.style.opacity = '0.5'; }
+
+        if (!playBtn || !audioSrc) return;
+        const audio = new Audio(asset(audioSrc));
+
+        audio.addEventListener('ended', () => {
+          if (status) status.textContent = 'Now click "Repeat" to record your pronunciation.';
+          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
+          playBtn.textContent = '🔁 Play Again / もう一度';
+          playBtn.disabled = false;
+        });
+
+        playBtn.addEventListener('click', (e) => {
+          e.preventDefault();
+          if (status) status.textContent = 'Playing… / 再生中…';
+          playBtn.disabled = true;
+          audio.currentTime = 0;
+          audio.play().catch(() => {
+            if (status) status.textContent = 'Audio failed.';
+            playBtn.disabled = false;
+            if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
+          });
+        });
+      }
+    };
+
+    const repeatRecord = hasMicPlugins ? {
+      type: T('jsPsychHtmlAudioResponse'),
+      stimulus: () => {
+        const target = jsPsych.timelineVariable('target');
+        return `<div style="text-align:center;">
+          <p style="font-size:24px;font-weight:bold;color:#1a237e;">${target}</p>
+          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
+            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Say the word… / 単語を言ってください… (4s)</p>
+          </div></div>`;
+      },
+      recording_duration: 4000, show_done_button: false, allow_playback: false,
+      data: () => ({
+        task: `naming_${stageName}_repeat`, target: jsPsych.timelineVariable('target'),
+        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
+        phase: 'pre', modality: 'audio', stage: stageName
+      }),
+      on_finish: (d) => {
+        const pid = currentPID(); const tgt = (d.target || 'x').toLowerCase();
+        d.audio_filename = `pre_${pid}_${tgt}_repeat.wav`;
+      }
+    } : null;
+
+    // Assemble: audio path or text path
+    if (hasMicPlugins) {
+      trials.push({
+        timeline: [nameAttempt, hearModel, repeatRecord].filter(Boolean),
+        timeline_variables: items,
+        randomize_order: true,
+        conditional_function: canRecordAudio
+      });
+    }
+    trials.push({
+      timeline: [nameAttemptText, hearModel],
+      timeline_variables: items,
+      randomize_order: true,
+      conditional_function: () => !canRecordAudio()
+    });
+
+    return trials;
+  }
+
+  // ---- STAGE 1: Object Naming ----
+  if ((FILTERED_STIMULI.objects?.length || 0) > 0) {
+    tl.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h3>Part 1: Name the Object / パート1：物の名前</h3>
+        <p>You will see a kitchen object. Say its name in English.</p>
+        <p>台所の道具が表示されます。英語で名前を言ってください。</p>
+        <p style="color:#666;">After your answer, you'll hear the correct word and repeat it.</p>
+        <p style="color:#666;">回答後、正しい単語を聞いて繰り返します。</p>`,
+      choices: ['Begin / 開始']
+    });
+    tl.push(...buildNamingBlock(FILTERED_STIMULI.objects, 'What is this?', 'これは何ですか？', 'object'));
+  }
+
+  // ---- STAGE 2: Action Naming ----
+  if ((FILTERED_STIMULI.actions?.length || 0) > 0) {
+    tl.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h3>Part 2: Name the Action / パート2：動作の名前</h3>
+        <p>You will see a cooking action. Say what is happening in English.</p>
+        <p>料理の動作が表示されます。英語で何をしているか言ってください。</p>
+        <p style="color:#666;">After your answer, you'll hear the correct word and repeat it.</p>
+        <p style="color:#666;">回答後、正しい単語を聞いて繰り返します。</p>`,
+      choices: ['Begin / 開始']
+    });
+    tl.push(...buildNamingBlock(FILTERED_STIMULI.actions, 'What is happening?', '何をしていますか？', 'action'));
+  }
+
+  // ---- STAGE 3: Scene Description ----
+  if ((FILTERED_STIMULI.scenes?.length || 0) > 0) {
+    tl.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h3>Part 3: Describe the Scene / パート3：場面の説明</h3>
+        <p>You will see a kitchen scene. Describe everything you see, hear, and smell.</p>
+        <p>台所の場面が表示されます。見えるもの、聞こえるもの、匂いを説明してください。</p>
+        <p style="color:#666;">You will have <b>8 seconds</b>. / <b>8秒間</b>です。</p>`,
+      choices: ['Begin / 開始']
+    });
+
+    const sceneItems = FILTERED_STIMULI.scenes.map(s => ({ ...s, imageUrl: asset(s.image) }));
+
+    const sceneRecordAudio = hasMicPlugins ? {
+      type: T('jsPsychHtmlAudioResponse'),
+      stimulus: () => {
+        const u = jsPsych.timelineVariable('imageUrl');
+        return `<div style="text-align:center;">
+          <img src="${u}" style="width:450px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
+          <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
+          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
+            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Recording… 8 seconds / 録音中… 8秒</p>
+          </div></div>`;
+      },
+      recording_duration: 8000, show_done_button: false, allow_playback: false,
+      data: () => ({
+        task: 'naming_scene_description', scene: jsPsych.timelineVariable('scene'),
+        phase: 'pre', modality: 'audio', stage: 'scene'
+      }),
+      on_finish: (d) => { d.audio_filename = `pre_${currentPID()}_scene_${d.scene || 'x'}.wav`; }
+    } : null;
+
+    const sceneRecordText = {
+      type: T('jsPsychSurveyText'),
+      preamble: () => {
+        const u = jsPsych.timelineVariable('imageUrl');
+        return `<div style="text-align:center;">
+          <img src="${u}" style="width:450px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
+          <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
+          <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your description. / 説明を入力してください。</div></div>`;
+      },
+      questions: [{ prompt: '', name: 'description', rows: 4, required: true }],
+      data: () => ({
+        task: 'naming_scene_description', scene: jsPsych.timelineVariable('scene'),
+        phase: 'pre', modality: 'text', stage: 'scene'
+      })
+    };
+
+    if (hasMicPlugins) {
+      tl.push({ timeline: [sceneRecordAudio].filter(Boolean), timeline_variables: sceneItems, randomize_order: false, conditional_function: canRecordAudio });
+    }
+    tl.push({ timeline: [sceneRecordText], timeline_variables: sceneItems, randomize_order: false, conditional_function: () => !canRecordAudio() });
+  }
+
   return tl;
 }
 
@@ -1280,13 +1543,11 @@ async function initializeExperiment() {
     timeline.push(createLDTPrimerWithImage());
     timeline.push(...createLDTTimeline());
 
-    if ((FILTERED_STIMULI.receptive?.length || 0) > 0) {
-      timeline.push(...create4AFCReceptiveBaseline());
-    }
+    // v7: Split 4AFC — objects then actions
+    timeline.push(...create4AFCReceptiveBaseline());
 
-    if ((FILTERED_STIMULI.picture?.length || 0) > 0) {
-      timeline.push(...createNamingTimeline());
-    }
+    // v7: Progressive naming — objects → actions → scenes
+    timeline.push(...createProgressiveNamingTimeline());
 
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
