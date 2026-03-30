@@ -803,15 +803,25 @@ function buildMicSetupGate({ required = true } = {}) {
       const statusEl  = document.getElementById('mic-status');
       const levelEl   = document.getElementById('mic-level');
 
-      const allBtns   = [...document.querySelectorAll('.jspsych-btn')];
-      const choiceBtns = allBtns.filter(b => b.id !== 'mic-enable');
-      const contBtn   = choiceBtns.length >= 2 ? choiceBtns[choiceBtns.length - 2] : null;
-      const textBtn   = choiceBtns.length >= 1 ? choiceBtns[choiceBtns.length - 1] : null;
+      // FIX v6: Use jsPsych's own button container class to find exactly
+      // the 2 choice buttons, instead of scanning all .jspsych-btn on page.
+      // This prevents Chrome from picking up extra elements (progress bar, etc.)
+      const choiceBtns = [...document.querySelectorAll('.jspsych-html-button-response-button button')];
+      const contBtn = choiceBtns.length >= 1 ? choiceBtns[0] : null;  // "Continue / 続行"
+      const textBtn = choiceBtns.length >= 2 ? choiceBtns[1] : null;  // "Use Text Only / 文字で続行"
+
+      console.log('[mic_gate] Found choice buttons:', choiceBtns.length, 
+        'Continue:', contBtn?.textContent?.trim(), 
+        'TextOnly:', textBtn?.textContent?.trim());
 
       if (!enableBtn || !statusEl || !levelEl) {
         console.error('[mic_gate] DOM elements not found');
         window.__mic_ok = false;
         return;
+      }
+
+      if (!contBtn) {
+        console.error('[mic_gate] Continue button not found — mic gate will not lock');
       }
 
       if (contBtn) { contBtn.disabled = true; contBtn.style.opacity = '0.5'; }
@@ -1057,7 +1067,7 @@ function createSpatialSpanTimeline() {
   function responseCollector(seq, timeout = 15000) {
     return new Promise(resolve => {
       const chosen = []; const cells = [...document.querySelectorAll('.corsi-cell')];
-      function clicker(e) { const i = Number(e.currentTarget.dataset.i); if (!Number.isFinite(i)) return; chosen.push(i); e.currentTarget.classList.add('lit'); setTimeout(() => e.currentTarget.classList.remove('lit'), 150); if (chosen.length === seq.length) { cleanup(); resolve({ chosen, correct: chosen.every((v, j) => v === seq[j]) }); } }
+      function clicker(e) { const cell = e.currentTarget; if (!cell) return; const i = Number(cell.dataset.i); if (!Number.isFinite(i)) return; chosen.push(i); cell.classList.add('lit'); setTimeout(() => { if (cell) cell.classList.remove('lit'); }, 150); if (chosen.length === seq.length) { cleanup(); resolve({ chosen, correct: chosen.every((v, j) => v === seq[j]) }); } }
       function cleanup() { cells.forEach(c => c.removeEventListener('click', clicker)); }
       cells.forEach(c => c.addEventListener('click', clicker));
       setTimeout(() => { cleanup(); resolve({ chosen, correct: false, timed_out: true }); }, timeout);
