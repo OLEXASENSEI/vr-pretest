@@ -1,6 +1,18 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v5)
+// pretest.js — VR Pre-Test Battery (CORRECTED v6)
 // GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration
+//
+// v6 CHANGES (validity fixes over v5):
+//  1. FIX: Removed Group B words (SIZZLE, MIX, STIR, FLOUR, POUR, BUTTER)
+//     from LDT to prevent orthographic priming / contamination of treatment
+//     targets. Replaced with foil words + matching nonwords.
+//  2. FIX: Replaced pancake procedural ordering with tea-making sequence
+//     to avoid priming the cooking procedure taught in the treatment.
+//  3. FIX: Updated all iconicity ratings to match Winter et al. database
+//     values. Fixed knife (5.29, iconic), salt (4.62, iconic), added
+//     ratings for spoon, plate, spread, sugar, egg.
+//  4. NOTE: "stir" = 4.30, "stirring" = 4.82 in database. Using -ing form
+//     (4.82) throughout for consistency with posttest. Document in methods.
 //
 // v5 CHANGES (bug fixes over v4):
 //  1. BUG FIX: Added jsPsychInitializeMicrophone trial after mic gate so
@@ -60,26 +72,41 @@ function namingPhase() { return 'pre'; }
 function assignCondition() { return 'immediate'; }
 
 /* ======================== WORD CLASSIFICATION ======================== */
+// All ratings verified against Winter et al. iconicity ratings database
+// Threshold for "iconic": rating >= 4.5
+// Note: "stir" = 4.30 but "stirring" = 4.82 — using -ing form rating
 const WORD_CLASSIFICATION = {
+  // GROUP A — tested in pretest, trained in all conditions
   'flip':    { iconic: true,  rating: 5.70, category: 'action',  group: 'A' },
   'crack':   { iconic: true,  rating: 5.40, category: 'action',  group: 'A' },
   'whisk':   { iconic: true,  rating: 4.55, category: 'action',  group: 'A' },
   'bowl':    { iconic: false, rating: 3.00, category: 'utensil', group: 'A' },
   'spatula': { iconic: false, rating: 3.91, category: 'utensil', group: 'A' },
   'pan':     { iconic: false, rating: 3.45, category: 'utensil', group: 'A' },
+
+  // GROUP B — NOT in pretest (treatment targets), tested in posttest only
   'sizzle':   { iconic: true,  rating: 5.30, category: 'process',    group: 'B' },
   'mix':      { iconic: true,  rating: 5.10, category: 'action',     group: 'B' },
   'stirring': { iconic: true,  rating: 4.82, category: 'action',     group: 'B' },
   'pour':     { iconic: false, rating: 3.60, category: 'action',     group: 'B' },
   'butter':   { iconic: false, rating: 3.50, category: 'ingredient', group: 'B' },
   'flour':    { iconic: false, rating: 3.00, category: 'ingredient', group: 'B' },
-  'glug':    { iconic: true,  rating: 6.20, category: 'sound',   group: 'foil' },
-  'splash':  { iconic: true,  rating: 6.09, category: 'action',  group: 'foil' },
-  'drizzle': { iconic: true,  rating: 6.00, category: 'action',  group: 'foil' },
-  'fork':    { iconic: false, rating: 3.90, category: 'utensil', group: 'foil' },
-  'cup':     { iconic: false, rating: 3.83, category: 'utensil', group: 'foil' },
-  'knife':   { iconic: false, rating: null, category: 'utensil', group: 'foil' },
-  'salt':    { iconic: false, rating: null, category: 'ingredient', group: 'foil' },
+
+  // FOILS — never trained, used in posttest transfer + pretest LDT
+  'glug':    { iconic: true,  rating: 6.20, category: 'sound',      group: 'foil' },
+  'splash':  { iconic: true,  rating: 6.09, category: 'action',     group: 'foil' },
+  'drizzle': { iconic: true,  rating: 6.00, category: 'action',     group: 'foil' },
+  'spread':  { iconic: true,  rating: 4.64, category: 'action',     group: 'foil' },
+  'knife':   { iconic: true,  rating: 5.29, category: 'utensil',    group: 'foil' },
+  'salt':    { iconic: true,  rating: 4.62, category: 'ingredient', group: 'foil' },
+  'fork':    { iconic: false, rating: 3.90, category: 'utensil',    group: 'foil' },
+  'cup':     { iconic: false, rating: 3.83, category: 'utensil',    group: 'foil' },
+
+  // ADDITIONAL — trained in conditions but not primary test targets
+  'spoon':   { iconic: false, rating: 4.30, category: 'utensil',    group: 'other' },
+  'plate':   { iconic: false, rating: 4.08, category: 'utensil',    group: 'other' },
+  'sugar':   { iconic: false, rating: 3.36, category: 'ingredient', group: 'other' },
+  'egg':     { iconic: false, rating: 4.20, category: 'object',     group: 'other' },
 };
 
 function getIconicity(word) {
@@ -163,27 +190,41 @@ const receptive_vocab_baseline_stimuli = [
   { word_audio: 'sounds/whisking.mp3', images: ['img/whisking.jpg', 'img/cracking.jpeg', 'img/spoon.jpg', 'img/pan.jpg'], correct: 0, target: 'whisking', iconic: true,  rating: 4.55, group: 'A' },
 ];
 
+// v6 FIX: LDT now contains ONLY Group A targets + foil words + controls + nonwords.
+// Group B words (SIZZLE, MIX, STIR, FLOUR, POUR, BUTTER) have been REMOVED
+// to prevent orthographic priming of treatment targets before training.
 const ldt_stimuli = [
+  // Group A targets (pretest-tested, will also be trained)
   { stimulus: 'FLIP',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.70, group: 'A' },
   { stimulus: 'CRACK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.40, group: 'A' },
   { stimulus: 'WHISK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.55, group: 'A' },
-  { stimulus: 'SIZZLE',   correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.30, group: 'B' },
-  { stimulus: 'MIX',      correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.10, group: 'B' },
-  { stimulus: 'STIR',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.82, group: 'B' },
   { stimulus: 'BOWL',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'A' },
   { stimulus: 'SPATULA',  correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.91, group: 'A' },
   { stimulus: 'PAN',      correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.45, group: 'A' },
-  { stimulus: 'FLOUR',    correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'B' },
-  { stimulus: 'POUR',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.60, group: 'B' },
-  { stimulus: 'BUTTER',   correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.50, group: 'B' },
+
+  // Foil words (never trained — provides LDT baseline for untrained kitchen words)
+  { stimulus: 'GLUG',     correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.20, group: 'foil' },
+  { stimulus: 'SPLASH',   correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.09, group: 'foil' },
+  { stimulus: 'DRIZZLE',  correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.00, group: 'foil' },
+  { stimulus: 'FORK',     correct_response: 'a', word_type: 'foil_arbitrary',   iconic: false, rating: 3.90, group: 'foil' },
+  { stimulus: 'CUP',      correct_response: 'a', word_type: 'foil_arbitrary',   iconic: false, rating: 3.83, group: 'foil' },
+  { stimulus: 'SALT',     correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 4.62, group: 'foil' },
+
+  // Control words (common, non-kitchen)
   { stimulus: 'CHAIR',    correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
   { stimulus: 'WINDOW',   correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
+
+  // Nonwords (matched to real words phonologically)
   { stimulus: 'FLUR',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
   { stimulus: 'SPATTLE',  correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
   { stimulus: 'BOWLE',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
   { stimulus: 'CRECK',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'MIXLE',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'WHISP',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'GLUB',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'SPLISH',   correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'DRAZZLE',  correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'FARK',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'CUB',      correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+  { stimulus: 'SELT',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -335,8 +376,6 @@ function createParticipantInfo() {
     data: { task: 'participant_info' },
     on_load: function () {
       setTimeout(() => {
-        // FIX v4: Use a more robust selector with a fallback so the button is
-        // always found regardless of jsPsych's internal button container markup
         const btn =
           document.querySelector('.jspsych-html-button-response-button button') ||
           document.querySelector('.jspsych-btn');
@@ -387,9 +426,6 @@ function createDigitSpanInstructions(forward = true) {
 }
 
 function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
-  // FIX v4: failsAtLength must be scoped per-call so forward and backward
-  // runs don't share state, and trials are returned wrapped in a nested
-  // timeline node so endCurrentTimeline() terminates the right level.
   const innerTrials = [];
   const failsAtLength = {};
 
@@ -442,8 +478,6 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
           if (!d.correct) {
             failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1;
             if (failsAtLength[d.length] >= 2) {
-              // FIX v4: endCurrentTimeline() now correctly ends the nested
-              // { timeline: innerTrials } node returned below, not the top level
               jsPsych.endCurrentTimeline();
             }
           }
@@ -452,7 +486,6 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
     }
   }
 
-  // FIX v4: wrap in a nested node so endCurrentTimeline() has a valid target
   return { timeline: innerTrials, randomize_order: false };
 }
 
@@ -503,8 +536,6 @@ function createPhonemeTrial() {
       const playA   = document.getElementById('playA');
       const playB   = document.getElementById('playB');
 
-      // FIX v4: Guard DOM access but defer finishTrial via setTimeout so
-      // jsPsych finishes its own post-load setup before we end the trial
       if (!btnSame || !btnDiff || !status || !playA || !playB) {
         console.error('[phoneme] DOM elements not found, skipping trial');
         setTimeout(() => jsPsych.finishTrial({ response_label: null, dom_error: true }), 0);
@@ -695,8 +726,6 @@ function create4AFCReceptiveBaseline() {
       const status  = document.getElementById('receptive-status');
       const choices = document.querySelectorAll('.receptive-choice');
 
-      // FIX v4: Guard DOM access but defer finishTrial via setTimeout so
-      // jsPsych finishes its own post-load setup before we end the trial
       if (!playBtn || !status) {
         console.error('[receptive] DOM elements not found, skipping trial');
         setTimeout(() => jsPsych.finishTrial({ response: -1, dom_error: true }), 0);
@@ -843,11 +872,6 @@ function createNamingTimeline() {
   };
 
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
-
-  // FIX v5: Compute whether audio recording is actually viable — both plugins
-  // must be loaded AND the user must have granted mic permission. This is used
-  // in conditional_function checks below to avoid the freeze where neither the
-  // audio path nor the text path would execute.
   const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
 
   const practiceImg = PRELOAD_IMAGES.includes('img/park_scene.jpg') ? 'img/park_scene.jpg' : null;
@@ -857,39 +881,23 @@ function createNamingTimeline() {
 
   const practiceIntro = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h3>Practice Recording / 録音練習</h3>
-      <p>Let's practice with an unrelated image.</p>
-      <p>料理とは関係のない画像で練習しましょう。</p>
-      <div style="background:#e3f2fd;padding:15px;border-radius:8px;margin-top:20px;">
-        <p><b>What to describe in 4 seconds:</b></p>
-        <p>Objects / Actions / Sounds / Smells</p>
-        <p>物体 / 動作 / 音 / 匂い</p>
-      </div>`,
+    stimulus: `<h3>Practice Recording / 録音練習</h3><p>Let's practice with an unrelated image.</p><p>料理とは関係のない画像で練習しましょう。</p>
+      <div style="background:#e3f2fd;padding:15px;border-radius:8px;margin-top:20px;"><p><b>What to describe in 4 seconds:</b></p><p>Objects / Actions / Sounds / Smells</p><p>物体 / 動作 / 音 / 匂い</p></div>`,
     choices: ['Try Practice / 練習を試す'],
     data: { task: 'picture_naming_practice_intro' }
   };
 
   const practicePrepare = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<div>${practiceImgTag}
-      <div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;">
-        <p><b>Remember:</b> Objects, Actions, Sounds, Smells (4 seconds)</p>
-      </div><p>Click when ready. / 準備ができたらクリック</p></div>`,
+    stimulus: `<div>${practiceImgTag}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Remember:</b> Objects, Actions, Sounds, Smells (4 seconds)</p></div><p>Click when ready. / 準備ができたらクリック</p></div>`,
     choices: ['Start Practice Recording / 練習録音開始'],
     data: { task: 'picture_naming_practice_prepare' }
   };
 
   const practiceRecord = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
-    stimulus: `<div>${practiceImgTag}
-      <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
-        <p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 PRACTICE Recording… / 練習録音中…</p>
-        <p style="margin:8px 0;font-size:14px;">4 seconds!</p>
-      </div></div>`,
-    recording_duration: 4000,
-    show_done_button: false,
-    allow_playback: true,
+    stimulus: `<div>${practiceImgTag}<div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;"><p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 PRACTICE Recording… / 練習録音中…</p><p style="margin:8px 0;font-size:14px;">4 seconds!</p></div></div>`,
+    recording_duration: 4000, show_done_button: false, allow_playback: true,
     data: { task: 'picture_naming_practice_record' }
   } : null;
 
@@ -905,55 +913,22 @@ function createNamingTimeline() {
     stimulus: () => {
       const u = jsPsych.timelineVariable('imageUrl');
       const img = u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : '<p style="color:#c00">Missing image.</p>';
-      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;">
-        <p><b>Describe:</b> Objects, Actions, Sounds, Smells</p>
-      </div><p>Click when ready. / 準備ができたらクリック</p></div>`;
+      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Describe:</b> Objects, Actions, Sounds, Smells</p></div><p>Click when ready. / 準備ができたらクリック</p></div>`;
     },
     choices: ['Start Recording / 録音開始'],
     post_trial_gap: 150,
-    data: () => ({
-      task: 'picture_naming_prepare',
-      target: jsPsych.timelineVariable('target') || 'unknown',
-      category: jsPsych.timelineVariable('category') || 'unknown',
-      image_file: jsPsych.timelineVariable('image') || 'none',
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre'
-    })
+    data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre' })
   };
 
   const recordAudio = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
     stimulus: () => {
       const u = jsPsych.timelineVariable('imageUrl');
-      return `<div>${u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : ''}
-        <div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;">
-          <p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 Recording… / 録音中…</p>
-          <p style="margin:8px 0;font-size:14px;">Objects, Actions, Sounds, Smells</p>
-        </div></div>`;
+      return `<div>${u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : ''}<div style="margin-top:16px;background:#ffebee;border-radius:8px;padding:15px;"><p style="margin:0;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 Recording… / 録音中…</p><p style="margin:8px 0;font-size:14px;">Objects, Actions, Sounds, Smells</p></div></div>`;
     },
-    recording_duration: 4000,
-    show_done_button: false,
-    allow_playback: false,
-    data: () => ({
-      task: 'picture_naming_audio',
-      target: jsPsych.timelineVariable('target') || 'unknown',
-      category: jsPsych.timelineVariable('category') || 'unknown',
-      image_file: jsPsych.timelineVariable('image') || 'none',
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre',
-      modality: 'audio',
-      pid_snapshot: currentPID()
-    }),
-    on_finish: (d) => {
-      const pid = d.pid_snapshot || currentPID();
-      const tgt = (d.target || 'unknown').toLowerCase();
-      const idx = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x';
-      d.audio_filename = `pre_${pid}_${tgt}_${idx}.wav`;
-    }
+    recording_duration: 4000, show_done_button: false, allow_playback: false,
+    data: () => ({ task: 'picture_naming_audio', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre', modality: 'audio', pid_snapshot: currentPID() }),
+    on_finish: (d) => { const pid = d.pid_snapshot || currentPID(); const tgt = (d.target || 'unknown').toLowerCase(); const idx = typeof d.trial_index === 'number' ? String(d.trial_index) : 'x'; d.audio_filename = `pre_${pid}_${tgt}_${idx}.wav`; }
   } : null;
 
   const prepareText = {
@@ -961,22 +936,11 @@ function createNamingTimeline() {
     stimulus: () => {
       const u = jsPsych.timelineVariable('imageUrl');
       const img = u ? `<img src="${u}" style="width:350px;border-radius:8px;"/>` : '<p style="color:#c00">Missing image.</p>';
-      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;">
-        <p><b>Describe:</b> Objects, Actions, Sounds, Smells</p>
-      </div></div>`;
+      return `<div>${img}<div style="margin-top:20px;padding:15px;background:#fff3cd;border-radius:8px;"><p><b>Describe:</b> Objects, Actions, Sounds, Smells</p></div></div>`;
     },
     choices: ['Describe / 説明する'],
     post_trial_gap: 150,
-    data: () => ({
-      task: 'picture_naming_prepare',
-      target: jsPsych.timelineVariable('target') || 'unknown',
-      category: jsPsych.timelineVariable('category') || 'unknown',
-      image_file: jsPsych.timelineVariable('image') || 'none',
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre'
-    })
+    data: () => ({ task: 'picture_naming_prepare', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre' })
   };
 
   const recordText = {
@@ -984,58 +948,19 @@ function createNamingTimeline() {
     preamble: () => {
       const u = jsPsych.timelineVariable('imageUrl');
       const img = u ? `<img src="${u}" style="width:300px;border-radius:8px;"/>` : '';
-      return `<div style="text-align:center">${img}
-        <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Mic unavailable; type your description.<br>
-        <b>注意：</b>マイクが使用できません。説明を入力してください。</div></div>`;
+      return `<div style="text-align:center">${img}<div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Mic unavailable; type your description.<br><b>注意：</b>マイクが使用できません。説明を入力してください。</div></div>`;
     },
     questions: [{ prompt: 'Describe: Objects, Actions, Sounds, Smells / 物・動作・音・匂い', name: 'description', rows: 3, required: true }],
-    data: () => ({
-      task: 'picture_naming_text',
-      target: jsPsych.timelineVariable('target') || 'unknown',
-      category: jsPsych.timelineVariable('category') || 'unknown',
-      image_file: jsPsych.timelineVariable('image') || 'none',
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre',
-      modality: 'text'
-    })
+    data: () => ({ task: 'picture_naming_text', target: jsPsych.timelineVariable('target') || 'unknown', category: jsPsych.timelineVariable('category') || 'unknown', image_file: jsPsych.timelineVariable('image') || 'none', iconic: jsPsych.timelineVariable('iconic'), iconicity_rating: jsPsych.timelineVariable('rating'), word_group: jsPsych.timelineVariable('group'), phase: 'pre', modality: 'text' })
   };
 
   const tv = FILTERED_STIMULI.picture.map(s => ({ ...s, imageUrl: asset(s.image) }));
   const tl = [intro];
-
   tl.push(practiceIntro, practicePrepare);
-  if (practiceRecord) {
-    tl.push({
-      timeline: [practiceRecord],
-      // FIX v5: Use canRecordAudio() so practice recording only runs when
-      // both mic plugins are loaded AND mic permission was granted
-      conditional_function: canRecordAudio
-    });
-  }
+  if (practiceRecord) { tl.push({ timeline: [practiceRecord], conditional_function: canRecordAudio }); }
   tl.push(practiceFeedback);
-
-  if (hasMicPlugins) {
-    tl.push({
-      timeline: [prepareAudio, recordAudio].filter(Boolean),
-      timeline_variables: tv,
-      randomize_order: true,
-      // FIX v5: Use canRecordAudio() — requires both plugins AND mic permission
-      conditional_function: canRecordAudio
-    });
-  }
-
-  tl.push({
-    timeline: [prepareText, recordText],
-    timeline_variables: tv,
-    randomize_order: true,
-    // FIX v5: Text fallback fires when mic is unavailable OR when mic plugins
-    // aren't loaded. This prevents the freeze where neither path executes
-    // (hasMicPlugins=false but microphoneAvailable=true would skip both).
-    conditional_function: () => !canRecordAudio()
-  });
-
+  if (hasMicPlugins) { tl.push({ timeline: [prepareAudio, recordAudio].filter(Boolean), timeline_variables: tv, randomize_order: true, conditional_function: canRecordAudio }); }
+  tl.push({ timeline: [prepareText, recordText], timeline_variables: tv, randomize_order: true, conditional_function: () => !canRecordAudio() });
   return tl;
 }
 
@@ -1043,88 +968,36 @@ function createNamingTimeline() {
 function createFoleyTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Sound Matching / 音のマッチング</h2>
-      <p>Listen to each sound carefully, then choose what it represents.</p>
-      <p>各音を注意深く聞いて、それが何を表すか選んでください。</p>
-      <p style="color:#888;">There are ${FILTERED_STIMULI.foley.length} sounds to identify. / 識別する音は${FILTERED_STIMULI.foley.length}個です。</p>`,
+    stimulus: `<h2>Sound Matching / 音のマッチング</h2><p>Listen to each sound carefully, then choose what it represents.</p><p>各音を注意深く聞いて、それが何を表すか選んでください。</p><p style="color:#888;">There are ${FILTERED_STIMULI.foley.length} sounds to identify. / 識別する音は${FILTERED_STIMULI.foley.length}個です。</p>`,
     choices: ['Begin / 開始']
   };
 
   const trial = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => `
-      <div>
-        <button id="foley-play" class="jspsych-btn" type="button" style="font-size:20px;">▶ Play Sound / 音を再生</button>
-        <p id="foley-status" style="margin-top:15px;color:#666;">Click play, then choose.</p>
-      </div>`,
-    choices: () => {
-      const o = jsPsych.timelineVariable('options');
-      return Array.isArray(o) && o.length ? o : ['Option A', 'Option B'];
-    },
+    stimulus: () => `<div><button id="foley-play" class="jspsych-btn" type="button" style="font-size:20px;">▶ Play Sound / 音を再生</button><p id="foley-status" style="margin-top:15px;color:#666;">Click play, then choose.</p></div>`,
+    choices: () => { const o = jsPsych.timelineVariable('options'); return Array.isArray(o) && o.length ? o : ['Option A', 'Option B']; },
     post_trial_gap: 250,
-    data: () => ({
-      task: 'foley_iconicity',
-      correct_answer: jsPsych.timelineVariable('correct'),
-      mapping_type: jsPsych.timelineVariable('mapping_type'),
-      audio_file: jsPsych.timelineVariable('audio'),
-      iconicity_rating: jsPsych.timelineVariable('iconicity_rating'),
-      phase: 'pre'
-    }),
+    data: () => ({ task: 'foley_iconicity', correct_answer: jsPsych.timelineVariable('correct'), mapping_type: jsPsych.timelineVariable('mapping_type'), audio_file: jsPsych.timelineVariable('audio'), iconicity_rating: jsPsych.timelineVariable('iconicity_rating'), phase: 'pre' }),
     on_load: function () {
-      const btn  = document.getElementById('foley-play');
+      const btn = document.getElementById('foley-play');
       const stat = document.getElementById('foley-status');
       const audioSrc = jsPsych.timelineVariable('audio');
-
-      if (!btn || !stat) {
-        console.error('[foley] DOM elements not found, answers unlocked');
-        return;
-      }
-
+      if (!btn || !stat) { console.error('[foley] DOM elements not found'); return; }
       if (!audioSrc) { stat.textContent = 'Audio missing'; return; }
-
       const audioEl = new Audio(asset(audioSrc));
-      audioEl.loop = false;
-      audioEl.preload = 'auto';
+      audioEl.loop = false; audioEl.preload = 'auto';
       window.__foley_audio = audioEl;
-
-      // FIX v4: .answer-btn class no longer exists in jsPsych 7.3 since
-      // button_html was removed. Query the actual rendered choice buttons
-      // using the plugin's container class, excluding the play button.
-      const answerBtns = Array.from(
-        document.querySelectorAll('.jspsych-html-button-response-button button')
-      );
-
+      const answerBtns = Array.from(document.querySelectorAll('.jspsych-html-button-response-button button'));
       let ready = false, unlocked = false, playing = false;
-
-      function lockAnswers(lock) {
-        answerBtns.forEach(b => { b.disabled = lock; b.style.opacity = lock ? '.5' : '1'; });
-      }
-      function unlockAnswers() {
-        if (!unlocked) { unlocked = true; lockAnswers(false); stat.textContent = 'Choose an answer / 答えを選択'; }
-      }
+      function lockAnswers(lock) { answerBtns.forEach(b => { b.disabled = lock; b.style.opacity = lock ? '.5' : '1'; }); }
+      function unlockAnswers() { if (!unlocked) { unlocked = true; lockAnswers(false); stat.textContent = 'Choose an answer / 答えを選択'; } }
       lockAnswers(true);
-
       audioEl.addEventListener('canplaythrough', () => { ready = true; btn.disabled = false; stat.textContent = 'Ready — click play'; }, { once: true });
       audioEl.addEventListener('error', () => { stat.textContent = 'Audio failed — choose anyway'; unlockAnswers(); }, { once: true });
       audioEl.addEventListener('ended', () => { playing = false; unlockAnswers(); btn.disabled = false; btn.textContent = '🔁 Play Again / もう一度'; });
-
-      btn.addEventListener('click', (e) => {
-        e.preventDefault();
-        if (!ready || playing) return;
-        stat.textContent = 'Playing… / 再生中…';
-        btn.disabled = true;
-        playing = true;
-        audioEl.currentTime = 0;
-        audioEl.play().catch(() => { playing = false; unlockAnswers(); btn.disabled = false; });
-      });
+      btn.addEventListener('click', (e) => { e.preventDefault(); if (!ready || playing) return; stat.textContent = 'Playing… / 再生中…'; btn.disabled = true; playing = true; audioEl.currentTime = 0; audioEl.play().catch(() => { playing = false; unlockAnswers(); btn.disabled = false; }); });
     },
-    on_finish: (d) => {
-      const a = window.__foley_audio;
-      if (a) { try { a.pause(); a.currentTime = 0; a.src = ''; } catch (e) {} }
-      window.__foley_audio = null;
-      d.correct = (d.response === d.correct_answer);
-    }
+    on_finish: (d) => { const a = window.__foley_audio; if (a) { try { a.pause(); a.currentTime = 0; a.src = ''; } catch (e) {} } window.__foley_audio = null; d.correct = (d.response === d.correct_answer); }
   };
 
   return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.foley, randomize_order: true }];
@@ -1134,10 +1007,7 @@ function createFoleyTimeline() {
 function createVisualTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h2>Shape-Word Matching / 形と単語のマッチング</h2>
-      <p>Choose the word that best matches the shape.</p>
-      <p>形に最も合う単語を選んでください。</p>`,
+    stimulus: `<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p>形に最も合う単語を選んでください。</p>`,
     choices: ['Begin / 開始']
   };
 
@@ -1148,10 +1018,7 @@ function createVisualTimeline() {
       const img = u ? `<img src="${u}" style="width:200px;height:200px;"/>` : '<p style="color:#c00">Missing shape.</p>';
       return `<div>${img}<p style="margin-top:20px;">Which word matches this shape? / この形に合う単語は？</p></div>`;
     },
-    choices: () => {
-      const w = jsPsych.timelineVariable('words');
-      return Array.isArray(w) && w.length ? w : ['(missing)', '(missing)'];
-    },
+    choices: () => { const w = jsPsych.timelineVariable('words'); return Array.isArray(w) && w.length ? w : ['(missing)', '(missing)']; },
     post_trial_gap: 250,
     data: () => ({ task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type'), phase: 'pre' }),
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
@@ -1166,28 +1033,12 @@ function createSpatialSpanTimeline() {
   const instr = {
     type: T('jsPsychHtmlButtonResponse'),
     choices: ['Begin / 開始'],
-    stimulus: `
-      <h2>Spatial Memory / 空間記憶（Corsi）</h2>
-      <p>Watch squares light up, then click them in the <b>same order</b>.</p>
-      <p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p>
-      <p style="color:#666;">Sequence length increases from 3 to 5. Two trials per length. / 3から5まで増加。各長さ2試行。</p>`
+    stimulus: `<h2>Spatial Memory / 空間記憶（Corsi）</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p><p style="color:#666;">Sequence length increases from 3 to 5. Two trials per length. / 3から5まで増加。各長さ2試行。</p>`
   };
 
   const gridCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
-
-  function makeSequence(len) {
-    const pool = gridCells.slice();
-    const seq = [];
-    for (let i = 0; i < len; i++) {
-      const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
-      seq.push(pick);
-    }
-    return seq;
-  }
-
-  function gridHTML() {
-    return `<div><div class="corsi-grid">${gridCells.map(i => `<div class="corsi-cell" data-i="${i}"></div>`).join('')}</div><p id="corsi-msg" style="margin-top:20px;">Watch… / 見てください…</p></div>`;
-  }
+  function makeSequence(len) { const pool = gridCells.slice(); const seq = []; for (let i = 0; i < len; i++) { const pick = pool.splice(Math.floor(Math.random() * pool.length), 1)[0]; seq.push(pick); } return seq; }
+  function gridHTML() { return `<div><div class="corsi-grid">${gridCells.map(i => `<div class="corsi-cell" data-i="${i}"></div>`).join('')}</div><p id="corsi-msg" style="margin-top:20px;">Watch… / 見てください…</p></div>`; }
 
   function playback(seq, speed = 700) {
     return new Promise(resolve => {
@@ -1195,17 +1046,9 @@ function createSpatialSpanTimeline() {
       cells.forEach(c => c.classList.add('playback'));
       let k = 0;
       function step() {
-        if (k >= seq.length) {
-          cells.forEach(c => c.classList.remove('playback'));
-          const m = document.getElementById('corsi-msg');
-          if (m) m.textContent = 'Now click in order. / 順番にクリック';
-          return resolve();
-        }
+        if (k >= seq.length) { cells.forEach(c => c.classList.remove('playback')); const m = document.getElementById('corsi-msg'); if (m) m.textContent = 'Now click in order. / 順番にクリック'; return resolve(); }
         const el = cells.find(c => Number(c.dataset.i) === seq[k]);
-        if (el) {
-          el.classList.add('lit');
-          setTimeout(() => { el.classList.remove('lit'); k++; setTimeout(step, 250); }, speed - 250);
-        } else { k++; setTimeout(step, speed); }
+        if (el) { el.classList.add('lit'); setTimeout(() => { el.classList.remove('lit'); k++; setTimeout(step, 250); }, speed - 250); } else { k++; setTimeout(step, speed); }
       }
       step();
     });
@@ -1213,63 +1056,31 @@ function createSpatialSpanTimeline() {
 
   function responseCollector(seq, timeout = 15000) {
     return new Promise(resolve => {
-      const chosen = [];
-      const cells = [...document.querySelectorAll('.corsi-cell')];
-      function clicker(e) {
-        const i = Number(e.currentTarget.dataset.i);
-        if (!Number.isFinite(i)) return;
-        chosen.push(i);
-        e.currentTarget.classList.add('lit');
-        setTimeout(() => e.currentTarget.classList.remove('lit'), 150);
-        if (chosen.length === seq.length) {
-          cleanup();
-          resolve({ chosen, correct: chosen.every((v, j) => v === seq[j]) });
-        }
-      }
+      const chosen = []; const cells = [...document.querySelectorAll('.corsi-cell')];
+      function clicker(e) { const i = Number(e.currentTarget.dataset.i); if (!Number.isFinite(i)) return; chosen.push(i); e.currentTarget.classList.add('lit'); setTimeout(() => e.currentTarget.classList.remove('lit'), 150); if (chosen.length === seq.length) { cleanup(); resolve({ chosen, correct: chosen.every((v, j) => v === seq[j]) }); } }
       function cleanup() { cells.forEach(c => c.removeEventListener('click', clicker)); }
       cells.forEach(c => c.addEventListener('click', clicker));
       setTimeout(() => { cleanup(); resolve({ chosen, correct: false, timed_out: true }); }, timeout);
     });
   }
 
-  // FIX v4: failsAtLength scoped here (not inside the for-loop) and all span
-  // trials collected into innerTrials then wrapped in a { timeline: innerTrials }
-  // node so endCurrentTimeline() terminates the right level.
   const innerTrials = [];
   const failsAtLength = {};
 
   for (let len = 3; len <= 5; len++) {
-    innerTrials.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      choices: ['Ready / 準備完了'],
-      stimulus: `<h3>Sequence length: ${len} / 系列長: ${len}</h3><p>You will have 2 trials at this length. / この長さで2試行あります。</p><p>Press Ready, then watch carefully.</p>`
-    });
-
+    innerTrials.push({ type: T('jsPsychHtmlButtonResponse'), choices: ['Ready / 準備完了'], stimulus: `<h3>Sequence length: ${len} / 系列長: ${len}</h3><p>You will have 2 trials at this length. / この長さで2試行あります。</p><p>Press Ready, then watch carefully.</p>` });
     for (let attempt = 0; attempt < 2; attempt++) {
       innerTrials.push({
-        type: T('jsPsychHtmlKeyboardResponse'),
-        choices: 'NO_KEYS',
-        trial_duration: null,
-        stimulus: gridHTML,
+        type: T('jsPsychHtmlKeyboardResponse'), choices: 'NO_KEYS', trial_duration: null, stimulus: gridHTML,
         data: { task: 'spatial_span', length: len, attempt: attempt + 1, phase: 'pre' },
         on_load: function () {
-          const currentLen = len;
-          const seq = makeSequence(currentLen);
+          const currentLen = len; const seq = makeSequence(currentLen);
           playback(seq).then(() => responseCollector(seq)).then(res => {
             jsPsych.finishTrial({ sequence: JSON.stringify(seq), chosen: JSON.stringify(res.chosen || []), correct: !!res.correct, timed_out: !!res.timed_out, length: currentLen, attempt: attempt + 1 });
-          }).catch(err => {
-            jsPsych.finishTrial({ sequence: '[]', chosen: '[]', correct: false, error: err.message, length: currentLen, attempt: attempt + 1 });
-          });
+          }).catch(err => { jsPsych.finishTrial({ sequence: '[]', chosen: '[]', correct: false, error: err.message, length: currentLen, attempt: attempt + 1 }); });
         },
         on_finish: function (d) {
-          if (!d.correct) {
-            failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1;
-            if (failsAtLength[d.length] >= 2) {
-              // FIX v4: endCurrentTimeline() now correctly ends the nested
-              // { timeline: innerTrials } node returned below
-              jsPsych.endCurrentTimeline();
-            }
-          }
+          if (!d.correct) { failsAtLength[d.length] = (failsAtLength[d.length] || 0) + 1; if (failsAtLength[d.length] >= 2) { jsPsych.endCurrentTimeline(); } }
         }
       });
     }
@@ -1279,12 +1090,15 @@ function createSpatialSpanTimeline() {
 }
 
 /* ======================== PROCEDURAL ORDERING ======================== */
-const PROCEDURE_STEPS = ['Crack eggs', 'Mix flour and eggs', 'Heat the pan', 'Pour batter on pan', 'Flip when ready'];
+// v6 FIX: Changed from pancake-making to tea-making to prevent priming
+// the cooking procedure taught in the treatment conditions.
+// Measures the same procedural reasoning ability without content overlap.
+const PROCEDURE_STEPS = ['Boil water', 'Get a teacup', 'Put tea bag in cup', 'Pour hot water', 'Remove tea bag'];
 const PROC_CONSTRAINTS = [
-  ['Crack eggs', 'Mix flour and eggs'],
-  ['Mix flour and eggs', 'Pour batter on pan'],
-  ['Heat the pan', 'Pour batter on pan'],
-  ['Pour batter on pan', 'Flip when ready']
+  ['Boil water', 'Pour hot water'],
+  ['Get a teacup', 'Put tea bag in cup'],
+  ['Put tea bag in cup', 'Pour hot water'],
+  ['Pour hot water', 'Remove tea bag']
 ];
 
 function createProceduralTimeline() {
@@ -1292,8 +1106,8 @@ function createProceduralTimeline() {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: `
       <h3>Recipe Ordering / レシピの順序</h3>
-      <p>Order these pancake-making steps from 1 to 5.</p>
-      <p>パンケーキ作りの手順を1から5の順番に並べてください。</p>`,
+      <p>Order these tea-making steps from 1 to 5.</p>
+      <p>お茶を入れる手順を1から5の順番に並べてください。</p>`,
     choices: ['OK / 了解']
   };
 
@@ -1319,7 +1133,7 @@ function createProceduralTimeline() {
         </div>`).join('')}
       </form>`;
     },
-    data: { task: 'procedural_knowledge', presented_order: steps, phase: 'pre' },
+    data: { task: 'procedural_knowledge', presented_order: steps, phase: 'pre', procedure_type: 'tea_making' },
     on_load() {
       const dds = [...document.querySelectorAll('.proc-dd')];
       function refresh() {
@@ -1388,7 +1202,6 @@ function createIdeophoneTest() {
 
 /* ======================== BOOTSTRAP ======================== */
 async function initializeExperiment() {
-  // Global error catcher — logs full stack to console for easier debugging
   window.addEventListener('error', (e) => {
     console.error('[pretest] Uncaught error:', e.message, '\nStack:', e.error?.stack);
   });
@@ -1426,7 +1239,6 @@ async function initializeExperiment() {
 
     const timeline = [];
 
-    // Welcome
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `<div style="text-align:center;">
@@ -1438,71 +1250,46 @@ async function initializeExperiment() {
       choices: ['Start / 開始']
     });
 
-    // Participant info
     timeline.push(createParticipantInfo());
-
-    // Mic gate
     timeline.push(buildMicSetupGate({ required: false }));
 
-    // FIX v5: Run jsPsychInitializeMicrophone as a proper jsPsych trial after
-    // the mic gate. jsPsychHtmlAudioResponse requires this plugin to have run
-    // first — it stores the MediaStream/device internally. The raw getUserMedia
-    // call in the mic gate only gets browser permission but does NOT satisfy
-    // the plugin's internal initialization requirement.
     if (have('jsPsychInitializeMicrophone')) {
-      timeline.push({
-        timeline: [{
-          type: T('jsPsychInitializeMicrophone')
-        }],
-        conditional_function: () => microphoneAvailable
-      });
+      timeline.push({ timeline: [{ type: T('jsPsychInitializeMicrophone') }], conditional_function: () => microphoneAvailable });
     }
 
-    // FIX v4: generateDigitSpanTrials now returns a { timeline: [...] } node
-    // directly, so just push it — no extra wrapping needed
     timeline.push(createDigitSpanInstructions(true));
     timeline.push(generateDigitSpanTrials({ forward: true,  startLen: 3, endLen: 6 }));
     timeline.push(createDigitSpanInstructions(false));
     timeline.push(generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }));
 
-    // Phoneme discrimination
     if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
       timeline.push(createPhonemeInstructions());
       timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order: true });
     }
 
-    // LDT
     timeline.push(createLDTPrimerWithImage());
     timeline.push(...createLDTTimeline());
 
-    // 4AFC Receptive vocab
     if ((FILTERED_STIMULI.receptive?.length || 0) > 0) {
       timeline.push(...create4AFCReceptiveBaseline());
     }
 
-    // Picture naming
     if ((FILTERED_STIMULI.picture?.length || 0) > 0) {
       timeline.push(...createNamingTimeline());
     }
 
-    // Foley
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
     }
 
-    // Visual iconicity
     if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
       timeline.push(...createVisualTimeline());
     }
 
-    // FIX v4: createSpatialSpanTimeline returns [instr, { timeline: innerTrials }]
     timeline.push(...createSpatialSpanTimeline());
-
-    // Procedural + Ideophone
     timeline.push(...createProceduralTimeline());
     timeline.push(...createIdeophoneTest());
 
-    // Exit
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `
