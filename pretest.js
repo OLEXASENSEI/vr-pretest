@@ -1,6 +1,21 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v7)
+// pretest.js — VR Pre-Test Battery (CORRECTED v7.1)
 // GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
 // ~20 minutes duration
+//
+// v7.1 CHANGES (asset-handling fixes over v7):
+//  1. FIX: Asset validator no longer silently drops stimuli when a referenced
+//     file is missing. All stimulus arrays remain intact; misses are tracked
+//     in MISSING_ASSETS and trials run with placeholder images / silent audio.
+//  2. NEW: Launch-check screen at the start of the timeline. If any required
+//     file is missing it lists every missing path and forces the researcher
+//     to either Abort (fix the deployment) or acknowledge and continue.
+//     Skipped silently when all assets are present.
+//  3. NEW: Every saved trial record carries `missing_assets`, the list of
+//     files that were unreachable at startup, so analysts can flag any
+//     trials whose stimuli rendered as placeholders.
+//  4. NEW: All <img> tags now fall back to a visible "Image missing"
+//     SVG placeholder instead of being hidden, so participants see something
+//     and trial timing/data collection are unaffected.
 //
 // v7 CHANGES (task redesign over v6):
 //  1. REDESIGN: 4AFC split into Objects block and Actions block to prevent
@@ -38,6 +53,18 @@ let assignedCondition = null;
 let microphoneAvailable = false;
 let currentPID_value = 'unknown';
 
+// v7.1: track every asset URL that fails its HEAD check at startup, so the
+// launch-check screen can list them and every saved trial record can carry
+// the list for downstream analysis.
+let MISSING_ASSETS = { audio: [], images: [] };
+
+// v7.1: visible "missing" placeholders so trials still run when an asset
+// is unreachable. Used as the onerror fallback on every <img> tag and as
+// the fallback src for new Audio() instances.
+const PLACEHOLDER_IMG = `data:image/svg+xml,${encodeURIComponent(
+  '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="#fff3cd"/><text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#856404">Image missing</text><text x="50%" y="62%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#856404">trial recorded with placeholder</text></svg>')}`;
+const PLACEHOLDER_AUDIO = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+
 const have = (name) => typeof window[name] !== 'undefined';
 const T = (name) => window[name];
 const ASSET_BUST = Math.floor(Math.random() * 100000);
@@ -68,6 +95,25 @@ function asObject(x) {
 function currentPID() { return currentPID_value; }
 function namingPhase() { return 'pre'; }
 function assignCondition() { return 'immediate'; }
+
+// v7.1: returns the safe URL for an image, plus the standard onerror
+// attribute that swaps to the "Image missing" placeholder. If the asset
+// was flagged missing at startup we just point straight at the placeholder.
+function imgSrc(path) {
+  if (!path) return PLACEHOLDER_IMG;
+  if (MISSING_ASSETS.images.includes(path)) return PLACEHOLDER_IMG;
+  return asset(path);
+}
+const IMG_ONERROR = `onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}';"`;
+
+// v7.1: same idea for audio — return the asset URL, falling back to silent
+// when a file was flagged missing at startup. Audio elements should also
+// attach an 'error' listener for runtime failures (most call sites already do).
+function audioSrc(path) {
+  if (!path) return PLACEHOLDER_AUDIO;
+  if (MISSING_ASSETS.audio.includes(path)) return PLACEHOLDER_AUDIO;
+  return asset(path);
+}
 
 /* ======================== WORD CLASSIFICATION ======================== */
 // All ratings verified against Winter et al. iconicity ratings database
@@ -273,92 +319,58 @@ function checkImageExists(url) {
 
 let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
-let FILTERED_STIMULI = { phoneme: [], foley: [], picture: [], visual: [], receptive: [] };
+// v7.1: FILTERED_STIMULI now points at the FULL stimulus arrays, not a
+// filtered subset. Asset existence is tracked separately via MISSING_ASSETS
+// so a missing file shows as a placeholder in the trial rather than
+// silently disappearing the trial.
+let FILTERED_STIMULI = { phoneme: [], foley: [], objects: [], actions: [], scenes: [], visual: [], receptiveObjects: [], receptiveActions: [] };
 
 async function filterExistingStimuli() {
   console.log('[Validation] Starting asset validation…');
 
-  const phoneme = [];
-  for (const s of phoneme_discrimination_stimuli) {
-    const ok1 = await checkAudioExists(s.audio1);
-    const ok2 = await checkAudioExists(s.audio2);
-    if (ok1 && ok2) { phoneme.push(s); PRELOAD_AUDIO.push(s.audio1, s.audio2); }
-  }
-  console.log(`[Validation] Phoneme: ${phoneme.length}/${phoneme_discrimination_stimuli.length}`);
+  // Collect every asset URL referenced anywhere in the experiment.
+  const allAudio = new Set();
+  const allImages = new Set();
+  for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
+  for (const s of foley_stimuli) { allAudio.add(s.audio); }
+  for (const s of object_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
+  for (const s of action_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
+  for (const s of scene_stimuli) { allImages.add(s.image); }
+  for (const s of visual_iconicity_stimuli) { allImages.add(s.shape); }
+  for (const s of receptive_objects_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
+  for (const s of receptive_actions_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
+  object_distractor_images.forEach(i => allImages.add(i));
+  action_distractor_images.forEach(i => allImages.add(i));
+  allImages.add('img/park_scene.jpg');
+  allImages.add('img/KEYBOARD.jpg');
 
-  const foley = [];
-  for (const s of foley_stimuli) {
-    if (await checkAudioExists(s.audio)) { foley.push(s); PRELOAD_AUDIO.push(s.audio); }
+  // HEAD-check each one. Misses go into MISSING_ASSETS; existing files go
+  // into the preload lists. Stimulus arrays are NOT filtered.
+  for (const url of allAudio) {
+    if (!(await checkAudioExists(url))) MISSING_ASSETS.audio.push(url);
+    else PRELOAD_AUDIO.push(url);
   }
-  console.log(`[Validation] Foley: ${foley.length}/${foley_stimuli.length}`);
-
-  // v7: Validate objects, actions, and scenes separately
-  const objects = [];
-  for (const s of object_stimuli) {
-    const okImg = await checkImageExists(s.image);
-    const okAudio = await checkAudioExists(s.model_audio);
-    if (okImg) { objects.push(s); PRELOAD_IMAGES.push(s.image); }
-    if (okAudio) { PRELOAD_AUDIO.push(s.model_audio); }
-  }
-  console.log(`[Validation] Objects: ${objects.length}/${object_stimuli.length}`);
-
-  const actions = [];
-  for (const s of action_stimuli) {
-    const okImg = await checkImageExists(s.image);
-    const okAudio = await checkAudioExists(s.model_audio);
-    if (okImg) { actions.push(s); PRELOAD_IMAGES.push(s.image); }
-    if (okAudio) { PRELOAD_AUDIO.push(s.model_audio); }
-  }
-  console.log(`[Validation] Actions: ${actions.length}/${action_stimuli.length}`);
-
-  // Validate distractor images
-  for (const img of [...object_distractor_images, ...action_distractor_images]) {
-    if (await checkImageExists(img)) { PRELOAD_IMAGES.push(img); }
+  for (const url of allImages) {
+    if (!(await checkImageExists(url))) MISSING_ASSETS.images.push(url);
+    else PRELOAD_IMAGES.push(url);
   }
 
-  const scenes = [];
-  for (const s of scene_stimuli) {
-    if (await checkImageExists(s.image)) { scenes.push(s); PRELOAD_IMAGES.push(s.image); }
-  }
-  console.log(`[Validation] Scenes: ${scenes.length}/${scene_stimuli.length}`);
+  FILTERED_STIMULI = {
+    phoneme: phoneme_discrimination_stimuli,
+    foley: foley_stimuli,
+    objects: object_stimuli,
+    actions: action_stimuli,
+    scenes: scene_stimuli,
+    visual: visual_iconicity_stimuli,
+    receptiveObjects: receptive_objects_stimuli,
+    receptiveActions: receptive_actions_stimuli
+  };
 
-  const visual = [];
-  for (const s of visual_iconicity_stimuli) {
-    if (await checkImageExists(s.shape)) { visual.push(s); PRELOAD_IMAGES.push(s.shape); }
+  console.log(`[Validation] Complete — missing: ${MISSING_ASSETS.images.length} images, ${MISSING_ASSETS.audio.length} audio.`);
+  if (MISSING_ASSETS.images.length || MISSING_ASSETS.audio.length) {
+    console.warn('[Validation] Missing images:', MISSING_ASSETS.images);
+    console.warn('[Validation] Missing audio:', MISSING_ASSETS.audio);
   }
-  console.log(`[Validation] Visual: ${visual.length}/${visual_iconicity_stimuli.length}`);
-
-  // v7: Validate split 4AFC stimuli
-  const receptiveObjects = [];
-  for (const s of receptive_objects_stimuli) {
-    const okAudio = await checkAudioExists(s.word_audio);
-    const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
-    if (okAudio && okImages.every(ok => ok)) {
-      receptiveObjects.push(s);
-      PRELOAD_AUDIO.push(s.word_audio);
-      s.images.forEach(img => { if (!PRELOAD_IMAGES.includes(img)) PRELOAD_IMAGES.push(img); });
-    }
-  }
-  console.log(`[Validation] 4AFC Objects: ${receptiveObjects.length}/${receptive_objects_stimuli.length}`);
-
-  const receptiveActions = [];
-  for (const s of receptive_actions_stimuli) {
-    const okAudio = await checkAudioExists(s.word_audio);
-    const okImages = await Promise.all(s.images.map(img => checkImageExists(img)));
-    if (okAudio && okImages.every(ok => ok)) {
-      receptiveActions.push(s);
-      PRELOAD_AUDIO.push(s.word_audio);
-      s.images.forEach(img => { if (!PRELOAD_IMAGES.includes(img)) PRELOAD_IMAGES.push(img); });
-    }
-  }
-  console.log(`[Validation] 4AFC Actions: ${receptiveActions.length}/${receptive_actions_stimuli.length}`);
-
-  if (await checkImageExists('img/park_scene.jpg')) {
-    PRELOAD_IMAGES.push('img/park_scene.jpg');
-  }
-
-  FILTERED_STIMULI = { phoneme, foley, objects, actions, scenes, visual, receptiveObjects, receptiveActions };
-  console.log('[Validation] Complete');
 }
 
 /* ======================== CSS ======================== */
@@ -373,6 +385,51 @@ function addCustomStyles() {
     .mic-error-msg { background-color:#ffebee; padding:20px; border-radius:8px; margin-top:20px; }
   `;
   document.head.appendChild(style);
+}
+
+/* ======================== ASSET LAUNCH-CHECK SCREEN (v7.1) ======================== */
+// Shows a list of every missing file at the very start of the timeline
+// when MISSING_ASSETS is non-empty. Researcher can Abort or acknowledge and
+// continue. Trials still run with placeholders if they continue.
+function buildAssetCheckScreen() {
+  return {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => {
+      const imgList = MISSING_ASSETS.images.map(f => `<li style="margin:2px 0">🖼 <code>${f}</code></li>`).join('');
+      const audList = MISSING_ASSETS.audio.map(f => `<li style="margin:2px 0">🔊 <code>${f}</code></li>`).join('');
+      const total = MISSING_ASSETS.images.length + MISSING_ASSETS.audio.length;
+      return `<div style="max-width:760px;margin:0 auto;text-align:left;line-height:1.6">
+        <h2 style="color:#d32f2f;">⚠️ Asset Check — ${total} file${total === 1 ? '' : 's'} missing</h2>
+        <p>The validator could not load <b>${total}</b> file${total === 1 ? '' : 's'} that the pretest references.
+        Affected trials will still run, but with a visible "Image missing" placeholder or silent audio.
+        Every saved trial record will carry the missing-asset list in <code>missing_assets</code> so analysts can flag affected data downstream.</p>
+        <div style="background:#fff3cd;border:1px solid #ffeeba;border-radius:6px;padding:12px;margin-top:12px">
+          <p style="margin:0 0 8px 0"><b>If this is unexpected, abort and fix the deployment before running participants.</b></p>
+          <ul style="font-family:monospace;font-size:13px;margin:8px 0 0 18px;padding:0">
+            ${imgList}${audList}
+          </ul>
+        </div>
+        <p style="margin-top:16px;color:#666;">Click <b>Abort</b> to stop now and fix the deployment, or <b>Continue (acknowledge)</b> to run with placeholders.</p>
+      </div>`;
+    },
+    choices: ['Abort', 'Continue (acknowledge) / 続行'],
+    data: () => ({
+      task: 'asset_check',
+      missing_images: MISSING_ASSETS.images.slice(),
+      missing_audio: MISSING_ASSETS.audio.slice()
+    }),
+    on_finish: (d) => {
+      d.aborted = (d.response === 0);
+      if (d.aborted) {
+        try {
+          jsPsych.endExperiment(`<h2>Aborted</h2><p>Fix missing assets and reload.</p><pre style="text-align:left;background:#f5f5f5;padding:10px;font-size:12px">${[...MISSING_ASSETS.images, ...MISSING_ASSETS.audio].join('\n')}</pre>`);
+        } catch (e) {
+          const target = document.getElementById('jspsych-target');
+          if (target) target.innerHTML = '<div style="text-align:center;padding:40px"><h2>Aborted</h2><p>Fix missing assets and reload.</p></div>';
+        }
+      }
+    }
+  };
 }
 
 /* ======================== PARTICIPANT INFO ======================== */
@@ -578,8 +635,8 @@ function createPhonemeTrial() {
       phase: 'pre'
     }),
     on_load: function () {
-      const a = new Audio(asset(jsPsych.timelineVariable('audio1')));
-      const b = new Audio(asset(jsPsych.timelineVariable('audio2')));
+      const a = new Audio(audioSrc(jsPsych.timelineVariable('audio1')));
+      const b = new Audio(audioSrc(jsPsych.timelineVariable('audio2')));
       a.loop = false;
       b.loop = false;
 
@@ -612,6 +669,10 @@ function createPhonemeTrial() {
 
       a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once: true });
+      // v7.1: if audio errors at runtime (rare — should be caught at HEAD-check),
+      // still let participant answer rather than hanging.
+      a.addEventListener('error', () => { aEnded = true; maybeEnable(); }, { once: true });
+      b.addEventListener('error', () => { bEnded = true; maybeEnable(); }, { once: true });
 
       playA.addEventListener('click', () => {
         status.textContent = 'Playing Sound A…';
@@ -644,7 +705,7 @@ function createPhonemeTrial() {
 
 /* ======================== LDT ======================== */
 function createLDTPrimerWithImage() {
-  const imgPath = asset('img/KEYBOARD.jpg');
+  const imgPath = imgSrc('img/KEYBOARD.jpg');
   return {
     type: T('jsPsychHtmlButtonResponse'),
     choices: ['Begin / 開始'],
@@ -660,7 +721,7 @@ function createLDTPrimerWithImage() {
         左手の人差し指を<b>Aキー</b>、右手の人差し指を<b>Lキー</b>に。</p>
 
         <div style="text-align:center;margin:20px 0;">
-          <img src="${imgPath}" alt="Keyboard showing A and L keys" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:8px;"/>
+          <img src="${imgPath}" alt="Keyboard showing A and L keys" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:8px;" ${IMG_ONERROR}/>
         </div>
 
         <div style="background-color:#fff3cd;padding:15px;border-radius:8px;margin-bottom:20px;">
@@ -747,7 +808,7 @@ function create4AFCReceptiveBaseline() {
         const images = jsPsych.timelineVariable('images');
         const imgHTML = images.map((src, i) =>
           `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
-            <img src="${asset(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;"/>
+            <img src="${imgSrc(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;" ${IMG_ONERROR}/>
           </div>`
         ).join('');
         return `
@@ -768,7 +829,7 @@ function create4AFCReceptiveBaseline() {
         phase: 'pre'
       }),
       on_load: function () {
-        const audioSrc = jsPsych.timelineVariable('word_audio');
+        const audioRef = jsPsych.timelineVariable('word_audio');
         const playBtn = document.getElementById('play-word');
         const status  = document.getElementById('receptive-status');
         const choices = document.querySelectorAll('.receptive-choice');
@@ -779,7 +840,7 @@ function create4AFCReceptiveBaseline() {
           return;
         }
 
-        const audio = new Audio(asset(audioSrc));
+        const audio = new Audio(audioSrc(audioRef));
         let hasPlayed = false;
 
         choices.forEach(c => { c.style.opacity = '0.5'; c.style.pointerEvents = 'none'; });
@@ -801,6 +862,14 @@ function create4AFCReceptiveBaseline() {
           playBtn.textContent = '🔁 Play Again / もう一度';
           choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
         });
+        // v7.1: if the audio file is the silent placeholder or fails to load,
+        // unlock the choices so the trial doesn't hang.
+        audio.addEventListener('error', () => {
+          hasPlayed = true;
+          status.textContent = 'Audio missing — choose anyway. / 音声なし。回答してください。';
+          playBtn.disabled = false;
+          choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
+        }, { once: true });
 
         choices.forEach(choice => {
           choice.addEventListener('click', () => {
@@ -887,8 +956,8 @@ function buildMicSetupGate({ required = true } = {}) {
       const contBtn = choiceBtns.length >= 1 ? choiceBtns[0] : null;  // "Continue / 続行"
       const textBtn = choiceBtns.length >= 2 ? choiceBtns[1] : null;  // "Use Text Only / 文字で続行"
 
-      console.log('[mic_gate] Found choice buttons:', choiceBtns.length, 
-        'Continue:', contBtn?.textContent?.trim(), 
+      console.log('[mic_gate] Found choice buttons:', choiceBtns.length,
+        'Continue:', contBtn?.textContent?.trim(),
         'TextOnly:', textBtn?.textContent?.trim());
 
       if (!enableBtn || !statusEl || !levelEl) {
@@ -954,10 +1023,9 @@ function createProgressiveNamingTimeline() {
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
   const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
 
-  const practiceImg = PRELOAD_IMAGES.includes('img/park_scene.jpg') ? 'img/park_scene.jpg' : null;
-  const practiceImgTag = practiceImg
-    ? `<img src="${asset(practiceImg)}" style="width:350px;border-radius:8px;"/>`
-    : '<div style="width:350px;height:250px;background:#e0e0e0;border-radius:8px;display:flex;align-items:center;justify-content:center;"><p>Park Scene</p></div>';
+  // v7.1: practice always uses the placeholder if park_scene.jpg is missing,
+  // rather than silently switching to a div. The placeholder makes it obvious.
+  const practiceImgTag = `<img src="${imgSrc('img/park_scene.jpg')}" style="width:350px;border-radius:8px;" ${IMG_ONERROR}/>`;
 
   const tl = [];
 
@@ -1011,7 +1079,7 @@ function createProgressiveNamingTimeline() {
 
   // ---- Helper: build naming trials for a stimulus set ----
   function buildNamingBlock(stimuli, prompt, promptJP, stageName) {
-    const items = stimuli.map(s => ({ ...s, imageUrl: asset(s.image) }));
+    const items = stimuli.map(s => ({ ...s, imageUrl: imgSrc(s.image) }));
     const trials = [];
 
     // Step A: See image → name it (spontaneous)
@@ -1020,7 +1088,7 @@ function createProgressiveNamingTimeline() {
       stimulus: () => {
         const u = jsPsych.timelineVariable('imageUrl');
         return `<div style="text-align:center;">
-          <img src="${u}" style="width:300px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <img src="${u}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
           <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
           <p style="color:#666;">${promptJP}</p>
           <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
@@ -1045,7 +1113,7 @@ function createProgressiveNamingTimeline() {
       preamble: () => {
         const u = jsPsych.timelineVariable('imageUrl');
         return `<div style="text-align:center;">
-          <img src="${u}" style="width:300px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <img src="${u}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
           <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
           <p style="color:#666;">${promptJP}</p>
           <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your answer. / 回答を入力してください。</div></div>`;
@@ -1066,7 +1134,7 @@ function createProgressiveNamingTimeline() {
         const u = jsPsych.timelineVariable('imageUrl');
         const target = jsPsych.timelineVariable('target');
         return `<div style="text-align:center;">
-          <img src="${u}" style="width:250px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <img src="${u}" style="width:250px;border-radius:8px;" ${IMG_ONERROR}/>
           <p style="margin-top:15px;">Now listen to the correct word: / 正しい単語を聞いてください：</p>
           <p style="font-size:24px;font-weight:bold;color:#1a237e;">${target}</p>
           <button id="model-play" class="jspsych-btn" style="font-size:18px;margin-top:10px;">▶ Play / 再生</button>
@@ -1076,7 +1144,7 @@ function createProgressiveNamingTimeline() {
       choices: ['Repeat Now / 繰り返す'],
       data: () => ({ task: `naming_${stageName}_model`, target: jsPsych.timelineVariable('target'), phase: 'pre', stage: stageName }),
       on_load: function () {
-        const audioSrc = jsPsych.timelineVariable('model_audio');
+        const audioRef = jsPsych.timelineVariable('model_audio');
         const playBtn = document.getElementById('model-play');
         const status = document.getElementById('model-status');
         const choiceBtns = [...document.querySelectorAll('.jspsych-html-button-response-button button')];
@@ -1084,8 +1152,12 @@ function createProgressiveNamingTimeline() {
 
         if (repeatBtn) { repeatBtn.disabled = true; repeatBtn.style.opacity = '0.5'; }
 
-        if (!playBtn || !audioSrc) return;
-        const audio = new Audio(asset(audioSrc));
+        if (!playBtn || !audioRef) {
+          // No audio referenced — let participant continue without locking
+          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
+          return;
+        }
+        const audio = new Audio(audioSrc(audioRef));
 
         audio.addEventListener('ended', () => {
           if (status) status.textContent = 'Now click "Repeat" to record your pronunciation.';
@@ -1093,6 +1165,12 @@ function createProgressiveNamingTimeline() {
           playBtn.textContent = '🔁 Play Again / もう一度';
           playBtn.disabled = false;
         });
+
+        // v7.1: if model audio is missing/silent, don't strand the participant
+        audio.addEventListener('error', () => {
+          if (status) status.textContent = 'Audio missing — proceed when ready.';
+          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
+        }, { once: true });
 
         playBtn.addEventListener('click', (e) => {
           e.preventDefault();
@@ -1189,14 +1267,14 @@ function createProgressiveNamingTimeline() {
       choices: ['Begin / 開始']
     });
 
-    const sceneItems = FILTERED_STIMULI.scenes.map(s => ({ ...s, imageUrl: asset(s.image) }));
+    const sceneItems = FILTERED_STIMULI.scenes.map(s => ({ ...s, imageUrl: imgSrc(s.image) }));
 
     const sceneRecordAudio = hasMicPlugins ? {
       type: T('jsPsychHtmlAudioResponse'),
       stimulus: () => {
         const u = jsPsych.timelineVariable('imageUrl');
         return `<div style="text-align:center;">
-          <img src="${u}" style="width:450px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <img src="${u}" style="width:450px;border-radius:8px;" ${IMG_ONERROR}/>
           <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
           <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
           <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
@@ -1216,7 +1294,7 @@ function createProgressiveNamingTimeline() {
       preamble: () => {
         const u = jsPsych.timelineVariable('imageUrl');
         return `<div style="text-align:center;">
-          <img src="${u}" style="width:450px;border-radius:8px;" onerror="this.style.display='none'"/>
+          <img src="${u}" style="width:450px;border-radius:8px;" ${IMG_ONERROR}/>
           <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
           <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
           <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your description. / 説明を入力してください。</div></div>`;
@@ -1254,10 +1332,9 @@ function createFoleyTimeline() {
     on_load: function () {
       const btn = document.getElementById('foley-play');
       const stat = document.getElementById('foley-status');
-      const audioSrc = jsPsych.timelineVariable('audio');
+      const audioRef = jsPsych.timelineVariable('audio');
       if (!btn || !stat) { console.error('[foley] DOM elements not found'); return; }
-      if (!audioSrc) { stat.textContent = 'Audio missing'; return; }
-      const audioEl = new Audio(asset(audioSrc));
+      const audioEl = new Audio(audioSrc(audioRef));
       audioEl.loop = false; audioEl.preload = 'auto';
       window.__foley_audio = audioEl;
       const answerBtns = Array.from(document.querySelectorAll('.jspsych-html-button-response-button button'));
@@ -1266,7 +1343,7 @@ function createFoleyTimeline() {
       function unlockAnswers() { if (!unlocked) { unlocked = true; lockAnswers(false); stat.textContent = 'Choose an answer / 答えを選択'; } }
       lockAnswers(true);
       audioEl.addEventListener('canplaythrough', () => { ready = true; btn.disabled = false; stat.textContent = 'Ready — click play'; }, { once: true });
-      audioEl.addEventListener('error', () => { stat.textContent = 'Audio failed — choose anyway'; unlockAnswers(); }, { once: true });
+      audioEl.addEventListener('error', () => { stat.textContent = 'Audio missing — choose anyway'; unlockAnswers(); }, { once: true });
       audioEl.addEventListener('ended', () => { playing = false; unlockAnswers(); btn.disabled = false; btn.textContent = '🔁 Play Again / もう一度'; });
       btn.addEventListener('click', (e) => { e.preventDefault(); if (!ready || playing) return; stat.textContent = 'Playing… / 再生中…'; btn.disabled = true; playing = true; audioEl.currentTime = 0; audioEl.play().catch(() => { playing = false; unlockAnswers(); btn.disabled = false; }); });
     },
@@ -1288,7 +1365,7 @@ function createVisualTimeline() {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: () => {
       const u = jsPsych.timelineVariable('shapeUrl');
-      const img = u ? `<img src="${u}" style="width:200px;height:200px;"/>` : '<p style="color:#c00">Missing shape.</p>';
+      const img = `<img src="${u}" style="width:200px;height:200px;" ${IMG_ONERROR}/>`;
       return `<div>${img}<p style="margin-top:20px;">Which word matches this shape? / この形に合う単語は？</p></div>`;
     },
     choices: () => { const w = jsPsych.timelineVariable('words'); return Array.isArray(w) && w.length ? w : ['(missing)', '(missing)']; },
@@ -1297,7 +1374,7 @@ function createVisualTimeline() {
     on_finish: d => { d.correct = (d.response === d.correct_answer); }
   };
 
-  const tv = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: asset(s.shape) }));
+  const tv = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: imgSrc(s.shape) }));
   return [intro, { timeline: [trial], timeline_variables: tv, randomize_order: true }];
 }
 
@@ -1510,7 +1587,183 @@ async function initializeExperiment() {
     assignedCondition = assignCondition();
     await filterExistingStimuli();
 
+    // v7.1: stamp every trial record with the missing-asset list so analysts
+    // can flag any data collected against placeholders.
+    try {
+      jsPsych.data.addProperties({
+        missing_assets: [...MISSING_ASSETS.images, ...MISSING_ASSETS.audio]
+      });
+    } catch {}
+
     const timeline = [];
+
+    // v7.1: launch-check screen — only renders if anything is missing.
+    timeline.push({
+      timeline: [buildAssetCheckScreen()],
+      conditional_function: () => (MISSING_ASSETS.images.length + MISSING_ASSETS.audio.length) > 0
+    });
+
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<div style="text-align:center;">
+        <h2>Pre-Test / プリテスト</h2>
+        <p>This test measures your baseline English vocabulary and cognitive abilities before the training session.</p>
+        <p>トレーニングセッション前の英語語彙と認知能力のベースラインを測定します。</p>
+        <p style="color:#666;">Duration: ~20 minutes / 所要時間：約20分</p>
+      </div>`,
+      choices: ['Start / 開始']
+    });
+
+    timeline.push(createParticipantInfo());
+    timeline.push(buildMicSetupGate({ required: false }));
+
+    if (have('jsPsychInitializeMicrophone')) {
+      timeline.push({ timeline: [{ type: T('jsPsychInitializeMicrophone') }], conditional_function: () => microphoneAvailable });
+    }
+
+    timeline.push(createDigitSpanInstructions(true));
+    timeline.push(generateDigitSpanTrials({ forward: true,  startLen: 3, endLen: 6 }));
+    timeline.push(createDigitSpanInstructions(false));
+    timeline.push(generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }));
+
+    if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
+      timeline.push(createPhonemeInstructions());
+      timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order: true });
+    }
+
+    timeline.push(createLDTPrimerWithImage());
+    timeline.push(...createLDTTimeline());
+
+    // v7: Split 4AFC — objects then actions
+    timeline.push(...create4AFCReceptiveBaseline());
+
+    // v7: Progressive naming — objects → actions → scenes
+    timeline.push(...createProgressiveNamingTimeline());
+
+    if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
+      timeline.push(...createFoleyTimeline());
+    }
+
+    if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
+      timeline.push(...createVisualTimeline());
+    }
+
+    timeline.push(...createSpatialSpanTimeline());
+    timeline.push(...createProceduralTimeline());
+    timeline.push(...createIdeophoneTest());
+
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `
+        <h2>All done! / 完了！</h2>
+        <p>Thank you for completing the pre-test.</p>
+        <p>プリテストを完了していただきありがとうございます。</p>
+        <p style="color:#666;">Next: Training session / 次：トレーニングセッション</p>
+        <p>You can download your results now. / 結果をダウンロードできます。</p>`,
+      choices: ['Download Results / 結果をダウンロード'],
+      on_finish: () => saveData()
+    });
+
+    jsPsych.run(timeline);
+  } catch (e) {
+    console.error('[pretest] Initialization error:', e);
+    alert('Error initializing: ' + (e?.message || e));
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeExperiment);
+} else {
+  initializeExperiment();
+}
+ns = [];
+      PROC_CONSTRAINTS.forEach(([a, b]) => {
+        if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(a + ' → ' + b); }
+      });
+      d.responses_positions = pos;
+      d.constraints_total = tot;
+      d.constraints_satisfied = ok;
+      d.partial_order_score = tot > 0 ? ok / tot : null;
+      d.violations = violations;
+    }
+  };
+
+  return [instructions, test];
+}
+
+/* ======================== IDEOPHONE ======================== */
+function createIdeophoneTest() {
+  return [
+    {
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: '<h2>Japanese Sound Words / 擬音語</h2><p>Match Japanese sound-symbolic words to their meanings.</p><p>日本語の擬音語をその意味と合わせてください。</p>',
+      choices: ['Begin / 開始']
+    },
+    {
+      type: T('jsPsychSurveyLikert'),
+      preamble: '<h3>Which sound represents: / どの音が表しますか：</h3>',
+      questions: [
+        { prompt: '<b>Egg frying sound?</b> / 卵が焼ける音', name: 'frying_sound',   labels: ['ジュージュー (jūjū)', 'パラパラ (parapara)', 'グルグル (guruguru)'], required: true },
+        { prompt: '<b>Stirring sound?</b> / かき混ぜる音',   name: 'stirring_sound', labels: ['ジュージュー (jūjū)', 'パラパラ (parapara)', 'グルグル (guruguru)'], required: true }
+      ],
+      button_label: 'Submit / 送信',
+      data: { task: 'ideophone_mapping', phase: 'pre' }
+    }
+  ];
+}
+
+/* ======================== BOOTSTRAP ======================== */
+async function initializeExperiment() {
+  window.addEventListener('error', (e) => {
+    console.error('[pretest] Uncaught error:', e.message, '\nStack:', e.error?.stack);
+  });
+
+  try {
+    if (!have('initJsPsych')) { alert('jsPsych core not loaded.'); return; }
+
+    addCustomStyles();
+
+    let displayEl = document.getElementById('jspsych-target');
+    if (!displayEl) {
+      displayEl = document.createElement('div');
+      displayEl.id = 'jspsych-target';
+      document.body.appendChild(displayEl);
+      console.warn('[pretest] Created missing #jspsych-target element');
+    }
+
+    jsPsych = T('initJsPsych')({
+      display_element: 'jspsych-target',
+      use_webaudio: false,
+      show_progress_bar: true,
+      message_progress_bar: 'Progress / 進行状況',
+      default_iti: 350,
+      on_trial_start: () => { try { window.scrollTo(0, 0); } catch {} },
+      on_finish: () => {
+        const all = jsPsych.data.get().values();
+        console.log('[pretest] complete, trials:', all.length);
+        saveData(all);
+      }
+    });
+    window.jsPsych = jsPsych;
+
+    assignedCondition = assignCondition();
+    await filterExistingStimuli();
+
+    // v7.1: stamp every trial record with the missing-asset list so analysts
+    // can flag any data collected against placeholders.
+    try {
+      jsPsych.data.addProperties({
+        missing_assets: [...MISSING_ASSETS.images, ...MISSING_ASSETS.audio]
+      });
+    } catch {}
+
+    const timeline = [];
+
+    // v7.1: launch-check screen — only renders if anything is missing.
+    timeline.push({
+      timeline: [buildAssetCheckScreen()],
+      conditional_function: () => (MISSING_ASSETS.images.length + MISSING_ASSETS.audio.length) > 0
+    });
 
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
