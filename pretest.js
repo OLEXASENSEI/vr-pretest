@@ -96,22 +96,22 @@ function currentPID() { return currentPID_value; }
 function namingPhase() { return 'pre'; }
 function assignCondition() { return 'immediate'; }
 
-// v7.1: returns the safe URL for an image, plus the standard onerror
-// attribute that swaps to the "Image missing" placeholder. If the asset
-// was flagged missing at startup we just point straight at the placeholder.
+// v7.1 (revised): always return the real asset URL. The browser's load
+// attempt is the source of truth — IMG_ONERROR swaps to the placeholder
+// only if the actual fetch fails. Earlier revisions of v7.1 preemptively
+// swapped to the placeholder when MISSING_ASSETS contained the path, but
+// that meant any HEAD-validator hiccup (CORS, weird hosting behavior, etc.)
+// would blank out real, present images. Now MISSING_ASSETS is informational
+// only — used by the launch-check screen and saved into trial data — and
+// never short-circuits image rendering.
 function imgSrc(path) {
   if (!path) return PLACEHOLDER_IMG;
-  if (MISSING_ASSETS.images.includes(path)) return PLACEHOLDER_IMG;
   return asset(path);
 }
 const IMG_ONERROR = `onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}';"`;
 
-// v7.1: same idea for audio — return the asset URL, falling back to silent
-// when a file was flagged missing at startup. Audio elements should also
-// attach an 'error' listener for runtime failures (most call sites already do).
 function audioSrc(path) {
   if (!path) return PLACEHOLDER_AUDIO;
-  if (MISSING_ASSETS.audio.includes(path)) return PLACEHOLDER_AUDIO;
   return asset(path);
 }
 
@@ -328,33 +328,14 @@ let FILTERED_STIMULI = { phoneme: [], foley: [], objects: [], actions: [], scene
 async function filterExistingStimuli() {
   console.log('[Validation] Starting asset validation…');
 
-  // Collect every asset URL referenced anywhere in the experiment.
-  const allAudio = new Set();
-  const allImages = new Set();
-  for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
-  for (const s of foley_stimuli) { allAudio.add(s.audio); }
-  for (const s of object_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
-  for (const s of action_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
-  for (const s of scene_stimuli) { allImages.add(s.image); }
-  for (const s of visual_iconicity_stimuli) { allImages.add(s.shape); }
-  for (const s of receptive_objects_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
-  for (const s of receptive_actions_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
-  object_distractor_images.forEach(i => allImages.add(i));
-  action_distractor_images.forEach(i => allImages.add(i));
-  allImages.add('img/park_scene.jpg');
-  allImages.add('img/KEYBOARD.jpg');
-
-  // HEAD-check each one. Misses go into MISSING_ASSETS; existing files go
-  // into the preload lists. Stimulus arrays are NOT filtered.
-  for (const url of allAudio) {
-    if (!(await checkAudioExists(url))) MISSING_ASSETS.audio.push(url);
-    else PRELOAD_AUDIO.push(url);
-  }
-  for (const url of allImages) {
-    if (!(await checkImageExists(url))) MISSING_ASSETS.images.push(url);
-    else PRELOAD_IMAGES.push(url);
-  }
-
+  // v7.1 (revised): FAIL-OPEN. Set FILTERED_STIMULI to the full arrays
+  // FIRST, before any network calls. If HEAD validation later throws, hangs,
+  // or returns false negatives, the experiment still runs end-to-end. The
+  // earlier revision of v7.1 set FILTERED_STIMULI at the END of validation,
+  // which meant a single thrown HEAD check could leave FILTERED_STIMULI
+  // empty and silently skip every gated task (4AFC, naming Stages 1–3,
+  // foley, visual, phoneme). The browser's onerror/error handlers on each
+  // <img>/<audio> are the safety net for actually-broken assets at runtime.
   FILTERED_STIMULI = {
     phoneme: phoneme_discrimination_stimuli,
     foley: foley_stimuli,
@@ -366,10 +347,48 @@ async function filterExistingStimuli() {
     receptiveActions: receptive_actions_stimuli
   };
 
-  console.log(`[Validation] Complete — missing: ${MISSING_ASSETS.images.length} images, ${MISSING_ASSETS.audio.length} audio.`);
-  if (MISSING_ASSETS.images.length || MISSING_ASSETS.audio.length) {
-    console.warn('[Validation] Missing images:', MISSING_ASSETS.images);
-    console.warn('[Validation] Missing audio:', MISSING_ASSETS.audio);
+  // Wrap the rest in try so any unexpected throw still leaves
+  // FILTERED_STIMULI populated and the experiment runnable.
+  try {
+    // Collect every asset URL referenced anywhere in the experiment.
+    const allAudio = new Set();
+    const allImages = new Set();
+    for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
+    for (const s of foley_stimuli) { allAudio.add(s.audio); }
+    for (const s of object_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
+    for (const s of action_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
+    for (const s of scene_stimuli) { allImages.add(s.image); }
+    for (const s of visual_iconicity_stimuli) { allImages.add(s.shape); }
+    for (const s of receptive_objects_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
+    for (const s of receptive_actions_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
+    object_distractor_images.forEach(i => allImages.add(i));
+    action_distractor_images.forEach(i => allImages.add(i));
+    allImages.add('img/park_scene.jpg');
+    allImages.add('img/KEYBOARD.jpg');
+
+    // HEAD-check each one. Misses go into MISSING_ASSETS for the launch-check
+    // screen and the per-trial missing_assets stamp. Even if every check
+    // misreports, FILTERED_STIMULI is already populated above.
+    for (const url of allAudio) {
+      try {
+        if (!(await checkAudioExists(url))) MISSING_ASSETS.audio.push(url);
+        else PRELOAD_AUDIO.push(url);
+      } catch (e) { console.warn('[Validation] checkAudio threw on', url, e); }
+    }
+    for (const url of allImages) {
+      try {
+        if (!(await checkImageExists(url))) MISSING_ASSETS.images.push(url);
+        else PRELOAD_IMAGES.push(url);
+      } catch (e) { console.warn('[Validation] checkImage threw on', url, e); }
+    }
+
+    console.log(`[Validation] Complete — missing: ${MISSING_ASSETS.images.length} images, ${MISSING_ASSETS.audio.length} audio.`);
+    if (MISSING_ASSETS.images.length || MISSING_ASSETS.audio.length) {
+      console.warn('[Validation] Missing images:', MISSING_ASSETS.images);
+      console.warn('[Validation] Missing audio:', MISSING_ASSETS.audio);
+    }
+  } catch (e) {
+    console.error('[Validation] HEAD validation crashed; experiment will still run with all stimuli. Error:', e);
   }
 }
 
@@ -1804,6 +1823,41 @@ async function initializeExperiment() {
 
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
+    }
+
+    if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
+      timeline.push(...createVisualTimeline());
+    }
+
+    timeline.push(...createSpatialSpanTimeline());
+    timeline.push(...createProceduralTimeline());
+    timeline.push(...createIdeophoneTest());
+
+    timeline.push({
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `
+        <h2>All done! / 完了！</h2>
+        <p>Thank you for completing the pre-test.</p>
+        <p>プリテストを完了していただきありがとうございます。</p>
+        <p style="color:#666;">Next: Training session / 次：トレーニングセッション</p>
+        <p>You can download your results now. / 結果をダウンロードできます。</p>`,
+      choices: ['Download Results / 結果をダウンロード'],
+      on_finish: () => saveData()
+    });
+
+    jsPsych.run(timeline);
+  } catch (e) {
+    console.error('[pretest] Initialization error:', e);
+    alert('Error initializing: ' + (e?.message || e));
+  }
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initializeExperiment);
+} else {
+  initializeExperiment();
+}
+.createFoleyTimeline());
     }
 
     if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
