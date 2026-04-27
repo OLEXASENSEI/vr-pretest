@@ -1,6 +1,36 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v7.1)
-// GROUP A WORDS: flip, crack, whisk (iconic) + bowl, spatula, pan (arbitrary)
+// pretest.js — VR Pre-Test Battery (CORRECTED v7.2)
+// GROUP A WORDS: flip, crack, stir (iconic) + bowl, spatula, pan, spoon (arbitrary)
 // ~20 minutes duration
+//
+// v7.2 CHANGES (Group A composition revision over v7.1):
+//  Whisk is not present in the VR training scenes for any condition (2D/3D/Text),
+//  so testing it in the pretest both (a) wasted a slot and (b) created a false
+//  baseline for a word participants would never encounter again. Tony confirmed
+//  the training uses spoon (not whisk) and stir (not whisk) for the relevant
+//  actions. This revision aligns the pretest stimulus pool with what's actually
+//  trained.
+//   - WORD_CLASSIFICATION: removed `whisk`; `stirring` moved to Group A;
+//     `spoon` moved to Group A (was 'other').
+//   - action_stimuli: replaced whisking with stirring (img/stirring.jpg,
+//     sounds/stirring.mp3, gerund-form rating 4.82).
+//   - object_stimuli: added spoon (img/spoon.jpg, sounds/spoon.mp3, rating 4.30,
+//     classified arbitrary per the >=4.5 cutoff used elsewhere in this file).
+//   - receptive_actions_stimuli: replaced whisking trial with stirring;
+//     whisking removed from cracking and flipping distractor lists, replaced
+//     with stirring.
+//   - receptive_objects_stimuli: added spoon as a target trial (it already
+//     appeared as a distractor in the bowl trial, so the distractor pool
+//     remains coherent).
+//   - ldt_stimuli: WHISK row replaced with STIR (rating 4.82, gerund); added
+//     SPOON row as target_arbitrary (rating 4.30).
+//   - foley_stimuli: dropped the circular_whir trial (was "whisking" vs
+//     "pouring"); 7 foley trials remain. No new stir-targeted foley added —
+//     egg_crack already lists "stirring" as a distractor option, and adding
+//     a dedicated stir foley would require a new audio asset.
+//   Group A composition is now: 3 iconic (flip 5.70, crack 5.40, stirring 4.82)
+//   + 4 arbitrary (bowl 3.00, spatula 3.91, pan 3.45, spoon 4.30). Mean
+//   iconic-vs-arbitrary contrast within Group A: 5.31 vs 3.67 (~1.6 points),
+//   approximately matching Group B's contrast (5.20 vs 3.37, ~1.8 points).
 //
 // v7.1 CHANGES (asset-handling fixes over v7):
 //  1. FIX: Asset validator no longer silently drops stimuli when a referenced
@@ -123,15 +153,15 @@ const WORD_CLASSIFICATION = {
   // GROUP A — tested in pretest, trained in all conditions
   'flip':    { iconic: true,  rating: 5.70, category: 'action',  group: 'A' },
   'crack':   { iconic: true,  rating: 5.40, category: 'action',  group: 'A' },
-  'whisk':   { iconic: true,  rating: 4.55, category: 'action',  group: 'A' },
+  'stirring': { iconic: true,  rating: 4.82, category: 'action',  group: 'A' },
   'bowl':    { iconic: false, rating: 3.00, category: 'utensil', group: 'A' },
   'spatula': { iconic: false, rating: 3.91, category: 'utensil', group: 'A' },
   'pan':     { iconic: false, rating: 3.45, category: 'utensil', group: 'A' },
+  'spoon':   { iconic: false, rating: 4.30, category: 'utensil', group: 'A' },
 
   // GROUP B — NOT in pretest (treatment targets), tested in posttest only
   'sizzle':   { iconic: true,  rating: 5.30, category: 'process',    group: 'B' },
   'mix':      { iconic: true,  rating: 5.10, category: 'action',     group: 'B' },
-  'stirring': { iconic: true,  rating: 4.82, category: 'action',     group: 'B' },
   'pour':     { iconic: false, rating: 3.60, category: 'action',     group: 'B' },
   'butter':   { iconic: false, rating: 3.50, category: 'ingredient', group: 'B' },
   'flour':    { iconic: false, rating: 3.00, category: 'ingredient', group: 'B' },
@@ -147,7 +177,6 @@ const WORD_CLASSIFICATION = {
   'cup':     { iconic: false, rating: 3.83, category: 'utensil',    group: 'foil' },
 
   // ADDITIONAL — trained in conditions but not primary test targets
-  'spoon':   { iconic: false, rating: 4.30, category: 'utensil',    group: 'other' },
   'plate':   { iconic: false, rating: 4.08, category: 'utensil',    group: 'other' },
   'sugar':   { iconic: false, rating: 3.36, category: 'ingredient', group: 'other' },
   'egg':     { iconic: false, rating: 4.20, category: 'object',     group: 'other' },
@@ -204,7 +233,6 @@ const foley_stimuli = [
   { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 3.6 },
   { audio: 'sounds/liquid_flow.mp3',   options: ['sugar', 'milk'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 5.8 },
   { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',         iconicity_rating: 5.40 },
-  { audio: 'sounds/circular_whir.mp3', options: ['whisking', 'pouring'],                                 correct: 0, mapping_type: 'motion_sound',   iconicity_rating: 4.8 },
   { audio: 'sounds/sharp_crack.mp3',   options: ['cracking an egg', 'stirring a bowl'],                  correct: 0, mapping_type: 'impact',         iconicity_rating: 5.6 },
   { audio: 'sounds/low_thud.mp3',      options: ['heavy pan on stove', 'light spoon in bowl'],           correct: 0, mapping_type: 'size_pitch',     iconicity_rating: 4.2 },
   { audio: 'sounds/sizzle.mp3',        options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound',  iconicity_rating: 5.30 },
@@ -215,12 +243,13 @@ const object_stimuli = [
   { image: 'img/bowl.jpg',    target: 'bowl',    category: 'object', iconic: false, rating: 3.00, group: 'A', model_audio: 'sounds/bowl.mp3' },
   { image: 'img/spatula.jpg', target: 'spatula', category: 'object', iconic: false, rating: 3.91, group: 'A', model_audio: 'sounds/spatula.mp3' },
   { image: 'img/pan.jpg',     target: 'pan',     category: 'object', iconic: false, rating: 3.45, group: 'A', model_audio: 'sounds/pan.mp3' },
+  { image: 'img/spoon.jpg',   target: 'spoon',   category: 'object', iconic: false, rating: 4.30, group: 'A', model_audio: 'sounds/spoon.mp3' },
 ];
 
 const action_stimuli = [
   { image: 'img/cracking.jpeg', target: 'cracking', category: 'action', iconic: true,  rating: 5.40, group: 'A', model_audio: 'sounds/cracking.mp3' },
   { image: 'img/flipping.jpg',  target: 'flipping', category: 'action', iconic: true,  rating: 5.70, group: 'A', model_audio: 'sounds/flipping.mp3' },
-  { image: 'img/whisking.jpg',  target: 'whisking', category: 'action', iconic: true,  rating: 4.55, group: 'A', model_audio: 'sounds/whisking.mp3' },
+  { image: 'img/stirring.jpg',  target: 'stirring', category: 'action', iconic: true,  rating: 4.82, group: 'A', model_audio: 'sounds/stirring.mp3' },
 ];
 
 // v7: Scene images for Stage 3 free description
@@ -239,12 +268,13 @@ const receptive_objects_stimuli = [
   { word_audio: 'sounds/bowl.mp3',    images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg', 'img/spoon.jpg'],  correct: 0, target: 'bowl',    iconic: false, rating: 3.00, group: 'A', category: 'object' },
   { word_audio: 'sounds/spatula.mp3', images: ['img/spatula.jpg', 'img/bowl.jpg', 'img/pan.jpg', 'img/egg.jpg'],    correct: 0, target: 'spatula', iconic: false, rating: 3.91, group: 'A', category: 'object' },
   { word_audio: 'sounds/pan.mp3',     images: ['img/pan.jpg', 'img/spoon.jpg', 'img/bowl.jpg', 'img/egg.jpg'],      correct: 0, target: 'pan',     iconic: false, rating: 3.45, group: 'A', category: 'object' },
+  { word_audio: 'sounds/spoon.mp3',   images: ['img/spoon.jpg', 'img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg'],  correct: 0, target: 'spoon',   iconic: false, rating: 4.30, group: 'A', category: 'object' },
 ];
 
 const receptive_actions_stimuli = [
-  { word_audio: 'sounds/cracking.mp3', images: ['img/cracking.jpeg', 'img/flipping.jpg', 'img/whisking.jpg', 'img/chopping.jpg'], correct: 0, target: 'cracking', iconic: true,  rating: 5.40, group: 'A', category: 'action' },
-  { word_audio: 'sounds/flipping.mp3', images: ['img/flipping.jpg', 'img/cracking.jpeg', 'img/chopping.jpg', 'img/whisking.jpg'], correct: 0, target: 'flipping', iconic: true,  rating: 5.70, group: 'A', category: 'action' },
-  { word_audio: 'sounds/whisking.mp3', images: ['img/whisking.jpg', 'img/chopping.jpg', 'img/cracking.jpeg', 'img/flipping.jpg'], correct: 0, target: 'whisking', iconic: true,  rating: 4.55, group: 'A', category: 'action' },
+  { word_audio: 'sounds/cracking.mp3', images: ['img/cracking.jpeg', 'img/flipping.jpg', 'img/stirring.jpg', 'img/chopping.jpg'], correct: 0, target: 'cracking', iconic: true,  rating: 5.40, group: 'A', category: 'action' },
+  { word_audio: 'sounds/flipping.mp3', images: ['img/flipping.jpg', 'img/cracking.jpeg', 'img/chopping.jpg', 'img/stirring.jpg'], correct: 0, target: 'flipping', iconic: true,  rating: 5.70, group: 'A', category: 'action' },
+  { word_audio: 'sounds/stirring.mp3', images: ['img/stirring.jpg', 'img/chopping.jpg', 'img/cracking.jpeg', 'img/flipping.jpg'], correct: 0, target: 'stirring', iconic: true,  rating: 4.82, group: 'A', category: 'action' },
 ];
 
 const visual_iconicity_stimuli = [
@@ -260,10 +290,11 @@ const ldt_stimuli = [
   // Group A targets (pretest-tested, will also be trained)
   { stimulus: 'FLIP',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.70, group: 'A' },
   { stimulus: 'CRACK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.40, group: 'A' },
-  { stimulus: 'WHISK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.55, group: 'A' },
+  { stimulus: 'STIR',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.82, group: 'A' },
   { stimulus: 'BOWL',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'A' },
   { stimulus: 'SPATULA',  correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.91, group: 'A' },
   { stimulus: 'PAN',      correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.45, group: 'A' },
+  { stimulus: 'SPOON',    correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 4.30, group: 'A' },
 
   // Foil words (never trained — provides LDT baseline for untrained kitchen words)
   { stimulus: 'GLUG',     correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.20, group: 'foil' },
