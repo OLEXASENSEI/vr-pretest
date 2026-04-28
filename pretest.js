@@ -1,6 +1,30 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v7.2)
+// pretest.js — VR Pre-Test Battery (CORRECTED v7.3)
 // GROUP A WORDS: flip, crack, stir (iconic) + bowl, spatula, pan, spoon (arbitrary)
-// ~20 minutes duration
+// ~15 minutes duration (was ~20 minutes; removing model+repeat shortens naming)
+//
+// v7.3 CHANGES (pre-teaching removal):
+//  Removed the "hear model → repeat" steps from naming Stages 1 and 2.
+//  Naming is now spontaneous-only: see picture → 4-second recording → next
+//  picture. Rationale:
+//   - Primary outcomes are intelligibility, recall, and retention across
+//     VR / 2D / Text training conditions. Hear-model + repeat is itself a
+//     mini-training trial (see picture → hear word → produce word) which
+//     contaminates the pretest as a pure baseline measure.
+//   - The contamination is constant across conditions, so condition contrasts
+//     remain valid, but it dampens absolute training effects and the
+//     iconic-vs-arbitrary contrast within Group A.
+//   - Imitation-baseline data was the trade-off. Most participants couldn't
+//     accurately imitate /spætʃələ/ after one hearing anyway, so the imitation
+//     recordings mostly indexed phonological capacity rather than learning.
+//     Phonological capacity can be inferred from posttest production directly.
+//   - Code change: in buildNamingBlock, the assembled timeline now includes
+//     only nameAttempt (or nameAttemptText fallback). The hearModel and
+//     repeatRecord trial definitions remain in place as dead code in case
+//     future studies want imitation data. Stage intro screens updated to no
+//     longer promise "you'll hear the correct word and repeat it."
+//   Pretest naming data per Group A item is now: one 4-second spontaneous
+//   recording (or one typed response if mic unavailable). Silence and guesses
+//   are valid baseline data.
 //
 // v7.2 CHANGES (Group A composition revision over v7.1):
 //  Whisk is not present in the VR training scenes for any condition (2D/3D/Text),
@@ -386,8 +410,13 @@ async function filterExistingStimuli() {
     const allImages = new Set();
     for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
     for (const s of foley_stimuli) { allAudio.add(s.audio); }
-    for (const s of object_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
-    for (const s of action_stimuli) { allImages.add(s.image); if (s.model_audio) allAudio.add(s.model_audio); }
+    // v7.3: model_audio fields are no longer used (model+repeat steps removed
+    // from naming). The same audio files (e.g. sounds/bowl.mp3) are still
+    // needed by receptive_objects_stimuli/receptive_actions_stimuli below as
+    // word_audio, so don't prune the audio files themselves — just stop
+    // checking model_audio here.
+    for (const s of object_stimuli) { allImages.add(s.image); }
+    for (const s of action_stimuli) { allImages.add(s.image); }
     for (const s of scene_stimuli) { allImages.add(s.image); }
     for (const s of visual_iconicity_stimuli) { allImages.add(s.shape); }
     for (const s of receptive_objects_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
@@ -1260,16 +1289,29 @@ function createProgressiveNamingTimeline() {
     } : null;
 
     // Assemble: audio path or text path
+    // v7.3: Spontaneous-only. The previous design included hear-model + repeat
+    // steps after each spontaneous attempt to collect imitation baselines.
+    // This is now removed because:
+    //   (1) primary outcomes are intelligibility / recall / retention across
+    //       VR vs 2D vs Text training conditions;
+    //   (2) hear-model + repeat is itself a mini-training trial (see picture →
+    //       hear word → produce word), which contaminates the pretest as a
+    //       pure baseline measure;
+    //   (3) this contamination is constant across conditions but dampens both
+    //       absolute training effects and the iconic-vs-arbitrary contrast.
+    // The hearModel and repeatRecord trial definitions remain above as dead
+    // code in case future studies want imitation data; they are simply not
+    // assembled into the timeline.
     if (hasMicPlugins) {
       trials.push({
-        timeline: [nameAttempt, hearModel, repeatRecord].filter(Boolean),
+        timeline: [nameAttempt].filter(Boolean),
         timeline_variables: items,
         randomize_order: true,
         conditional_function: canRecordAudio
       });
     }
     trials.push({
-      timeline: [nameAttemptText, hearModel],
+      timeline: [nameAttemptText],
       timeline_variables: items,
       randomize_order: true,
       conditional_function: () => !canRecordAudio()
@@ -1285,8 +1327,8 @@ function createProgressiveNamingTimeline() {
       stimulus: `<h3>Part 1: Name the Object / パート1：物の名前</h3>
         <p>You will see a kitchen object. Say its name in English.</p>
         <p>台所の道具が表示されます。英語で名前を言ってください。</p>
-        <p style="color:#666;">After your answer, you'll hear the correct word and repeat it.</p>
-        <p style="color:#666;">回答後、正しい単語を聞いて繰り返します。</p>`,
+        <p style="color:#666;">If you don't know the word, that's okay — just stay silent or guess.</p>
+        <p style="color:#666;">単語が分からない場合は、無言でも推測でも大丈夫です。</p>`,
       choices: ['Begin / 開始']
     });
     tl.push(...buildNamingBlock(FILTERED_STIMULI.objects, 'What is this?', 'これは何ですか？', 'object'));
@@ -1299,8 +1341,8 @@ function createProgressiveNamingTimeline() {
       stimulus: `<h3>Part 2: Name the Action / パート2：動作の名前</h3>
         <p>You will see a cooking action. Say what is happening in English.</p>
         <p>料理の動作が表示されます。英語で何をしているか言ってください。</p>
-        <p style="color:#666;">After your answer, you'll hear the correct word and repeat it.</p>
-        <p style="color:#666;">回答後、正しい単語を聞いて繰り返します。</p>`,
+        <p style="color:#666;">If you don't know the word, that's okay — just stay silent or guess.</p>
+        <p style="color:#666;">単語が分からない場合は、無言でも推測でも大丈夫です。</p>`,
       choices: ['Begin / 開始']
     });
     tl.push(...buildNamingBlock(FILTERED_STIMULI.actions, 'What is happening?', '何をしていますか？', 'action'));
