@@ -564,6 +564,7 @@ function createParticipantInfo() {
         <div style="margin-bottom:15px;">
           <label><b>English Learning Years / 英語学習年数</b></label><br>
           <input name="english_years" id="eng_years" type="number" min="0" max="50" required placeholder="e.g., 8" style="width:100%;padding:5px;">
+          <small style="color:#888;">Should be ≤ your age. / 年齢以下である必要があります。</small>
         </div>
         <div style="margin-bottom:15px;">
           <label><b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b></label><br>
@@ -643,7 +644,8 @@ function createDigitSpanInstructions() {
     stimulus: '<h2>Number Memory Test / 数字記憶テスト</h2>'
             + '<p>You will see a series of numbers. Remember them in the <b>same order</b>.</p>'
             + '<p>数字が表示されます。<b>同じ順番</b>で覚えてください。</p>',
-    choices: ['Begin / 開始']
+    choices: ['Begin / 開始'],
+    data: { task: 'digit_span_intro' }
   };
 }
 
@@ -717,7 +719,8 @@ function createPhonemeInstructions() {
       <h2>Sound Discrimination / 音の識別</h2>
       <p>You will hear two English words. Listen to both completely, then decide if they are the <b>SAME</b> word or <b>DIFFERENT</b> words.</p>
       <p>2つの英単語が聞こえます。両方を完全に聞いてから、同じ単語か違う単語かを判断してください。</p>`,
-    choices: ['Begin / 開始']
+    choices: ['Begin / 開始'],
+    data: { task: 'phoneme_discrimination_intro' }
   };
 }
 
@@ -937,6 +940,17 @@ function buildProductionBlock(timelineItems, itemRole) {
 
   const tl = [];
 
+  // Repetition counter for filenames. jsPsych's `repetitions: 2` does NOT
+  // auto-stamp a `repetition` field, so we maintain our own counter keyed
+  // by (target_word, pass). Increments at trial finish; first occurrence
+  // gets rep1, second gets rep2.
+  const repCounter = {};
+  const nextRep = (word, pass) => {
+    const key = `${word}_${pass}`;
+    repCounter[key] = (repCounter[key] || 0) + 1;
+    return repCounter[key];
+  };
+
   // Block intro — neutral labels so participants don't treat control items
   // as "practice that doesn't count" (they ARE measurement data).
   const blockTitle = (itemRole === 'control')
@@ -996,7 +1010,8 @@ function buildProductionBlock(timelineItems, itemRole) {
     on_finish: (d) => {
       const pid = currentPID();
       const tgt = (d.target_word || 'x').toLowerCase();
-      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_phrase_rep${(d.repetition || '?')}.wav`;
+      d.repetition = nextRep(tgt, 'phrase');
+      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_phrase_rep${d.repetition}.webm`;
     }
   } : null;
 
@@ -1061,7 +1076,8 @@ function buildProductionBlock(timelineItems, itemRole) {
     on_finish: (d) => {
       const pid = currentPID();
       const tgt = (d.target_word || 'x').toLowerCase();
-      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_isolated_rep${(d.repetition || '?')}.wav`;
+      d.repetition = nextRep(tgt, 'isolated');
+      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_isolated_rep${d.repetition}.webm`;
     }
   } : null;
 
@@ -1205,7 +1221,8 @@ function createFoleyTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: `<h2>Sound Matching / 音のマッチング</h2><p>Listen to each sound carefully, then choose what it represents.</p><p>各音を注意深く聞いて、それが何を表すか選んでください。</p><p style="color:#888;">${FILTERED_STIMULI.foley.length} sounds. / ${FILTERED_STIMULI.foley.length}個の音。</p>`,
-    choices: ['Begin / 開始']
+    choices: ['Begin / 開始'],
+    data: { task: 'foley_iconicity_intro' }
   };
 
   const trial = {
@@ -1244,7 +1261,8 @@ function createSpatialSpanTimeline() {
   const instr = {
     type: T('jsPsychHtmlButtonResponse'),
     choices: ['Begin / 開始'],
-    stimulus: `<h2>Spatial Memory / 空間記憶（Corsi）</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p><p style="color:#666;">Sequence length 3 then 4. Two trials per length. / 長さ3と4。各長さ2試行。</p>`
+    stimulus: `<h2>Spatial Memory / 空間記憶（Corsi）</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p><p style="color:#666;">Sequence length 3 then 4. Two trials per length. / 長さ3と4。各長さ2試行。</p>`,
+    data: { task: 'spatial_span_intro' }
   };
 
   const gridCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -1360,7 +1378,8 @@ async function initializeExperiment() {
         <p>トレーニング前のベースラインを測定します。</p>
         <p style="color:#666;">Duration: ~15 minutes / 所要時間：約15分</p>
       </div>`,
-      choices: ['Start / 開始']
+      choices: ['Start / 開始'],
+      data: { task: 'welcome' }
     });
 
     // Participant info (also assigns counterbalance)
@@ -1408,7 +1427,10 @@ async function initializeExperiment() {
         <p style="color:#666;">Next: Training session / 次：トレーニングセッション</p>
         <p>You can download your results now. / 結果をダウンロードできます。</p>`,
       choices: ['Download Results / 結果をダウンロード'],
-      on_finish: () => saveData()
+      data: { task: 'session_end' }
+      // saveData() is invoked by jsPsych's experiment-level on_finish callback
+      // configured in initJsPsych above. Calling it here too caused the
+      // duplicate-JSON-output bug (two timestamps, identical content).
     });
 
     jsPsych.run(timeline);
