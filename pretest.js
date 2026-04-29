@@ -38,14 +38,14 @@
 // PARALLEL CONTROLS (4) — kitchen-domain words, never trained, pretested
 // AND posttested for every participant. Iconicity-balanced 2+2:
 //   ICONIC CONTROLS (mean 5.55): chopping 5.50, peeling 5.60
-//   CONVENTIONAL CONTROLS (mean 3.74): ladle 3.67, kettle 3.80
+//   CONVENTIONAL CONTROLS (mean 3.15): spoon 3.30, plate 3.00
 //
 // NO SPLIT-HALF. v8.0's earlier draft used pid-hash counterbalance to assign
 // participants to Group A (pretested) vs Group B (held back) targets. That
 // was dropped because pretest production WITHOUT FEEDBACK is minimal
 // contamination: a 4-second recording with no model audio, no correct/wrong
-// indicator, no repetition. The parallel-control lane (chop, peel, ladle,
-// kettle) lets us estimate testing/familiarization effects directly via the
+// indicator, no repetition. The parallel-control lane (chop, peel, spoon,
+// plate) lets us estimate testing/familiarization effects directly via the
 // pre→post change on items the participant never trained on. Splitting the
 // targets gave us 3-vs-4 within-subject coverage at the cost of doubling
 // counterbalance complexity. Pretesting all 8 gives us 8-vs-8 coverage with
@@ -126,8 +126,8 @@
 // Pictures NEW for v8.0 control items (please verify):
 //   img/chopping.jpg     — was in v7.3 as 4AFC distractor; reuse
 //   img/peeling.jpg      — NEW
-//   img/ladle.jpg        — NEW
-//   img/kettle.jpg       — NEW
+//   img/spoon.jpg        — kitchen vocabulary (already in pretest folder)
+//   img/plate.jpg        — kitchen vocabulary (verify present)
 //
 // Phoneme-discrimination audio: 11 new files recorded; 9 carried over from
 // v7.3. See phoneme_discrimination_stimuli array.
@@ -228,8 +228,8 @@ const WORD_CLASSIFICATION = {
   'peel':    { iconic: true,  rating: 5.60, category: 'action',     role: 'control' },
 
   // CONVENTIONAL CONTROLS — never trained; production-tested at pre AND post for all
-  'ladle':   { iconic: false, rating: 3.67, category: 'object',     role: 'control' },
-  'kettle':  { iconic: false, rating: 3.80, category: 'object',     role: 'control' },
+  'spoon':   { iconic: false, rating: 3.30, category: 'object',     role: 'control' },
+  'plate':   { iconic: false, rating: 3.00, category: 'object',     role: 'control' },
 
   // FOILS — never trained, used as posttest recognition distractors only
   'glug':    { iconic: true,  rating: 6.20, category: 'action',     role: 'foil' },
@@ -339,13 +339,13 @@ const foley_stimuli = [
   { audio: 'sounds/high_tinkle.mp3', options: ['ice dropped into a bowl', 'sugar poured into a bowl'], correct: 0, mapping_type: 'size_pitch',    iconicity_rating: 5.5 },
   { audio: 'sounds/liquid_flow.mp3', options: ['sugar', 'milk'],                                       correct: 1, mapping_type: 'texture',       iconicity_rating: 5.8 },
   { audio: 'sounds/egg_crack.mp3',   options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',        iconicity_rating: 5.40 },
-  { audio: 'sounds/sizzle.mp3',      options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound', iconicity_rating: 5.30 },
+  { audio: 'sounds/sfx_sizzle_1.mp3', options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound', iconicity_rating: 5.30 },
 ];
 
 // Production targets — all 7 trained targets pretested AND posttested for
 // every participant. No counterbalance split-half: pretest production with
 // no feedback is minimal contamination, and the parallel-control lane
-// (chop, peel, ladle, kettle) lets us estimate testing effects directly.
+// (chop, peel, spoon, plate) lets us estimate testing effects directly.
 //
 // `sizzle` is NOT a production target. Participants never produce `sizzle`
 // during training — it's an SFX consequence of saying "butter the pan" or
@@ -380,11 +380,25 @@ const PRODUCTION_TARGETS = [
 // participant. Iconicity-balanced (2 iconic + 2 conventional). Never trained.
 // Pre→post change on these estimates pure testing/familiarization effect.
 // Targets' change minus controls' change isolates training.
+//
+// Control selection criterion: words that KOSEN second-year English learners
+// can plausibly attempt to produce. Earlier ladle/kettle were dropped because
+// pilot intuition predicted floor effects (silence) at pretest, which would
+// make their pre→post change uninformative. spoon/plate are basic kitchen
+// vocabulary, never appear as utterances in training, and give us a real
+// baseline to detect testing/familiarization gain on.
+//
+// `peel` is retained as an iconic control with `target_form: 'bare'` even
+// though students likely know `peeling` rather than `peel`. This is by design:
+// it gives the form-selection secondary analysis a clean comparator. If
+// trained iconic verbs show gerund-substitution because of training × iconicity,
+// untrained `peel` showing the same pattern would isolate the iconicity-driven
+// component of form-selection from any training-specific contribution.
 const PRODUCTION_CONTROLS = [
-  { word: 'chop',   display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.50 },
-  { word: 'peel',   display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.60 },
-  { word: 'ladle',  display: 'ladle',    image: 'img/ladle.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.67 },
-  { word: 'kettle', display: 'kettle',   image: 'img/kettle.jpg',   prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.80 },
+  { word: 'chop',  display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.50 },
+  { word: 'peel',  display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.60 },
+  { word: 'spoon', display: 'spoon',    image: 'img/spoon.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.30 },
+  { word: 'plate', display: 'plate',    image: 'img/plate.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.00 },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
