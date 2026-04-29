@@ -1,111 +1,124 @@
-// pretest.js — VR Pre-Test Battery (CORRECTED v7.3)
-// GROUP A WORDS: flip, crack, stir (iconic) + bowl, spatula, pan, spoon (arbitrary)
-// ~15 minutes duration (was ~20 minutes; removing model+repeat shortens naming)
+// pretest.js — VR Pre-Test Battery (v8.0 — REDESIGNED)
 //
-// v7.3 CHANGES (pre-teaching removal):
-//  Removed the "hear model → repeat" steps from naming Stages 1 and 2.
-//  Naming is now spontaneous-only: see picture → 4-second recording → next
-//  picture. Rationale:
-//   - Primary outcomes are intelligibility, recall, and retention across
-//     VR / 2D / Text training conditions. Hear-model + repeat is itself a
-//     mini-training trial (see picture → hear word → produce word) which
-//     contaminates the pretest as a pure baseline measure.
-//   - The contamination is constant across conditions, so condition contrasts
-//     remain valid, but it dampens absolute training effects and the
-//     iconic-vs-arbitrary contrast within Group A.
-//   - Imitation-baseline data was the trade-off. Most participants couldn't
-//     accurately imitate /spætʃələ/ after one hearing anyway, so the imitation
-//     recordings mostly indexed phonological capacity rather than learning.
-//     Phonological capacity can be inferred from posttest production directly.
-//   - Code change: in buildNamingBlock, the assembled timeline now includes
-//     only nameAttempt (or nameAttemptText fallback). The hearModel and
-//     repeatRecord trial definitions remain in place as dead code in case
-//     future studies want imitation data. Stage intro screens updated to no
-//     longer promise "you'll hear the correct word and repeat it."
-//   Pretest naming data per Group A item is now: one 4-second spontaneous
-//   recording (or one typed response if mic unavailable). Silence and guesses
-//   are valid baseline data.
+// ============================================================================
+// v8.0 OVERVIEW (full redesign over v7.3)
+// ============================================================================
 //
-// v7.2 CHANGES (Group A composition revision over v7.1):
-//  Whisk is not present in the VR training scenes for any condition (2D/3D/Text),
-//  so testing it in the pretest both (a) wasted a slot and (b) created a false
-//  baseline for a word participants would never encounter again. Tony confirmed
-//  the training uses spoon (not whisk) and stir (not whisk) for the relevant
-//  actions. This revision aligns the pretest stimulus pool with what's actually
-//  trained.
-//   - WORD_CLASSIFICATION: removed `whisk`; `stirring` moved to Group A;
-//     `spoon` moved to Group A (was 'other').
-//   - action_stimuli: replaced whisking with stirring (img/stirring.jpg,
-//     sounds/stirring.mp3, gerund-form rating 4.82).
-//   - object_stimuli: added spoon (img/spoon.jpg, sounds/spoon.mp3, rating 4.30,
-//     classified arbitrary per the >=4.5 cutoff used elsewhere in this file).
-//   - receptive_actions_stimuli: replaced whisking trial with stirring;
-//     whisking removed from cracking and flipping distractor lists, replaced
-//     with stirring.
-//   - receptive_objects_stimuli: added spoon as a target trial (it already
-//     appeared as a distractor in the bowl trial, so the distractor pool
-//     remains coherent).
-//   - ldt_stimuli: WHISK row replaced with STIR (rating 4.82, gerund); added
-//     SPOON row as target_arbitrary (rating 4.30).
-//   - foley_stimuli: dropped the circular_whir trial (was "whisking" vs
-//     "pouring"); 7 foley trials remain. No new stir-targeted foley added —
-//     egg_crack already lists "stirring" as a distractor option, and adding
-//     a dedicated stir foley would require a new audio asset.
-//   Group A composition is now: 3 iconic (flip 5.70, crack 5.40, stirring 4.82)
-//   + 4 arbitrary (bowl 3.00, spatula 3.91, pan 3.45, spoon 4.30). Mean
-//   iconic-vs-arbitrary contrast within Group A: 5.31 vs 3.67 (~1.6 points),
-//   approximately matching Group B's contrast (5.20 vs 3.37, ~1.8 points).
+// PRIMARY DV: production intelligibility on iconicity-bearing phonemes,
+//   measured pre→post across VR / 2D / Text training conditions.
+//   This is NOT a vocabulary battery. Receptive recognition tasks have been
+//   removed because Japanese KOSEN students already know words like `bowl`
+//   and `egg` — what we measure is phoneme-level production accuracy and
+//   intelligibility on iconic vs conventional items.
 //
-// v7.1 CHANGES (asset-handling fixes over v7):
-//  1. FIX: Asset validator no longer silently drops stimuli when a referenced
-//     file is missing. All stimulus arrays remain intact; misses are tracked
-//     in MISSING_ASSETS and trials run with placeholder images / silent audio.
-//  2. NEW: Launch-check screen at the start of the timeline. If any required
-//     file is missing it lists every missing path and forces the researcher
-//     to either Abort (fix the deployment) or acknowledge and continue.
-//     Skipped silently when all assets are present.
-//  3. NEW: Every saved trial record carries `missing_assets`, the list of
-//     files that were unreachable at startup, so analysts can flag any
-//     trials whose stimuli rendered as placeholders.
-//  4. NEW: All <img> tags now fall back to a visible "Image missing"
-//     SVG placeholder instead of being hidden, so participants see something
-//     and trial timing/data collection are unaffected.
+// HYPOTHESIS: VR's spatial-acoustic affordance amplifies iconicity effects
+//   more than 2D, which amplifies more than Text. Iconic words show steeper
+//   pre→post intelligibility gains in VR, with the iconicity gradient
+//   steepest in VR > 2D > Text.
 //
-// v7 CHANGES (task redesign over v6):
-//  1. REDESIGN: 4AFC split into Objects block and Actions block to prevent
-//     category giveaway (previously mixing objects and actions let participants
-//     eliminate by category instead of vocabulary knowledge)
-//  2. REDESIGN: Picture naming replaced with 3-stage progressive task:
-//     Stage 1 — Object naming: "What is this?" → name → hear model → repeat
-//     Stage 2 — Action naming: "What is happening?" → name → hear model → repeat
-//     Stage 3 — Scene description: see cooking scene → 8s free description
-//  3. NEW ASSETS: chopping.jpg (action distractor), scene_prep.jpg, scene_cooking.jpg
+// PRIMARY STATISTICAL CONTRAST: Condition × Iconicity × Time, on Group B
+//   targets (zero pretest contamination), replicated within-subject on
+//   Group A targets.
 //
-// v5 CHANGES (bug fixes over v4):
-//  1. BUG FIX: Added jsPsychInitializeMicrophone trial after mic gate so
-//     jsPsychHtmlAudioResponse has an initialized recorder (raw getUserMedia
-//     in the mic gate is not sufficient — the plugin needs its own init trial)
-//  2. BUG FIX: Text fallback conditional in createNamingTimeline() now also
-//     fires when hasMicPlugins is false, preventing a freeze when mic is
-//     granted but recording plugins aren't loaded
+// ----------------------------------------------------------------------------
+// STIMULUS DESIGN (locked against Winter et al. 2024 iconicity ratings)
+// ----------------------------------------------------------------------------
 //
-// v4 CHANGES (bug fixes over v3):
-//  1. BUG FIX: finishTrial() in on_load now deferred via setTimeout(fn,0) to
-//     prevent null.addEventListener crash in jsPsych's post-load setup
-//     (phoneme trial + receptive 4AFC trial)
-//  2. BUG FIX: Foley answer button locking now uses
-//     '.jspsych-html-button-response-button button' selector since .answer-btn
-//     class no longer exists in jsPsych 7.3
-//  3. BUG FIX: Participant info button query hardened with fallback selector
-//  4. BUG FIX: endCurrentTimeline() now works correctly — digit span and
-//     spatial span inner trials are wrapped in a nested { timeline: [...] }
-//     node so endCurrentTimeline() terminates the right level
+// PRIMARY ICONICITY CONTRAST — 8 production targets, all in the recipe,
+// all trained, balanced 4 iconic + 4 conventional:
+//   ICONIC TARGETS (mean rating 5.42):
+//     crack 5.40, sizzle 5.30, flip 5.70, slice 5.27
+//   CONVENTIONAL TARGETS (mean rating 3.24):
+//     bowl 3.00, pan 3.45, flour 3.00, butter 3.50
+//
+// PARALLEL CONTROLS — 4 kitchen-domain words, never trained, pretested
+// AND posttested for every participant. Iconicity-balanced 2+2:
+//   ICONIC CONTROLS (mean 5.55): chopping 5.50, peeling 5.60
+//   CONVENTIONAL CONTROLS (mean 3.74): ladle 3.67, kettle 3.80
+//
+// COUNTERBALANCED SPLIT-HALF — per participant, derived from pid:
+//   pid hash mod 2 == 0 → List 1
+//     Group A (pre + post): sizzle, slice, bowl, butter
+//     Group B (post only):  crack, flip, pan, flour
+//   pid hash mod 2 == 1 → List 2
+//     Group A (pre + post): crack, flip, pan, flour
+//     Group B (post only):  sizzle, slice, bowl, butter
+//   Both lists: 2 iconic + 2 conventional in each group; iconicity-class
+//   means within ±0.3 across A and B. Counterbalance prevents item effects
+//   from confounding with split-half assignment.
+//
+// ----------------------------------------------------------------------------
+// TWO-PASS PRODUCTION ELICITATION
+// ----------------------------------------------------------------------------
+//
+// Whisper (used in training conditions) recovers single-word productions
+// using lexical context. Phrase elicitation gets contextual rescue (good
+// for training, bad for measurement); isolated elicitation strips the
+// context (clean phoneme signal). We collect both:
+//
+//   PHRASE PASS (4s recording per item):
+//     Object items → "What is this?" prompt → expected: "It's a [word]"
+//     Action items → "What is happening?" prompt → expected: "She is [word]ing"
+//     Matches what training conditions do; preserves ecological validity.
+//
+//   ISOLATED PASS (3s recording per item):
+//     Same picture → "Say just the word." prompt
+//     Forces single-word production; primary measurement signal for
+//     phoneme-level intelligibility analysis (forced alignment, naïve-rater
+//     scoring, acoustic measures).
+//
+// 2 reps per pass per item. Both passes are recorded as separate audio
+// files with explicit `pass` field in trial data for analysis.
+//
+// ----------------------------------------------------------------------------
+// CUTS FROM v7.3 (15-min budget)
+// ----------------------------------------------------------------------------
+//
+//   Reverse digit span        — redundant with Corsi
+//   Lexical decision          — orthographic priming of targets + low ROI
+//   Receptive 4AFC            — pure pre-teaching, zero measurement value
+//   Visual iconicity (bouba)  — redundant with foley iconicity
+//   Spatial span length 5     — lengths 3,4 sufficient for covariate
+//   Scene description (pre)   — moved to posttest as recall measure
+//   Procedural ordering       — moved to posttest
+//   Ideophone Likert          — cross-linguistic interest, not core story
+//   Foley                     — trimmed from 7 → 4 highest-iconicity items
+//
+// Function definitions for cut blocks are NOT preserved in v8.0 — recover
+// from v7.3 via git history if needed for posttest.
+//
+// ----------------------------------------------------------------------------
+// NEW ASSETS REQUIRED
+// ----------------------------------------------------------------------------
+//
+// Pictures (likely already in repo for training/posttest):
+//   img/cracking.jpeg, img/flipping.jpg, img/sizzling.jpg, img/slicing.jpg,
+//   img/bowl.jpg, img/pan.jpg, img/flour.jpg, img/butter.jpg
+//
+// Pictures NEW for v8.0 control items (likely missing — please add):
+//   img/chopping.jpg     (existed in v7.3 as 4AFC distractor — reuse)
+//   img/peeling.jpg      ← NEW
+//   img/ladle.jpg        ← NEW
+//   img/kettle.jpg       ← NEW
+//
+// No audio files needed for production prompts (text only). Phoneme-
+// discrimination audio unchanged from v7.3.
+//
+// ============================================================================
 
 /* ======================== GLOBAL / HELPERS ======================== */
 let jsPsych = null;
 let assignedCondition = null;
 let microphoneAvailable = false;
 let currentPID_value = 'unknown';
+let counterbalanceList = 0;  // 0 or 1, set during participant info
+
+// v8.0: dynamic Group A target list — populated during participant info
+// on_finish based on pid hash mod 2. Mutated in place so the production
+// timeline (which holds a reference to this array) sees the right items
+// when the trial executes. Empty until participant info completes; the
+// production block trial node reads it at execution time, not at build.
+let GROUP_A_PRODUCTION_ITEMS = [];
 
 // v7.1: track every asset URL that fails its HEAD check at startup, so the
 // launch-check screen can list them and every saved trial record can carry
@@ -113,8 +126,7 @@ let currentPID_value = 'unknown';
 let MISSING_ASSETS = { audio: [], images: [] };
 
 // v7.1: visible "missing" placeholders so trials still run when an asset
-// is unreachable. Used as the onerror fallback on every <img> tag and as
-// the fallback src for new Audio() instances.
+// is unreachable.
 const PLACEHOLDER_IMG = `data:image/svg+xml,${encodeURIComponent(
   '<svg xmlns="http://www.w3.org/2000/svg" width="320" height="240"><rect width="320" height="240" fill="#fff3cd"/><text x="50%" y="45%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="22" fill="#856404">Image missing</text><text x="50%" y="62%" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#856404">trial recorded with placeholder</text></svg>')}`;
 const PLACEHOLDER_AUDIO = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
@@ -150,14 +162,17 @@ function currentPID() { return currentPID_value; }
 function namingPhase() { return 'pre'; }
 function assignCondition() { return 'immediate'; }
 
-// v7.1 (revised): always return the real asset URL. The browser's load
-// attempt is the source of truth — IMG_ONERROR swaps to the placeholder
-// only if the actual fetch fails. Earlier revisions of v7.1 preemptively
-// swapped to the placeholder when MISSING_ASSETS contained the path, but
-// that meant any HEAD-validator hiccup (CORS, weird hosting behavior, etc.)
-// would blank out real, present images. Now MISSING_ASSETS is informational
-// only — used by the launch-check screen and saved into trial data — and
-// never short-circuits image rendering.
+// v8.0: derive counterbalance from pid (works for numeric or string IDs)
+function pidToCounterbalance(pid) {
+  const s = String(pid || 'unknown');
+  let hash = 0;
+  for (let i = 0; i < s.length; i++) {
+    hash = ((hash << 5) - hash) + s.charCodeAt(i);
+    hash |= 0;
+  }
+  return Math.abs(hash) % 2;
+}
+
 function imgSrc(path) {
   if (!path) return PLACEHOLDER_IMG;
   return asset(path);
@@ -170,47 +185,59 @@ function audioSrc(path) {
 }
 
 /* ======================== WORD CLASSIFICATION ======================== */
-// All ratings verified against Winter et al. iconicity ratings database
-// Threshold for "iconic": rating >= 4.5
-// Note: "stir" = 4.30 but "stirring" = 4.82 — using -ing form rating
+// All ratings verified against Winter et al. 2024 iconicity ratings database
+// (n=14,776 words). Per-item SEs are large; class contrasts (mean of 4 iconic
+// vs mean of 4 conventional) are used as the primary operationalization.
+// Continuous Winter ratings retained for sensitivity analysis.
 const WORD_CLASSIFICATION = {
-  // GROUP A — tested in pretest, trained in all conditions
-  'flip':    { iconic: true,  rating: 5.70, category: 'action',  group: 'A' },
-  'crack':   { iconic: true,  rating: 5.40, category: 'action',  group: 'A' },
-  'stirring': { iconic: true,  rating: 4.82, category: 'action',  group: 'A' },
-  'bowl':    { iconic: false, rating: 3.00, category: 'utensil', group: 'A' },
-  'spatula': { iconic: false, rating: 3.91, category: 'utensil', group: 'A' },
-  'pan':     { iconic: false, rating: 3.45, category: 'utensil', group: 'A' },
-  'spoon':   { iconic: false, rating: 4.30, category: 'utensil', group: 'A' },
+  // ICONIC TARGETS — production-tested at pre (Group A only) and post (both)
+  'crack':   { iconic: true,  rating: 5.40, category: 'action',     role: 'target' },
+  'sizzle':  { iconic: true,  rating: 5.30, category: 'action',     role: 'target' },
+  'flip':    { iconic: true,  rating: 5.70, category: 'action',     role: 'target' },
+  'slice':   { iconic: true,  rating: 5.27, category: 'action',     role: 'target' },
 
-  // GROUP B — NOT in pretest (treatment targets), tested in posttest only
-  'sizzle':   { iconic: true,  rating: 5.30, category: 'process',    group: 'B' },
-  'mix':      { iconic: true,  rating: 5.10, category: 'action',     group: 'B' },
-  'pour':     { iconic: false, rating: 3.60, category: 'action',     group: 'B' },
-  'butter':   { iconic: false, rating: 3.50, category: 'ingredient', group: 'B' },
-  'flour':    { iconic: false, rating: 3.00, category: 'ingredient', group: 'B' },
+  // CONVENTIONAL TARGETS — production-tested at pre (Group A only) and post (both)
+  'bowl':    { iconic: false, rating: 3.00, category: 'object',     role: 'target' },
+  'pan':     { iconic: false, rating: 3.45, category: 'object',     role: 'target' },
+  'flour':   { iconic: false, rating: 3.00, category: 'ingredient', role: 'target' },
+  'butter':  { iconic: false, rating: 3.50, category: 'ingredient', role: 'target' },
 
-  // FOILS — never trained, used in posttest transfer + pretest LDT
-  'glug':    { iconic: true,  rating: 6.20, category: 'sound',      group: 'foil' },
-  'splash':  { iconic: true,  rating: 6.09, category: 'action',     group: 'foil' },
-  'drizzle': { iconic: true,  rating: 6.00, category: 'action',     group: 'foil' },
-  'spread':  { iconic: true,  rating: 4.64, category: 'action',     group: 'foil' },
-  'knife':   { iconic: true,  rating: 5.29, category: 'utensil',    group: 'foil' },
-  'salt':    { iconic: true,  rating: 4.62, category: 'ingredient', group: 'foil' },
-  'fork':    { iconic: false, rating: 3.90, category: 'utensil',    group: 'foil' },
-  'cup':     { iconic: false, rating: 3.83, category: 'utensil',    group: 'foil' },
+  // ICONIC CONTROLS — never trained; production-tested at pre AND post for all
+  'chop':    { iconic: true,  rating: 5.50, category: 'action',     role: 'control' },
+  'peel':    { iconic: true,  rating: 5.60, category: 'action',     role: 'control' },
 
-  // ADDITIONAL — trained in conditions but not primary test targets
-  'plate':   { iconic: false, rating: 4.08, category: 'utensil',    group: 'other' },
-  'sugar':   { iconic: false, rating: 3.36, category: 'ingredient', group: 'other' },
-  'egg':     { iconic: false, rating: 4.20, category: 'object',     group: 'other' },
+  // CONVENTIONAL CONTROLS — never trained; production-tested at pre AND post for all
+  'ladle':   { iconic: false, rating: 3.67, category: 'object',     role: 'control' },
+  'kettle':  { iconic: false, rating: 3.80, category: 'object',     role: 'control' },
+
+  // FOILS — never trained, used as posttest recognition distractors only
+  'glug':    { iconic: true,  rating: 6.20, category: 'action',     role: 'foil' },
+  'splash':  { iconic: true,  rating: 6.09, category: 'action',     role: 'foil' },
+  'drizzle': { iconic: true,  rating: 6.00, category: 'action',     role: 'foil' },
+  'knife':   { iconic: true,  rating: 5.29, category: 'object',     role: 'foil' },
+  'salt':    { iconic: true,  rating: 4.62, category: 'ingredient', role: 'foil' },
+  'fork':    { iconic: false, rating: 3.90, category: 'object',     role: 'foil' },
+  'cup':     { iconic: false, rating: 3.83, category: 'object',     role: 'foil' },
+
+  // FILLER — in recipe and trained, but not in primary production analysis
+  'spoon':   { iconic: false, rating: 4.30, category: 'object',     role: 'filler' },
+  'plate':   { iconic: false, rating: 4.08, category: 'object',     role: 'filler' },
+  'spatula': { iconic: false, rating: 3.91, category: 'object',     role: 'filler' },
+  'sugar':   { iconic: false, rating: 3.36, category: 'ingredient', role: 'filler' },
+  'egg':     { iconic: false, rating: 4.20, category: 'ingredient', role: 'filler' },
+  'milk':    { iconic: false, rating: 5.09, category: 'ingredient', role: 'filler' },
+  'mix':     { iconic: false, rating: 5.10, category: 'action',     role: 'filler' }, // rating anomaly
+  'stir':    { iconic: false, rating: 4.30, category: 'action',     role: 'filler' },
+  'pour':    { iconic: false, rating: 3.60, category: 'action',     role: 'filler' },
+  'heat':    { iconic: false, rating: 5.20, category: 'action',     role: 'filler' }, // rating anomaly
+  'put':     { iconic: false, rating: 2.10, category: 'action',     role: 'filler' },
 };
 
 function getIconicity(word) {
   const w = (word || '').toLowerCase().replace(/ing$/, '');
   const info = WORD_CLASSIFICATION[w];
-  return info ? { iconic: info.iconic, rating: info.rating, group: info.group }
-              : { iconic: null, rating: null, group: null };
+  return info ? { iconic: info.iconic, rating: info.rating, role: info.role }
+              : { iconic: null, rating: null, role: null };
 }
 
 /* ======================== DATA SAVE ======================== */
@@ -243,106 +270,59 @@ async function saveData(data) {
 }
 
 /* ======================== STIMULI ======================== */
+// Phoneme discrimination — covariate measure of L2 phonological perception.
+// Contrasts target the difficult phonemes carried by iconic recipe items
+// (/r/-/l/, vowel contrasts, cluster discrimination). Audio files unchanged
+// from v7.3; expand only if matching audio is available.
 const phoneme_discrimination_stimuli = [
-  { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'l_r' },
+  { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'vowel_oU_O' },
   { audio1: 'sounds/flip.mp3',   audio2: 'sounds/frip.mp3',   correct: 'different', contrast: 'l_r' },
   { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'control' },
-  { audio1: 'sounds/batter.mp3', audio2: 'sounds/better.mp3', correct: 'different', contrast: 'vowel' },
+  { audio1: 'sounds/batter.mp3', audio2: 'sounds/better.mp3', correct: 'different', contrast: 'vowel_ae_E' },
   { audio1: 'sounds/flour.mp3',  audio2: 'sounds/flower.mp3', correct: 'same',      contrast: 'homophone' },
-  { audio1: 'sounds/stir.mp3',   audio2: 'sounds/star.mp3',   correct: 'different', contrast: 'vowel' },
+  { audio1: 'sounds/stir.mp3',   audio2: 'sounds/star.mp3',   correct: 'different', contrast: 'vowel_3r_a' },
 ];
 
+// Foley — baseline iconicity sensitivity covariate. Trimmed from 7 to 4
+// items (highest Winter ratings, cleanest mappings). Drops:
+//   granular_pour (3.6, low iconicity)
+//   sharp_crack (5.6, redundant with egg_crack)
+//   low_thud (4.2, low iconicity)
 const foley_stimuli = [
-  { audio: 'sounds/high_tinkle.mp3',   options: ['ice dropped into a bowl', 'sugar poured into a bowl'], correct: 0, mapping_type: 'size_pitch',     iconicity_rating: 5.5 },
-  { audio: 'sounds/granular_pour.mp3', options: ['milk', 'flour'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 3.6 },
-  { audio: 'sounds/liquid_flow.mp3',   options: ['sugar', 'milk'],                                       correct: 1, mapping_type: 'texture',        iconicity_rating: 5.8 },
-  { audio: 'sounds/egg_crack.mp3',     options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',         iconicity_rating: 5.40 },
-  { audio: 'sounds/sharp_crack.mp3',   options: ['cracking an egg', 'stirring a bowl'],                  correct: 0, mapping_type: 'impact',         iconicity_rating: 5.6 },
-  { audio: 'sounds/low_thud.mp3',      options: ['heavy pan on stove', 'light spoon in bowl'],           correct: 0, mapping_type: 'size_pitch',     iconicity_rating: 4.2 },
-  { audio: 'sounds/sizzle.mp3',        options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound',  iconicity_rating: 5.30 },
+  { audio: 'sounds/high_tinkle.mp3', options: ['ice dropped into a bowl', 'sugar poured into a bowl'], correct: 0, mapping_type: 'size_pitch',    iconicity_rating: 5.5 },
+  { audio: 'sounds/liquid_flow.mp3', options: ['sugar', 'milk'],                                       correct: 1, mapping_type: 'texture',       iconicity_rating: 5.8 },
+  { audio: 'sounds/egg_crack.mp3',   options: ['stirring', 'cracking'],                                correct: 1, mapping_type: 'action',        iconicity_rating: 5.40 },
+  { audio: 'sounds/sizzle.mp3',      options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound', iconicity_rating: 5.30 },
 ];
 
-// v7: Split into objects and actions for both 4AFC and naming
-const object_stimuli = [
-  { image: 'img/bowl.jpg',    target: 'bowl',    category: 'object', iconic: false, rating: 3.00, group: 'A', model_audio: 'sounds/bowl.mp3' },
-  { image: 'img/spatula.jpg', target: 'spatula', category: 'object', iconic: false, rating: 3.91, group: 'A', model_audio: 'sounds/spatula.mp3' },
-  { image: 'img/pan.jpg',     target: 'pan',     category: 'object', iconic: false, rating: 3.45, group: 'A', model_audio: 'sounds/pan.mp3' },
-  { image: 'img/spoon.jpg',   target: 'spoon',   category: 'object', iconic: false, rating: 4.30, group: 'A', model_audio: 'sounds/spoon.mp3' },
+// Production targets — used by the production block. The actual subset
+// shown to a given participant is determined at runtime by counterbalance
+// (see GROUP_A_PRODUCTION_ITEMS, populated during participant info).
+const PRODUCTION_TARGETS_LIST_1 = [
+  // Group A for participants with counterbalance == 0
+  { word: 'sizzle', display: 'sizzling', image: 'img/sizzling.jpg', prompt_type: 'action', iconic: true,  rating: 5.30 },
+  { word: 'slice',  display: 'slicing',  image: 'img/slicing.jpg',  prompt_type: 'action', iconic: true,  rating: 5.27 },
+  { word: 'bowl',   display: 'bowl',     image: 'img/bowl.jpg',     prompt_type: 'object', iconic: false, rating: 3.00 },
+  { word: 'butter', display: 'butter',   image: 'img/butter.jpg',   prompt_type: 'object', iconic: false, rating: 3.50 },
 ];
 
-const action_stimuli = [
-  { image: 'img/cracking.jpeg', target: 'cracking', category: 'action', iconic: true,  rating: 5.40, group: 'A', model_audio: 'sounds/cracking.mp3' },
-  { image: 'img/flipping.jpg',  target: 'flipping', category: 'action', iconic: true,  rating: 5.70, group: 'A', model_audio: 'sounds/flipping.mp3' },
-  { image: 'img/stirring.jpg',  target: 'stirring', category: 'action', iconic: true,  rating: 4.82, group: 'A', model_audio: 'sounds/stirring.mp3' },
+const PRODUCTION_TARGETS_LIST_2 = [
+  // Group A for participants with counterbalance == 1
+  { word: 'crack',  display: 'cracking', image: 'img/cracking.jpeg', prompt_type: 'action', iconic: true,  rating: 5.40 },
+  { word: 'flip',   display: 'flipping', image: 'img/flipping.jpg',  prompt_type: 'action', iconic: true,  rating: 5.70 },
+  { word: 'pan',    display: 'pan',      image: 'img/pan.jpg',       prompt_type: 'object', iconic: false, rating: 3.45 },
+  { word: 'flour',  display: 'flour',    image: 'img/flour.jpg',     prompt_type: 'object', iconic: false, rating: 3.00 },
 ];
 
-// v7: Scene images for Stage 3 free description
-const scene_stimuli = [
-  { image: 'img/scene_prep.jpg',    scene: 'kitchen_prep',    description: 'Kitchen counter with ingredients' },
-  { image: 'img/scene_cooking.jpg', scene: 'cooking_active',  description: 'Pan on stove with spatula' },
-];
-
-// v7: 4AFC distractors — objects only (same-category, no action giveaway)
-const object_distractor_images = ['img/spoon.jpg', 'img/egg.jpg'];
-// v7: 4AFC distractors — actions only (same-category, no object giveaway)
-const action_distractor_images = ['img/chopping.jpg'];
-
-// v7: 4AFC split into object block and action block
-const receptive_objects_stimuli = [
-  { word_audio: 'sounds/bowl.mp3',    images: ['img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg', 'img/spoon.jpg'],  correct: 0, target: 'bowl',    iconic: false, rating: 3.00, group: 'A', category: 'object' },
-  { word_audio: 'sounds/spatula.mp3', images: ['img/spatula.jpg', 'img/bowl.jpg', 'img/pan.jpg', 'img/egg.jpg'],    correct: 0, target: 'spatula', iconic: false, rating: 3.91, group: 'A', category: 'object' },
-  { word_audio: 'sounds/pan.mp3',     images: ['img/pan.jpg', 'img/spoon.jpg', 'img/bowl.jpg', 'img/egg.jpg'],      correct: 0, target: 'pan',     iconic: false, rating: 3.45, group: 'A', category: 'object' },
-  { word_audio: 'sounds/spoon.mp3',   images: ['img/spoon.jpg', 'img/bowl.jpg', 'img/spatula.jpg', 'img/pan.jpg'],  correct: 0, target: 'spoon',   iconic: false, rating: 4.30, group: 'A', category: 'object' },
-];
-
-const receptive_actions_stimuli = [
-  { word_audio: 'sounds/cracking.mp3', images: ['img/cracking.jpeg', 'img/flipping.jpg', 'img/stirring.jpg', 'img/chopping.jpg'], correct: 0, target: 'cracking', iconic: true,  rating: 5.40, group: 'A', category: 'action' },
-  { word_audio: 'sounds/flipping.mp3', images: ['img/flipping.jpg', 'img/cracking.jpeg', 'img/chopping.jpg', 'img/stirring.jpg'], correct: 0, target: 'flipping', iconic: true,  rating: 5.70, group: 'A', category: 'action' },
-  { word_audio: 'sounds/stirring.mp3', images: ['img/stirring.jpg', 'img/chopping.jpg', 'img/cracking.jpeg', 'img/flipping.jpg'], correct: 0, target: 'stirring', iconic: true,  rating: 4.82, group: 'A', category: 'action' },
-];
-
-const visual_iconicity_stimuli = [
-  { shape: 'img/bowl_shape.svg',  words: ['container', 'cutter'], expected: 0, shape_type: 'container' },
-  { shape: 'img/round_shape.svg', words: ['maluma', 'takete'],    expected: 0, shape_type: 'round' },
-  { shape: 'img/spiky_shape.svg', words: ['bouba', 'kiki'],       expected: 1, shape_type: 'spiky' },
-];
-
-// v6 FIX: LDT now contains ONLY Group A targets + foil words + controls + nonwords.
-// Group B words (SIZZLE, MIX, STIR, FLOUR, POUR, BUTTER) have been REMOVED
-// to prevent orthographic priming of treatment targets before training.
-const ldt_stimuli = [
-  // Group A targets (pretest-tested, will also be trained)
-  { stimulus: 'FLIP',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.70, group: 'A' },
-  { stimulus: 'CRACK',    correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 5.40, group: 'A' },
-  { stimulus: 'STIR',     correct_response: 'a', word_type: 'target_iconic',    iconic: true,  rating: 4.82, group: 'A' },
-  { stimulus: 'BOWL',     correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.00, group: 'A' },
-  { stimulus: 'SPATULA',  correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.91, group: 'A' },
-  { stimulus: 'PAN',      correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 3.45, group: 'A' },
-  { stimulus: 'SPOON',    correct_response: 'a', word_type: 'target_arbitrary', iconic: false, rating: 4.30, group: 'A' },
-
-  // Foil words (never trained — provides LDT baseline for untrained kitchen words)
-  { stimulus: 'GLUG',     correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.20, group: 'foil' },
-  { stimulus: 'SPLASH',   correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.09, group: 'foil' },
-  { stimulus: 'DRIZZLE',  correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 6.00, group: 'foil' },
-  { stimulus: 'FORK',     correct_response: 'a', word_type: 'foil_arbitrary',   iconic: false, rating: 3.90, group: 'foil' },
-  { stimulus: 'CUP',      correct_response: 'a', word_type: 'foil_arbitrary',   iconic: false, rating: 3.83, group: 'foil' },
-  { stimulus: 'SALT',     correct_response: 'a', word_type: 'foil_iconic',      iconic: true,  rating: 4.62, group: 'foil' },
-
-  // Control words (common, non-kitchen)
-  { stimulus: 'CHAIR',    correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
-  { stimulus: 'WINDOW',   correct_response: 'a', word_type: 'control_word',     iconic: null,  rating: null, group: 'control' },
-
-  // Nonwords (matched to real words phonologically)
-  { stimulus: 'FLUR',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'SPATTLE',  correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'BOWLE',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'CRECK',    correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'GLUB',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'SPLISH',   correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'DRAZZLE',  correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'FARK',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'CUB',      correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
-  { stimulus: 'SELT',     correct_response: 'l', word_type: 'nonword', iconic: null, rating: null, group: 'nonword' },
+// Parallel control items — production-tested for everyone, never trained.
+// Iconicity-balanced to match targets; pretest-vs-posttest change on these
+// estimates pure testing/familiarization effect (no training). Targets'
+// pretest-vs-posttest change minus controls' change isolates training.
+const PRODUCTION_CONTROLS = [
+  { word: 'chop',   display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  rating: 5.50 },
+  { word: 'peel',   display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  rating: 5.60 },
+  { word: 'ladle',  display: 'ladle',    image: 'img/ladle.jpg',    prompt_type: 'object', iconic: false, rating: 3.67 },
+  { word: 'kettle', display: 'kettle',   image: 'img/kettle.jpg',   prompt_type: 'object', iconic: false, rating: 3.80 },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -374,61 +354,31 @@ function checkImageExists(url) {
 
 let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
-// v7.1: FILTERED_STIMULI now points at the FULL stimulus arrays, not a
-// filtered subset. Asset existence is tracked separately via MISSING_ASSETS
-// so a missing file shows as a placeholder in the trial rather than
-// silently disappearing the trial.
-let FILTERED_STIMULI = { phoneme: [], foley: [], objects: [], actions: [], scenes: [], visual: [], receptiveObjects: [], receptiveActions: [] };
+let FILTERED_STIMULI = { phoneme: [], foley: [], targetsList1: [], targetsList2: [], controls: [] };
 
 async function filterExistingStimuli() {
   console.log('[Validation] Starting asset validation…');
 
-  // v7.1 (revised): FAIL-OPEN. Set FILTERED_STIMULI to the full arrays
-  // FIRST, before any network calls. If HEAD validation later throws, hangs,
-  // or returns false negatives, the experiment still runs end-to-end. The
-  // earlier revision of v7.1 set FILTERED_STIMULI at the END of validation,
-  // which meant a single thrown HEAD check could leave FILTERED_STIMULI
-  // empty and silently skip every gated task (4AFC, naming Stages 1–3,
-  // foley, visual, phoneme). The browser's onerror/error handlers on each
-  // <img>/<audio> are the safety net for actually-broken assets at runtime.
+  // FAIL-OPEN: populate full stimulus arrays first; HEAD checks only
+  // populate MISSING_ASSETS for the launch-check screen + per-trial stamps.
   FILTERED_STIMULI = {
     phoneme: phoneme_discrimination_stimuli,
     foley: foley_stimuli,
-    objects: object_stimuli,
-    actions: action_stimuli,
-    scenes: scene_stimuli,
-    visual: visual_iconicity_stimuli,
-    receptiveObjects: receptive_objects_stimuli,
-    receptiveActions: receptive_actions_stimuli
+    targetsList1: PRODUCTION_TARGETS_LIST_1,
+    targetsList2: PRODUCTION_TARGETS_LIST_2,
+    controls: PRODUCTION_CONTROLS,
   };
 
-  // Wrap the rest in try so any unexpected throw still leaves
-  // FILTERED_STIMULI populated and the experiment runnable.
   try {
-    // Collect every asset URL referenced anywhere in the experiment.
     const allAudio = new Set();
     const allImages = new Set();
     for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
     for (const s of foley_stimuli) { allAudio.add(s.audio); }
-    // v7.3: model_audio fields are no longer used (model+repeat steps removed
-    // from naming). The same audio files (e.g. sounds/bowl.mp3) are still
-    // needed by receptive_objects_stimuli/receptive_actions_stimuli below as
-    // word_audio, so don't prune the audio files themselves — just stop
-    // checking model_audio here.
-    for (const s of object_stimuli) { allImages.add(s.image); }
-    for (const s of action_stimuli) { allImages.add(s.image); }
-    for (const s of scene_stimuli) { allImages.add(s.image); }
-    for (const s of visual_iconicity_stimuli) { allImages.add(s.shape); }
-    for (const s of receptive_objects_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
-    for (const s of receptive_actions_stimuli) { allAudio.add(s.word_audio); s.images.forEach(i => allImages.add(i)); }
-    object_distractor_images.forEach(i => allImages.add(i));
-    action_distractor_images.forEach(i => allImages.add(i));
-    allImages.add('img/park_scene.jpg');
-    allImages.add('img/KEYBOARD.jpg');
+    for (const s of PRODUCTION_TARGETS_LIST_1) { allImages.add(s.image); }
+    for (const s of PRODUCTION_TARGETS_LIST_2) { allImages.add(s.image); }
+    for (const s of PRODUCTION_CONTROLS) { allImages.add(s.image); }
+    allImages.add('img/park_scene.jpg');  // practice image
 
-    // HEAD-check each one. Misses go into MISSING_ASSETS for the launch-check
-    // screen and the per-trial missing_assets stamp. Even if every check
-    // misreports, FILTERED_STIMULI is already populated above.
     for (const url of allAudio) {
       try {
         if (!(await checkAudioExists(url))) MISSING_ASSETS.audio.push(url);
@@ -466,10 +416,7 @@ function addCustomStyles() {
   document.head.appendChild(style);
 }
 
-/* ======================== ASSET LAUNCH-CHECK SCREEN (v7.1) ======================== */
-// Shows a list of every missing file at the very start of the timeline
-// when MISSING_ASSETS is non-empty. Researcher can Abort or acknowledge and
-// continue. Trials still run with placeholders if they continue.
+/* ======================== ASSET LAUNCH-CHECK SCREEN ======================== */
 function buildAssetCheckScreen() {
   return {
     type: T('jsPsychHtmlButtonResponse'),
@@ -527,7 +474,7 @@ function createParticipantInfo() {
         </div>
         <div style="margin-bottom:15px;">
           <label><b>Age / 年齢</b></label><br>
-          <input name="age" id="age" type="number" min="18" max="100" required placeholder="e.g., 25" style="width:100%;padding:5px;">
+          <input name="age" id="age" type="number" min="18" max="100" required placeholder="e.g., 20" style="width:100%;padding:5px;">
         </div>
         <div style="margin-bottom:15px;">
           <label><b>Native Language / 母語</b></label><br>
@@ -542,7 +489,7 @@ function createParticipantInfo() {
         </div>
         <div style="margin-bottom:15px;">
           <label><b>English Learning Years / 英語学習年数</b></label><br>
-          <input name="english_years" id="eng_years" type="number" min="0" max="50" required placeholder="e.g., 5" style="width:100%;padding:5px;">
+          <input name="english_years" id="eng_years" type="number" min="0" max="50" required placeholder="e.g., 8" style="width:100%;padding:5px;">
         </div>
         <div style="margin-bottom:15px;">
           <label><b>TOEIC or EIKEN Score / TOEICまたは英検のスコア</b></label><br>
@@ -596,26 +543,42 @@ function createParticipantInfo() {
       if (capturedResponses?.participant_id) {
         currentPID_value = capturedResponses.participant_id;
       }
+
+      // v8.0: assign counterbalance and populate the Group A target list
+      // that the production block reads at trial-execution time.
+      counterbalanceList = pidToCounterbalance(currentPID_value);
+      const chosen = (counterbalanceList === 0)
+        ? PRODUCTION_TARGETS_LIST_1
+        : PRODUCTION_TARGETS_LIST_2;
+      GROUP_A_PRODUCTION_ITEMS.length = 0;
+      GROUP_A_PRODUCTION_ITEMS.push(...chosen);
+
+      data.counterbalance_list = counterbalanceList;
+      data.group_a_words = chosen.map(s => s.word).join(',');
+
+      // Stamp counterbalance on every subsequent trial for analysis convenience.
+      try {
+        jsPsych.data.addProperties({ counterbalance_list: counterbalanceList });
+      } catch {}
+
+      console.log(`[participant_info] pid=${currentPID_value}, counterbalance=${counterbalanceList}, Group A=[${data.group_a_words}]`);
     }
   };
 }
 
-/* ======================== DIGIT SPAN (3–6) ======================== */
-function createDigitSpanInstructions(forward = true) {
-  const title = forward
-    ? '<h2>Number Memory Test / 数字記憶テスト</h2>'
-    : '<h2>Reverse Number Memory / 逆順数字記憶</h2>';
-  const instruction = forward
-    ? '<p>You will see a series of numbers. Remember them in the <b>same order</b>.</p><p>数字が表示されます。<b>同じ順番</b>で覚えてください。</p>'
-    : '<p>You will see a series of numbers. Enter them in <b>reverse order</b>.</p><p>数字が表示されます。<b>逆順</b>で入力してください。</p>';
+/* ======================== DIGIT SPAN (forward only, 3–5) ======================== */
+// v8.0: reverse digit span dropped — Corsi spatial span covers WM construct.
+function createDigitSpanInstructions() {
   return {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: title + instruction,
+    stimulus: '<h2>Number Memory Test / 数字記憶テスト</h2>'
+            + '<p>You will see a series of numbers. Remember them in the <b>same order</b>.</p>'
+            + '<p>数字が表示されます。<b>同じ順番</b>で覚えてください。</p>',
     choices: ['Begin / 開始']
   };
 }
 
-function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
+function generateDigitSpanTrials({ startLen = 3, endLen = 5 }) {
   const innerTrials = [];
   const failsAtLength = {};
 
@@ -633,26 +596,24 @@ function generateDigitSpanTrials({ forward = true, startLen = 3, endLen = 6 }) {
           digits: digits.join(''),
           length,
           attempt: attempt + 1,
-          direction: forward ? 'forward' : 'backward'
+          direction: 'forward'
         }
       });
 
       innerTrials.push({
         type: T('jsPsychSurveyText'),
         questions: [{
-          prompt: forward
-            ? 'Enter numbers in SAME order / 同じ順番で入力'
-            : 'Enter numbers in REVERSE order / 逆順で入力',
+          prompt: 'Enter numbers in SAME order / 同じ順番で入力',
           name: 'response',
           required: true
         }],
         post_trial_gap: 250,
         data: {
           task: 'digit_span_response',
-          correct_answer: forward ? digits.join('') : digits.slice().reverse().join(''),
+          correct_answer: digits.join(''),
           length,
           attempt: attempt + 1,
-          direction: forward ? 'forward' : 'backward'
+          direction: 'forward'
         },
         on_finish: (d) => {
           const raw = d.response;
@@ -748,8 +709,6 @@ function createPhonemeTrial() {
 
       a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once: true });
-      // v7.1: if audio errors at runtime (rare — should be caught at HEAD-check),
-      // still let participant answer rather than hanging.
       a.addEventListener('error', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('error', () => { bEnded = true; maybeEnable(); }, { once: true });
 
@@ -780,218 +739,6 @@ function createPhonemeTrial() {
       d.correct = d.response_label ? (d.response_label === d.correct_answer) : null;
     }
   };
-}
-
-/* ======================== LDT ======================== */
-function createLDTPrimerWithImage() {
-  const imgPath = imgSrc('img/KEYBOARD.jpg');
-  return {
-    type: T('jsPsychHtmlButtonResponse'),
-    choices: ['Begin / 開始'],
-    data: { task: 'ldt_primer' },
-    stimulus: `
-      <div style="max-width:760px;margin:0 auto;text-align:left;line-height:1.6">
-        <h2>Word Recognition / 単語認識</h2>
-        <p>This section tests your ability to recognize real English words based on spelling.<br>
-        つづりに基づいて実在する英単語かどうかを判断する力を測定します。</p>
-
-        <p><b>Finger placement / 指の配置:</b><br>
-        Left index finger on <b>A key</b>, right index finger on <b>L key</b>.<br>
-        左手の人差し指を<b>Aキー</b>、右手の人差し指を<b>Lキー</b>に。</p>
-
-        <div style="text-align:center;margin:20px 0;">
-          <img src="${imgPath}" alt="Keyboard showing A and L keys" style="max-width:100%;height:auto;border:2px solid #ddd;border-radius:8px;" ${IMG_ONERROR}/>
-        </div>
-
-        <div style="background-color:#fff3cd;padding:15px;border-radius:8px;margin-bottom:20px;">
-          <p><b>How to respond / 回答方法:</b></p>
-          <p>Real English word → press <b>A</b> / 実在する英単語 → <b>A</b></p>
-          <p>Not a real word → press <b>L</b> / 英単語でない → <b>L</b></p>
-        </div>
-
-        <p>Between words you will see a "+" sign to help you focus.<br>
-        単語の間に「+」が表示されます。集中のための目印です。</p>
-      </div>`
-  };
-}
-
-function createLDTTimeline() {
-  const ldt_practice = [
-    { stimulus: 'TABLE', correct_response: 'a', word_type: 'practice_word',    iconic: null, rating: null, group: 'practice' },
-    { stimulus: 'BLARP', correct_response: 'l', word_type: 'practice_nonword', iconic: null, rating: null, group: 'practice' },
-    { stimulus: 'WATER', correct_response: 'a', word_type: 'practice_word',    iconic: null, rating: null, group: 'practice' }
-  ];
-
-  const fixation = {
-    type: T('jsPsychHtmlKeyboardResponse'),
-    stimulus: '<div style="font-size:60px;">+</div>',
-    choices: 'NO_KEYS',
-    trial_duration: 500
-  };
-
-  const ldtTrial = {
-    type: T('jsPsychHtmlKeyboardResponse'),
-    stimulus: () => `<div style="font-size:48px;font-weight:bold;">${jsPsych.timelineVariable('stimulus')}</div>`,
-    stimulus_duration: 1000,
-    choices: ['a', 'l'],
-    trial_duration: 2500,
-    post_trial_gap: 250,
-    data: () => ({
-      task: 'lexical_decision',
-      stimulus: jsPsych.timelineVariable('stimulus'),
-      correct_response: jsPsych.timelineVariable('correct_response'),
-      word_type: jsPsych.timelineVariable('word_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      word_group: jsPsych.timelineVariable('group'),
-      phase: 'pre'
-    }),
-    on_finish: d => { d.correct = (d.response === d.correct_response); }
-  };
-
-  const practiceFeedback = {
-    type: T('jsPsychHtmlKeyboardResponse'),
-    stimulus: () => {
-      const last = jsPsych.data.get().last(1).values()[0] || {};
-      return last.correct
-        ? '<h3 style="color:green">Correct! ✓</h3><p>Press SPACE to continue</p>'
-        : '<h3 style="color:red">Incorrect ✗</h3><p>A = Word, L = Not a word</p><p>Press SPACE</p>';
-    },
-    choices: [' ']
-  };
-
-  return [
-    {
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: '<h3>Practice Trials / 練習試行</h3><p>3 examples with feedback. / フィードバック付き3問の練習。</p><p><b>A = Word, L = Not a word</b></p>',
-      choices: ['Start Practice / 練習開始']
-    },
-    { timeline: [fixation, ldtTrial, practiceFeedback], timeline_variables: ldt_practice, randomize_order: true },
-    {
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: '<h3>Main Task / 本番</h3><p>No more feedback. / フィードバックはありません。</p><p><b>A = Word　　L = Not a word</b></p>',
-      choices: ['Start / 開始']
-    },
-    { timeline: [fixation, ldtTrial], timeline_variables: ldt_stimuli, randomize_order: true }
-  ];
-}
-
-/* ======================== 4AFC RECEPTIVE VOCABULARY (SPLIT) ======================== */
-// v7: Split into Objects block and Actions block to prevent category giveaway
-function create4AFCReceptiveBaseline() {
-  function make4AFCTrial() {
-    return {
-      type: T('jsPsychHtmlKeyboardResponse'),
-      choices: 'NO_KEYS',
-      stimulus: () => {
-        const images = jsPsych.timelineVariable('images');
-        const imgHTML = images.map((src, i) =>
-          `<div style="display:inline-block;margin:10px;cursor:pointer;" class="receptive-choice" data-choice="${i}">
-            <img src="${imgSrc(src)}" style="width:150px;height:150px;border:3px solid #ccc;border-radius:8px;" ${IMG_ONERROR}/>
-          </div>`
-        ).join('');
-        return `
-          <div style="margin-bottom:20px;">
-            <button id="play-word" class="jspsych-btn" style="font-size:18px;">▶ Play Word / 音声を再生</button>
-            <p id="receptive-status" style="color:#666;margin-top:10px;">Click play to hear the word.</p>
-          </div>
-          <div style="margin-top:20px;">${imgHTML}</div>`;
-      },
-      data: () => ({
-        task: 'receptive_vocab_baseline',
-        target_word: jsPsych.timelineVariable('target'),
-        correct_answer: jsPsych.timelineVariable('correct'),
-        iconic: jsPsych.timelineVariable('iconic'),
-        iconicity_rating: jsPsych.timelineVariable('rating'),
-        word_group: jsPsych.timelineVariable('group'),
-        stimulus_category: jsPsych.timelineVariable('category'),
-        phase: 'pre'
-      }),
-      on_load: function () {
-        const audioRef = jsPsych.timelineVariable('word_audio');
-        const playBtn = document.getElementById('play-word');
-        const status  = document.getElementById('receptive-status');
-        const choices = document.querySelectorAll('.receptive-choice');
-
-        if (!playBtn || !status) {
-          console.error('[receptive] DOM elements not found, skipping trial');
-          setTimeout(() => jsPsych.finishTrial({ response: -1, dom_error: true }), 0);
-          return;
-        }
-
-        const audio = new Audio(audioSrc(audioRef));
-        let hasPlayed = false;
-
-        choices.forEach(c => { c.style.opacity = '0.5'; c.style.pointerEvents = 'none'; });
-
-        playBtn.addEventListener('click', () => {
-          status.textContent = 'Playing… / 再生中…';
-          playBtn.disabled = true;
-          audio.currentTime = 0;
-          audio.play().catch(() => {
-            status.textContent = 'Audio failed — please try again';
-            playBtn.disabled = false;
-          });
-        });
-
-        audio.addEventListener('ended', () => {
-          hasPlayed = true;
-          status.textContent = 'Click the matching picture. / 対応する画像をクリック';
-          playBtn.disabled = false;
-          playBtn.textContent = '🔁 Play Again / もう一度';
-          choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
-        });
-        // v7.1: if the audio file is the silent placeholder or fails to load,
-        // unlock the choices so the trial doesn't hang.
-        audio.addEventListener('error', () => {
-          hasPlayed = true;
-          status.textContent = 'Audio missing — choose anyway. / 音声なし。回答してください。';
-          playBtn.disabled = false;
-          choices.forEach(c => { c.style.opacity = '1'; c.style.pointerEvents = 'auto'; });
-        }, { once: true });
-
-        choices.forEach(choice => {
-          choice.addEventListener('click', () => {
-            if (!hasPlayed) return;
-            audio.pause(); audio.currentTime = 0;
-            jsPsych.finishTrial({ response: parseInt(choice.dataset.choice) });
-          });
-        });
-      },
-      on_finish: d => { d.correct = (d.response === d.correct_answer); }
-    };
-  }
-
-  const trial = make4AFCTrial();
-
-  const tl = [];
-
-  // Objects block
-  if ((FILTERED_STIMULI.receptiveObjects?.length || 0) > 0) {
-    tl.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `<h2>Word-Picture Matching: Objects / 物の名前</h2>
-        <p>Listen to the word, then click the matching picture.</p>
-        <p>単語を聞いて、対応する画像をクリックしてください。</p>
-        <p style="color:#888;">You must listen to the whole word before pictures become clickable.</p>`,
-      choices: ['Begin / 開始']
-    });
-    tl.push({ timeline: [trial], timeline_variables: FILTERED_STIMULI.receptiveObjects, randomize_order: true });
-  }
-
-  // Actions block
-  if ((FILTERED_STIMULI.receptiveActions?.length || 0) > 0) {
-    tl.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `<h2>Word-Picture Matching: Actions / 動作の名前</h2>
-        <p>Listen to the word, then click the matching picture.</p>
-        <p>単語を聞いて、対応する画像をクリックしてください。</p>`,
-      choices: ['Begin / 開始']
-    });
-    tl.push({ timeline: [trial], timeline_variables: FILTERED_STIMULI.receptiveActions, randomize_order: true });
-  }
-
-  return tl;
 }
 
 /* ======================== MIC SETUP GATE ======================== */
@@ -1028,12 +775,9 @@ function buildMicSetupGate({ required = true } = {}) {
       const statusEl  = document.getElementById('mic-status');
       const levelEl   = document.getElementById('mic-level');
 
-      // FIX v6: Use jsPsych's own button container class to find exactly
-      // the 2 choice buttons, instead of scanning all .jspsych-btn on page.
-      // This prevents Chrome from picking up extra elements (progress bar, etc.)
       const choiceBtns = [...document.querySelectorAll('.jspsych-html-button-response-button button')];
-      const contBtn = choiceBtns.length >= 1 ? choiceBtns[0] : null;  // "Continue / 続行"
-      const textBtn = choiceBtns.length >= 2 ? choiceBtns[1] : null;  // "Use Text Only / 文字で続行"
+      const contBtn = choiceBtns.length >= 1 ? choiceBtns[0] : null;
+      const textBtn = choiceBtns.length >= 2 ? choiceBtns[1] : null;
 
       console.log('[mic_gate] Found choice buttons:', choiceBtns.length,
         'Continue:', contBtn?.textContent?.trim(),
@@ -1093,45 +837,267 @@ function buildMicSetupGate({ required = true } = {}) {
   };
 }
 
-/* ======================== PROGRESSIVE NAMING (3-stage) ======================== */
-// v7: Replaced single "describe" prompt with progressive gradient:
-//   Stage 1 — Object naming: "What is this?" → name → hear model → repeat
-//   Stage 2 — Action naming: "What is happening?" → name → hear model → repeat
-//   Stage 3 — Scene description: see cooking scene → 8s free description
-function createProgressiveNamingTimeline() {
+/* ======================== PRODUCTION BLOCK (v8.0 — phrase + isolated) ======================== */
+//
+// Two-pass elicitation per item:
+//   PHRASE PASS — picture + "What is this?" / "What is happening?" — 4s
+//     Matches what training conditions do (sentence-frame production).
+//     Whisper has lexical context to recover from; ecological validity.
+//   ISOLATED PASS — same picture + "Say just the word." — 3s
+//     Forces single-word production. Primary signal for phoneme-level
+//     intelligibility (forced alignment, naïve raters, acoustic measures)
+//     because there's no carrier-phrase context for ASR or listener to
+//     compensate with.
+//
+// 2 reps per pass per item via `repetitions: 2` on each timeline node.
+// Phrase block runs first across all items, then isolated block — this
+// avoids within-item carryover (don't model phrase production then
+// immediately repeat as isolated — that's a free practice trial).
+//
+// Items are passed in via the timelineItems array. The function is called
+// twice from the main timeline:
+//   buildProductionBlock(FILTERED_STIMULI.controls, 'control')
+//   buildProductionBlock(GROUP_A_PRODUCTION_ITEMS, 'target')
+//
+// GROUP_A_PRODUCTION_ITEMS is mutated in place during participant info,
+// AFTER timeline construction but BEFORE the production block executes.
+// jsPsych reads timeline_variables at execution time, so the late
+// population is fine.
+
+function buildProductionBlock(timelineItems, itemRole) {
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
   const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
 
-  // v7.1: practice always uses the placeholder if park_scene.jpg is missing,
-  // rather than silently switching to a div. The placeholder makes it obvious.
-  const practiceImgTag = `<img src="${imgSrc('img/park_scene.jpg')}" style="width:350px;border-radius:8px;" ${IMG_ONERROR}/>`;
-
   const tl = [];
 
-  // ---- PRACTICE ----
-  tl.push({
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<h2>Naming & Description / 名前と説明</h2>
-      <p>This section has 3 parts:</p>
-      <p>このセクションは3部構成です：</p>
-      <ol style="text-align:left;max-width:500px;margin:0 auto;">
-        <li><b>Name objects</b> — What is this? / これは何？</li>
-        <li><b>Name actions</b> — What is happening? / 何をしている？</li>
-        <li><b>Describe a scene</b> — What do you see, hear, smell? / 何が見える、聞こえる、匂う？</li>
-      </ol>
-      <p style="color:#666;margin-top:15px;">Let's practice recording first. / まず録音の練習をしましょう。</p>`,
-    choices: ['Continue / 続行'],
-    data: { task: 'progressive_naming_intro' }
-  });
+  // Block intro — neutral labels so participants don't treat control items
+  // as "practice that doesn't count" (they ARE measurement data).
+  const blockTitle = (itemRole === 'control')
+    ? 'First Set / 第1セット'
+    : 'Second Set / 第2セット';
+  const blockDesc = (itemRole === 'control')
+    ? 'You will see kitchen pictures. Say what you see in English.<br>台所の写真を見て、英語で答えてください。'
+    : 'More kitchen pictures. Same task as before.<br>同じ課題を続けます。';
 
   tl.push({
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<div style="text-align:center;">${practiceImgTag}
-      <p style="margin-top:15px;"><b>Practice:</b> What do you see in this picture?</p>
-      <p>練習：この写真に何が見えますか？</p></div>`,
-    choices: ['Start Practice Recording / 練習録音開始'],
-    data: { task: 'naming_practice_prepare' }
+    stimulus: `<h3>${blockTitle}</h3>
+      <p>${blockDesc}</p>
+      <p style="color:#666;">If you don't know a word, that's okay — guess or stay silent.</p>
+      <p style="color:#666;">単語が分からない場合は、推測でも無言でも大丈夫です。</p>`,
+    choices: ['Begin / 開始'],
+    data: { task: 'production_block_intro', item_role: itemRole, phase: 'pre' }
   });
+
+  // Build prompt strings keyed on prompt_type (object vs action)
+  function phrasePrompt(promptType) {
+    return promptType === 'action'
+      ? { en: 'What is happening?', jp: '何をしていますか？' }
+      : { en: 'What is this?',      jp: 'これは何ですか？' };
+  }
+
+  // ---- PHRASE PASS ----
+  const phraseAttemptAudio = hasMicPlugins ? {
+    type: T('jsPsychHtmlAudioResponse'),
+    stimulus: () => {
+      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
+      return `<div style="text-align:center;">
+        <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
+        <p style="margin-top:15px;font-size:18px;"><b>${prompt.en}</b></p>
+        <p style="color:#666;">${prompt.jp}</p>
+        <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
+          <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Recording… 4 seconds / 録音中… 4秒</p>
+        </div></div>`;
+    },
+    recording_duration: 4000, show_done_button: false, allow_playback: false,
+    data: () => ({
+      task: 'production_phrase',
+      target_word: jsPsych.timelineVariable('word'),
+      display_target: jsPsych.timelineVariable('display'),
+      prompt_type: jsPsych.timelineVariable('prompt_type'),
+      iconic: jsPsych.timelineVariable('iconic'),
+      iconicity_rating: jsPsych.timelineVariable('rating'),
+      item_role: itemRole,
+      pass: 'phrase',
+      phase: 'pre',
+      modality: 'audio',
+      counterbalance_list: counterbalanceList
+    }),
+    on_finish: (d) => {
+      const pid = currentPID();
+      const tgt = (d.target_word || 'x').toLowerCase();
+      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_phrase_rep${(d.repetition || '?')}.wav`;
+    }
+  } : null;
+
+  const phraseAttemptText = {
+    type: T('jsPsychSurveyText'),
+    preamble: () => {
+      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
+      return `<div style="text-align:center;">
+        <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
+        <p style="margin-top:15px;font-size:18px;"><b>${prompt.en}</b></p>
+        <p style="color:#666;">${prompt.jp}</p>
+        <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your answer in English. / 英語で入力してください。</div></div>`;
+    },
+    questions: [{ prompt: '', name: 'response', rows: 1, required: false }],
+    data: () => ({
+      task: 'production_phrase',
+      target_word: jsPsych.timelineVariable('word'),
+      display_target: jsPsych.timelineVariable('display'),
+      prompt_type: jsPsych.timelineVariable('prompt_type'),
+      iconic: jsPsych.timelineVariable('iconic'),
+      iconicity_rating: jsPsych.timelineVariable('rating'),
+      item_role: itemRole,
+      pass: 'phrase',
+      phase: 'pre',
+      modality: 'text',
+      counterbalance_list: counterbalanceList
+    })
+  };
+
+  // ---- ISOLATED PASS ----
+  const isolatedAttemptAudio = hasMicPlugins ? {
+    type: T('jsPsychHtmlAudioResponse'),
+    stimulus: () => {
+      const img = imgSrc(jsPsych.timelineVariable('image'));
+      return `<div style="text-align:center;">
+        <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
+        <p style="margin-top:15px;font-size:18px;"><b>Say just the word.</b></p>
+        <p style="color:#666;">単語だけを言ってください。</p>
+        <div style="margin-top:12px;background:#fff3cd;border-radius:8px;padding:12px;">
+          <p style="margin:0;color:#856404;font-weight:bold;">🔴 Recording… 3 seconds / 録音中… 3秒</p>
+        </div></div>`;
+    },
+    recording_duration: 3000, show_done_button: false, allow_playback: false,
+    data: () => ({
+      task: 'production_isolated',
+      target_word: jsPsych.timelineVariable('word'),
+      display_target: jsPsych.timelineVariable('display'),
+      prompt_type: jsPsych.timelineVariable('prompt_type'),
+      iconic: jsPsych.timelineVariable('iconic'),
+      iconicity_rating: jsPsych.timelineVariable('rating'),
+      item_role: itemRole,
+      pass: 'isolated',
+      phase: 'pre',
+      modality: 'audio',
+      counterbalance_list: counterbalanceList
+    }),
+    on_finish: (d) => {
+      const pid = currentPID();
+      const tgt = (d.target_word || 'x').toLowerCase();
+      d.audio_filename = `pre_${pid}_${itemRole}_${tgt}_isolated_rep${(d.repetition || '?')}.wav`;
+    }
+  } : null;
+
+  const isolatedAttemptText = {
+    type: T('jsPsychSurveyText'),
+    preamble: () => {
+      const img = imgSrc(jsPsych.timelineVariable('image'));
+      return `<div style="text-align:center;">
+        <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
+        <p style="margin-top:15px;font-size:18px;"><b>Type just the word.</b></p>
+        <p style="color:#666;">単語だけを入力してください。</p>
+        <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> One word only. / 1単語のみ。</div></div>`;
+    },
+    questions: [{ prompt: '', name: 'response', rows: 1, required: false }],
+    data: () => ({
+      task: 'production_isolated',
+      target_word: jsPsych.timelineVariable('word'),
+      display_target: jsPsych.timelineVariable('display'),
+      prompt_type: jsPsych.timelineVariable('prompt_type'),
+      iconic: jsPsych.timelineVariable('iconic'),
+      iconicity_rating: jsPsych.timelineVariable('rating'),
+      item_role: itemRole,
+      pass: 'isolated',
+      phase: 'pre',
+      modality: 'text',
+      counterbalance_list: counterbalanceList
+    })
+  };
+
+  // PHRASE block (audio path) — 2 reps
+  if (hasMicPlugins) {
+    tl.push({
+      timeline: [phraseAttemptAudio],
+      timeline_variables: timelineItems,
+      randomize_order: true,
+      repetitions: 2,
+      conditional_function: canRecordAudio
+    });
+  }
+  // PHRASE block (text fallback)
+  tl.push({
+    timeline: [phraseAttemptText],
+    timeline_variables: timelineItems,
+    randomize_order: true,
+    repetitions: 2,
+    conditional_function: () => !canRecordAudio()
+  });
+
+  // Brief transition between passes
+  tl.push({
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `<p>Now we'll do the same pictures one more time. This time, please <b>say only the word</b> — no full sentence.</p>
+      <p>同じ写真をもう一度見ます。今度は<b>単語だけ</b>を言ってください — 文章は不要です。</p>`,
+    choices: ['Continue / 続行'],
+    data: { task: 'production_pass_transition', item_role: itemRole, phase: 'pre' }
+  });
+
+  // ISOLATED block (audio path) — 2 reps
+  if (hasMicPlugins) {
+    tl.push({
+      timeline: [isolatedAttemptAudio],
+      timeline_variables: timelineItems,
+      randomize_order: true,
+      repetitions: 2,
+      conditional_function: canRecordAudio
+    });
+  }
+  // ISOLATED block (text fallback)
+  tl.push({
+    timeline: [isolatedAttemptText],
+    timeline_variables: timelineItems,
+    randomize_order: true,
+    repetitions: 2,
+    conditional_function: () => !canRecordAudio()
+  });
+
+  return tl;
+}
+
+/* ======================== PRODUCTION PRACTICE ======================== */
+// Single practice trial before the production blocks so participants
+// understand the recording mechanic. Uses the unrelated park scene image
+// (not a kitchen item) so it doesn't prime any target.
+function buildProductionPractice() {
+  const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
+  const canRecordAudio = () => hasMicPlugins && microphoneAvailable;
+  const practiceImgTag = `<img src="${imgSrc('img/park_scene.jpg')}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>`;
+
+  const tl = [
+    {
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<h2>Naming Task / 名前の課題</h2>
+        <p>You will see pictures and answer in English. Some you'll know, some you may not — that's okay.</p>
+        <p>写真を見て英語で答えてください。知らない単語があっても大丈夫です。</p>
+        <p>For each picture you'll be asked: <b>"What is this?"</b> or <b>"What is happening?"</b></p>
+        <p>各写真で <b>「これは何？」</b> または <b>「何をしている？」</b> と聞かれます。</p>
+        <p style="color:#666;margin-top:15px;">Let's do one practice. / 練習を1問しましょう。</p>`,
+      choices: ['Continue / 続行'],
+      data: { task: 'production_practice_intro', phase: 'pre' }
+    },
+    {
+      type: T('jsPsychHtmlButtonResponse'),
+      stimulus: `<div style="text-align:center;">${practiceImgTag}
+        <p style="margin-top:15px;"><b>Practice:</b> What do you see?</p>
+        <p>練習：何が見えますか？</p></div>`,
+      choices: ['Start Practice Recording / 練習録音開始'],
+      data: { task: 'production_practice_prepare', phase: 'pre' }
+    }
+  ];
 
   if (hasMicPlugins) {
     tl.push({
@@ -1143,7 +1109,7 @@ function createProgressiveNamingTimeline() {
             <p style="margin:8px 0;font-size:14px;">4 seconds!</p>
           </div></div>`,
         recording_duration: 4000, show_done_button: false, allow_playback: true,
-        data: { task: 'naming_practice_record' }
+        data: { task: 'production_practice_record', phase: 'pre' }
       }],
       conditional_function: canRecordAudio
     });
@@ -1153,265 +1119,17 @@ function createProgressiveNamingTimeline() {
     type: T('jsPsychHtmlButtonResponse'),
     stimulus: '<h3 style="color:green">Practice Complete! / 練習完了！</h3>',
     choices: ['Continue / 続行'],
-    data: { task: 'naming_practice_done' }
+    data: { task: 'production_practice_done', phase: 'pre' }
   });
-
-  // ---- Helper: build naming trials for a stimulus set ----
-  function buildNamingBlock(stimuli, prompt, promptJP, stageName) {
-    const items = stimuli.map(s => ({ ...s, imageUrl: imgSrc(s.image) }));
-    const trials = [];
-
-    // Step A: See image → name it (spontaneous)
-    const nameAttempt = hasMicPlugins ? {
-      type: T('jsPsychHtmlAudioResponse'),
-      stimulus: () => {
-        const u = jsPsych.timelineVariable('imageUrl');
-        return `<div style="text-align:center;">
-          <img src="${u}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
-          <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
-          <p style="color:#666;">${promptJP}</p>
-          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
-            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Recording… 4 seconds</p>
-          </div></div>`;
-      },
-      recording_duration: 4000, show_done_button: false, allow_playback: false,
-      data: () => ({
-        task: `naming_${stageName}_spontaneous`, target: jsPsych.timelineVariable('target'),
-        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
-        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
-        phase: 'pre', modality: 'audio', stage: stageName
-      }),
-      on_finish: (d) => {
-        const pid = currentPID(); const tgt = (d.target || 'x').toLowerCase();
-        d.audio_filename = `pre_${pid}_${tgt}_spontaneous.wav`;
-      }
-    } : null;
-
-    const nameAttemptText = {
-      type: T('jsPsychSurveyText'),
-      preamble: () => {
-        const u = jsPsych.timelineVariable('imageUrl');
-        return `<div style="text-align:center;">
-          <img src="${u}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
-          <p style="margin-top:15px;font-size:18px;"><b>${prompt}</b></p>
-          <p style="color:#666;">${promptJP}</p>
-          <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your answer. / 回答を入力してください。</div></div>`;
-      },
-      questions: [{ prompt: '', name: 'response', rows: 1, required: true }],
-      data: () => ({
-        task: `naming_${stageName}_spontaneous`, target: jsPsych.timelineVariable('target'),
-        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
-        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
-        phase: 'pre', modality: 'text', stage: stageName
-      })
-    };
-
-    // Step B: Hear model audio → repeat (pronunciation baseline)
-    const hearModel = {
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: () => {
-        const u = jsPsych.timelineVariable('imageUrl');
-        const target = jsPsych.timelineVariable('target');
-        return `<div style="text-align:center;">
-          <img src="${u}" style="width:250px;border-radius:8px;" ${IMG_ONERROR}/>
-          <p style="margin-top:15px;">Now listen to the correct word: / 正しい単語を聞いてください：</p>
-          <p style="font-size:24px;font-weight:bold;color:#1a237e;">${target}</p>
-          <button id="model-play" class="jspsych-btn" style="font-size:18px;margin-top:10px;">▶ Play / 再生</button>
-          <p id="model-status" style="color:#666;margin-top:8px;">Click play to hear the word.</p>
-        </div>`;
-      },
-      choices: ['Repeat Now / 繰り返す'],
-      data: () => ({ task: `naming_${stageName}_model`, target: jsPsych.timelineVariable('target'), phase: 'pre', stage: stageName }),
-      on_load: function () {
-        const audioRef = jsPsych.timelineVariable('model_audio');
-        const playBtn = document.getElementById('model-play');
-        const status = document.getElementById('model-status');
-        const choiceBtns = [...document.querySelectorAll('.jspsych-html-button-response-button button')];
-        const repeatBtn = choiceBtns[0];
-
-        if (repeatBtn) { repeatBtn.disabled = true; repeatBtn.style.opacity = '0.5'; }
-
-        if (!playBtn || !audioRef) {
-          // No audio referenced — let participant continue without locking
-          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
-          return;
-        }
-        const audio = new Audio(audioSrc(audioRef));
-
-        audio.addEventListener('ended', () => {
-          if (status) status.textContent = 'Now click "Repeat" to record your pronunciation.';
-          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
-          playBtn.textContent = '🔁 Play Again / もう一度';
-          playBtn.disabled = false;
-        });
-
-        // v7.1: if model audio is missing/silent, don't strand the participant
-        audio.addEventListener('error', () => {
-          if (status) status.textContent = 'Audio missing — proceed when ready.';
-          if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
-        }, { once: true });
-
-        playBtn.addEventListener('click', (e) => {
-          e.preventDefault();
-          if (status) status.textContent = 'Playing… / 再生中…';
-          playBtn.disabled = true;
-          audio.currentTime = 0;
-          audio.play().catch(() => {
-            if (status) status.textContent = 'Audio failed.';
-            playBtn.disabled = false;
-            if (repeatBtn) { repeatBtn.disabled = false; repeatBtn.style.opacity = '1'; }
-          });
-        });
-      }
-    };
-
-    const repeatRecord = hasMicPlugins ? {
-      type: T('jsPsychHtmlAudioResponse'),
-      stimulus: () => {
-        const target = jsPsych.timelineVariable('target');
-        return `<div style="text-align:center;">
-          <p style="font-size:24px;font-weight:bold;color:#1a237e;">${target}</p>
-          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
-            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Say the word… / 単語を言ってください… (4s)</p>
-          </div></div>`;
-      },
-      recording_duration: 4000, show_done_button: false, allow_playback: false,
-      data: () => ({
-        task: `naming_${stageName}_repeat`, target: jsPsych.timelineVariable('target'),
-        category: jsPsych.timelineVariable('category'), iconic: jsPsych.timelineVariable('iconic'),
-        iconicity_rating: jsPsych.timelineVariable('rating'), word_group: 'A',
-        phase: 'pre', modality: 'audio', stage: stageName
-      }),
-      on_finish: (d) => {
-        const pid = currentPID(); const tgt = (d.target || 'x').toLowerCase();
-        d.audio_filename = `pre_${pid}_${tgt}_repeat.wav`;
-      }
-    } : null;
-
-    // Assemble: audio path or text path
-    // v7.3: Spontaneous-only. The previous design included hear-model + repeat
-    // steps after each spontaneous attempt to collect imitation baselines.
-    // This is now removed because:
-    //   (1) primary outcomes are intelligibility / recall / retention across
-    //       VR vs 2D vs Text training conditions;
-    //   (2) hear-model + repeat is itself a mini-training trial (see picture →
-    //       hear word → produce word), which contaminates the pretest as a
-    //       pure baseline measure;
-    //   (3) this contamination is constant across conditions but dampens both
-    //       absolute training effects and the iconic-vs-arbitrary contrast.
-    // The hearModel and repeatRecord trial definitions remain above as dead
-    // code in case future studies want imitation data; they are simply not
-    // assembled into the timeline.
-    if (hasMicPlugins) {
-      trials.push({
-        timeline: [nameAttempt].filter(Boolean),
-        timeline_variables: items,
-        randomize_order: true,
-        conditional_function: canRecordAudio
-      });
-    }
-    trials.push({
-      timeline: [nameAttemptText],
-      timeline_variables: items,
-      randomize_order: true,
-      conditional_function: () => !canRecordAudio()
-    });
-
-    return trials;
-  }
-
-  // ---- STAGE 1: Object Naming ----
-  if ((FILTERED_STIMULI.objects?.length || 0) > 0) {
-    tl.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `<h3>Part 1: Name the Object / パート1：物の名前</h3>
-        <p>You will see a kitchen object. Say its name in English.</p>
-        <p>台所の道具が表示されます。英語で名前を言ってください。</p>
-        <p style="color:#666;">If you don't know the word, that's okay — just stay silent or guess.</p>
-        <p style="color:#666;">単語が分からない場合は、無言でも推測でも大丈夫です。</p>`,
-      choices: ['Begin / 開始']
-    });
-    tl.push(...buildNamingBlock(FILTERED_STIMULI.objects, 'What is this?', 'これは何ですか？', 'object'));
-  }
-
-  // ---- STAGE 2: Action Naming ----
-  if ((FILTERED_STIMULI.actions?.length || 0) > 0) {
-    tl.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `<h3>Part 2: Name the Action / パート2：動作の名前</h3>
-        <p>You will see a cooking action. Say what is happening in English.</p>
-        <p>料理の動作が表示されます。英語で何をしているか言ってください。</p>
-        <p style="color:#666;">If you don't know the word, that's okay — just stay silent or guess.</p>
-        <p style="color:#666;">単語が分からない場合は、無言でも推測でも大丈夫です。</p>`,
-      choices: ['Begin / 開始']
-    });
-    tl.push(...buildNamingBlock(FILTERED_STIMULI.actions, 'What is happening?', '何をしていますか？', 'action'));
-  }
-
-  // ---- STAGE 3: Scene Description ----
-  if ((FILTERED_STIMULI.scenes?.length || 0) > 0) {
-    tl.push({
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: `<h3>Part 3: Describe the Scene / パート3：場面の説明</h3>
-        <p>You will see a kitchen scene. Describe everything you see, hear, and smell.</p>
-        <p>台所の場面が表示されます。見えるもの、聞こえるもの、匂いを説明してください。</p>
-        <p style="color:#666;">You will have <b>8 seconds</b>. / <b>8秒間</b>です。</p>`,
-      choices: ['Begin / 開始']
-    });
-
-    const sceneItems = FILTERED_STIMULI.scenes.map(s => ({ ...s, imageUrl: imgSrc(s.image) }));
-
-    const sceneRecordAudio = hasMicPlugins ? {
-      type: T('jsPsychHtmlAudioResponse'),
-      stimulus: () => {
-        const u = jsPsych.timelineVariable('imageUrl');
-        return `<div style="text-align:center;">
-          <img src="${u}" style="width:450px;border-radius:8px;" ${IMG_ONERROR}/>
-          <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
-          <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
-          <div style="margin-top:12px;background:#ffebee;border-radius:8px;padding:12px;">
-            <p style="margin:0;color:#d32f2f;font-weight:bold;">🔴 Recording… 8 seconds / 録音中… 8秒</p>
-          </div></div>`;
-      },
-      recording_duration: 8000, show_done_button: false, allow_playback: false,
-      data: () => ({
-        task: 'naming_scene_description', scene: jsPsych.timelineVariable('scene'),
-        phase: 'pre', modality: 'audio', stage: 'scene'
-      }),
-      on_finish: (d) => { d.audio_filename = `pre_${currentPID()}_scene_${d.scene || 'x'}.wav`; }
-    } : null;
-
-    const sceneRecordText = {
-      type: T('jsPsychSurveyText'),
-      preamble: () => {
-        const u = jsPsych.timelineVariable('imageUrl');
-        return `<div style="text-align:center;">
-          <img src="${u}" style="width:450px;border-radius:8px;" ${IMG_ONERROR}/>
-          <p style="margin-top:15px;font-size:18px;"><b>Describe what you see, hear, and smell.</b></p>
-          <p style="color:#666;">見えるもの、聞こえるもの、匂いを説明してください。</p>
-          <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your description. / 説明を入力してください。</div></div>`;
-      },
-      questions: [{ prompt: '', name: 'description', rows: 4, required: true }],
-      data: () => ({
-        task: 'naming_scene_description', scene: jsPsych.timelineVariable('scene'),
-        phase: 'pre', modality: 'text', stage: 'scene'
-      })
-    };
-
-    if (hasMicPlugins) {
-      tl.push({ timeline: [sceneRecordAudio].filter(Boolean), timeline_variables: sceneItems, randomize_order: false, conditional_function: canRecordAudio });
-    }
-    tl.push({ timeline: [sceneRecordText], timeline_variables: sceneItems, randomize_order: false, conditional_function: () => !canRecordAudio() });
-  }
 
   return tl;
 }
 
-/* ======================== FOLEY ======================== */
+/* ======================== FOLEY (4 items) ======================== */
 function createFoleyTimeline() {
   const intro = {
     type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<h2>Sound Matching / 音のマッチング</h2><p>Listen to each sound carefully, then choose what it represents.</p><p>各音を注意深く聞いて、それが何を表すか選んでください。</p><p style="color:#888;">There are ${FILTERED_STIMULI.foley.length} sounds to identify. / 識別する音は${FILTERED_STIMULI.foley.length}個です。</p>`,
+    stimulus: `<h2>Sound Matching / 音のマッチング</h2><p>Listen to each sound carefully, then choose what it represents.</p><p>各音を注意深く聞いて、それが何を表すか選んでください。</p><p style="color:#888;">${FILTERED_STIMULI.foley.length} sounds. / ${FILTERED_STIMULI.foley.length}個の音。</p>`,
     choices: ['Begin / 開始']
   };
 
@@ -1445,37 +1163,13 @@ function createFoleyTimeline() {
   return [intro, { timeline: [trial], timeline_variables: FILTERED_STIMULI.foley, randomize_order: true }];
 }
 
-/* ======================== VISUAL ICONICITY ======================== */
-function createVisualTimeline() {
-  const intro = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `<h2>Shape-Word Matching / 形と単語のマッチング</h2><p>Choose the word that best matches the shape.</p><p>形に最も合う単語を選んでください。</p>`,
-    choices: ['Begin / 開始']
-  };
-
-  const trial = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: () => {
-      const u = jsPsych.timelineVariable('shapeUrl');
-      const img = `<img src="${u}" style="width:200px;height:200px;" ${IMG_ONERROR}/>`;
-      return `<div>${img}<p style="margin-top:20px;">Which word matches this shape? / この形に合う単語は？</p></div>`;
-    },
-    choices: () => { const w = jsPsych.timelineVariable('words'); return Array.isArray(w) && w.length ? w : ['(missing)', '(missing)']; },
-    post_trial_gap: 250,
-    data: () => ({ task: 'visual_iconicity', correct_answer: jsPsych.timelineVariable('expected'), shape_type: jsPsych.timelineVariable('shape_type'), phase: 'pre' }),
-    on_finish: d => { d.correct = (d.response === d.correct_answer); }
-  };
-
-  const tv = FILTERED_STIMULI.visual.map(s => ({ ...s, shapeUrl: imgSrc(s.shape) }));
-  return [intro, { timeline: [trial], timeline_variables: tv, randomize_order: true }];
-}
-
-/* ======================== SPATIAL SPAN (Corsi 3–5) ======================== */
+/* ======================== SPATIAL SPAN (Corsi 3–4) ======================== */
+// v8.0: trimmed from 3-5 to 3-4. Length 5 was rarely reached and added ~2min.
 function createSpatialSpanTimeline() {
   const instr = {
     type: T('jsPsychHtmlButtonResponse'),
     choices: ['Begin / 開始'],
-    stimulus: `<h2>Spatial Memory / 空間記憶（Corsi）</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p><p style="color:#666;">Sequence length increases from 3 to 5. Two trials per length. / 3から5まで増加。各長さ2試行。</p>`
+    stimulus: `<h2>Spatial Memory / 空間記憶（Corsi）</h2><p>Watch squares light up, then click them in the <b>same order</b>.</p><p>光る四角を見て、<b>同じ順番</b>でクリックしてください。</p><p style="color:#666;">Sequence length 3 then 4. Two trials per length. / 長さ3と4。各長さ2試行。</p>`
   };
 
   const gridCells = [0, 1, 2, 3, 4, 5, 6, 7, 8];
@@ -1509,7 +1203,7 @@ function createSpatialSpanTimeline() {
   const innerTrials = [];
   const failsAtLength = {};
 
-  for (let len = 3; len <= 5; len++) {
+  for (let len = 3; len <= 4; len++) {
     innerTrials.push({ type: T('jsPsychHtmlButtonResponse'), choices: ['Ready / 準備完了'], stimulus: `<h3>Sequence length: ${len} / 系列長: ${len}</h3><p>You will have 2 trials at this length. / この長さで2試行あります。</p><p>Press Ready, then watch carefully.</p>` });
     for (let attempt = 0; attempt < 2; attempt++) {
       innerTrials.push({
@@ -1529,117 +1223,6 @@ function createSpatialSpanTimeline() {
   }
 
   return [instr, { timeline: innerTrials }];
-}
-
-/* ======================== PROCEDURAL ORDERING ======================== */
-// v6 FIX: Changed from pancake-making to tea-making to prevent priming
-// the cooking procedure taught in the treatment conditions.
-// Measures the same procedural reasoning ability without content overlap.
-const PROCEDURE_STEPS = ['Boil water', 'Get a teacup', 'Put tea bag in cup', 'Pour hot water', 'Remove tea bag'];
-const PROC_CONSTRAINTS = [
-  ['Boil water', 'Pour hot water'],
-  ['Get a teacup', 'Put tea bag in cup'],
-  ['Put tea bag in cup', 'Pour hot water'],
-  ['Pour hot water', 'Remove tea bag']
-];
-
-function createProceduralTimeline() {
-  const instructions = {
-    type: T('jsPsychHtmlButtonResponse'),
-    stimulus: `
-      <h3>Recipe Ordering / レシピの順序</h3>
-      <p>Order these tea-making steps from 1 to 5.</p>
-      <p>お茶を入れる手順を1から5の順番に並べてください。</p>`,
-    choices: ['OK / 了解']
-  };
-
-  const steps = PROCEDURE_STEPS.slice();
-  for (let i = steps.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [steps[i], steps[j]] = [steps[j], steps[i]];
-  }
-
-  let capturedPositions = null;
-
-  const test = {
-    type: T('jsPsychHtmlButtonResponse'),
-    choices: ['Submit / 送信'],
-    stimulus: () => {
-      const options = ['', '1', '2', '3', '4', '5'];
-      return `<form id="proc-form" style="text-align:left;max-width:520px;margin:0 auto;">
-        ${steps.map((label, i) => `<div style="display:flex;align-items:center;gap:10px;margin:12px 0;">
-          <label style="flex:1;font-size:16px;"><b>${label}</b></label>
-          <select data-i="${i}" data-label="${label}" class="proc-dd" required style="font-size:16px;padding:5px;">
-            ${options.map(o => `<option value="${o}">${o || '—'}</option>`).join('')}
-          </select>
-        </div>`).join('')}
-      </form>`;
-    },
-    data: { task: 'procedural_knowledge', presented_order: steps, phase: 'pre', procedure_type: 'tea_making' },
-    on_load() {
-      const dds = [...document.querySelectorAll('.proc-dd')];
-      function refresh() {
-        const used = new Set(dds.map(dd => dd.value).filter(Boolean));
-        dds.forEach(dd => {
-          const cur = dd.value;
-          [...dd.options].forEach(opt => { if (!opt.value) return; opt.disabled = used.has(opt.value) && opt.value !== cur; });
-        });
-      }
-      dds.forEach(dd => dd.addEventListener('change', refresh));
-      refresh();
-
-      setTimeout(() => {
-        const buttons = document.querySelectorAll('.jspsych-btn');
-        const submitBtn = buttons[buttons.length - 1];
-        if (submitBtn) {
-          submitBtn.addEventListener('click', function () {
-            const selects = document.querySelectorAll('.proc-dd');
-            capturedPositions = {};
-            selects.forEach(s => {
-              if (s.dataset.label) {
-                capturedPositions[s.dataset.label] = s.value ? Number(s.value) : null;
-              }
-            });
-          }, { capture: true });
-        }
-      }, 50);
-    },
-    on_finish(d) {
-      const pos = capturedPositions || {};
-      let tot = 0, ok = 0, violations = [];
-      PROC_CONSTRAINTS.forEach(([a, b]) => {
-        if (pos[a] && pos[b]) { tot++; if (pos[a] < pos[b]) ok++; else violations.push(a + ' → ' + b); }
-      });
-      d.responses_positions = pos;
-      d.constraints_total = tot;
-      d.constraints_satisfied = ok;
-      d.partial_order_score = tot > 0 ? ok / tot : null;
-      d.violations = violations;
-    }
-  };
-
-  return [instructions, test];
-}
-
-/* ======================== IDEOPHONE ======================== */
-function createIdeophoneTest() {
-  return [
-    {
-      type: T('jsPsychHtmlButtonResponse'),
-      stimulus: '<h2>Japanese Sound Words / 擬音語</h2><p>Match Japanese sound-symbolic words to their meanings.</p><p>日本語の擬音語をその意味と合わせてください。</p>',
-      choices: ['Begin / 開始']
-    },
-    {
-      type: T('jsPsychSurveyLikert'),
-      preamble: '<h3>Which sound represents: / どの音が表しますか：</h3>',
-      questions: [
-        { prompt: '<b>Egg frying sound?</b> / 卵が焼ける音', name: 'frying_sound',   labels: ['ジュージュー (jūjū)', 'パラパラ (parapara)', 'グルグル (guruguru)'], required: true },
-        { prompt: '<b>Stirring sound?</b> / かき混ぜる音',   name: 'stirring_sound', labels: ['ジュージュー (jūjū)', 'パラパラ (parapara)', 'グルグル (guruguru)'], required: true }
-      ],
-      button_label: 'Submit / 送信',
-      data: { task: 'ideophone_mapping', phase: 'pre' }
-    }
-  ];
 }
 
 /* ======================== BOOTSTRAP ======================== */
@@ -1679,8 +1262,6 @@ async function initializeExperiment() {
     assignedCondition = assignCondition();
     await filterExistingStimuli();
 
-    // v7.1: stamp every trial record with the missing-asset list so analysts
-    // can flag any data collected against placeholders.
     try {
       jsPsych.data.addProperties({
         missing_assets: [...MISSING_ASSETS.images, ...MISSING_ASSETS.audio]
@@ -1689,61 +1270,61 @@ async function initializeExperiment() {
 
     const timeline = [];
 
-    // v7.1: launch-check screen — only renders if anything is missing.
+    // Asset launch-check (only renders if anything is missing)
     timeline.push({
       timeline: [buildAssetCheckScreen()],
       conditional_function: () => (MISSING_ASSETS.images.length + MISSING_ASSETS.audio.length) > 0
     });
 
+    // Welcome
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `<div style="text-align:center;">
         <h2>Pre-Test / プリテスト</h2>
-        <p>This test measures your baseline English vocabulary and cognitive abilities before the training session.</p>
-        <p>トレーニングセッション前の英語語彙と認知能力のベースラインを測定します。</p>
-        <p style="color:#666;">Duration: ~20 minutes / 所要時間：約20分</p>
+        <p>This test measures your baseline before the training session.</p>
+        <p>トレーニング前のベースラインを測定します。</p>
+        <p style="color:#666;">Duration: ~15 minutes / 所要時間：約15分</p>
       </div>`,
       choices: ['Start / 開始']
     });
 
+    // Participant info (also assigns counterbalance)
     timeline.push(createParticipantInfo());
-    timeline.push(buildMicSetupGate({ required: false }));
 
+    // Mic setup
+    timeline.push(buildMicSetupGate({ required: false }));
     if (have('jsPsychInitializeMicrophone')) {
       timeline.push({ timeline: [{ type: T('jsPsychInitializeMicrophone') }], conditional_function: () => microphoneAvailable });
     }
 
-    timeline.push(createDigitSpanInstructions(true));
-    timeline.push(generateDigitSpanTrials({ forward: true,  startLen: 3, endLen: 6 }));
-    timeline.push(createDigitSpanInstructions(false));
-    timeline.push(generateDigitSpanTrials({ forward: false, startLen: 3, endLen: 6 }));
+    // Forward digit span 3-5 (covariate)
+    timeline.push(createDigitSpanInstructions());
+    timeline.push(generateDigitSpanTrials({ startLen: 3, endLen: 5 }));
 
+    // Phoneme discrimination (covariate)
     if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
       timeline.push(createPhonemeInstructions());
       timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order: true });
     }
 
-    timeline.push(createLDTPrimerWithImage());
-    timeline.push(...createLDTTimeline());
-
-    // v7: Split 4AFC — objects then actions
-    timeline.push(...create4AFCReceptiveBaseline());
-
-    // v7: Progressive naming — objects → actions → scenes
-    timeline.push(...createProgressiveNamingTimeline());
-
+    // Foley iconicity sensitivity (covariate, 4 items)
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
     }
 
-    if ((FILTERED_STIMULI.visual?.length || 0) > 0) {
-      timeline.push(...createVisualTimeline());
-    }
-
+    // Spatial span (covariate)
     timeline.push(...createSpatialSpanTimeline());
-    timeline.push(...createProceduralTimeline());
-    timeline.push(...createIdeophoneTest());
 
+    // ---- PRODUCTION (primary DV) ----
+    // Practice → controls → Group A targets
+    timeline.push(...buildProductionPractice());
+    timeline.push(...buildProductionBlock(FILTERED_STIMULI.controls, 'control'));
+    // GROUP_A_PRODUCTION_ITEMS is populated during participant_info on_finish.
+    // jsPsych reads timeline_variables at trial-execution time, so the late
+    // population works as long as the array reference is stable (it is).
+    timeline.push(...buildProductionBlock(GROUP_A_PRODUCTION_ITEMS, 'target'));
+
+    // Done
     timeline.push({
       type: T('jsPsychHtmlButtonResponse'),
       stimulus: `
