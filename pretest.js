@@ -274,13 +274,39 @@ async function saveData(data) {
 // Contrasts target the difficult phonemes carried by iconic recipe items
 // (/r/-/l/, vowel contrasts, cluster discrimination). Audio files unchanged
 // from v7.3; expand only if matching audio is available.
+// Phoneme discrimination — 12 trials, contrasts targeted to v8.0 production
+// items. Each trial type:
+//   target     — pair where one of the words IS a v8.0 production target
+//                (gives per-target perceptual baseline)
+//   filler     — pair targeting a contrast that appears in fillers/recipe
+//                items but not in primary production targets
+//   identity   — same audio file played twice; flags non-attenders. A
+//                participant who reports "different" on both identity
+//                controls is excluded from analysis.
+//
+// Identity controls intentionally use the same audio file for both audio1
+// and audio2 (NOT two takes of the same word). Re-recordings introduce
+// natural acoustic variation and become genuine "different" trials, which
+// defeats the attention-check purpose.
 const phoneme_discrimination_stimuli = [
-  { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/ball.mp3',   correct: 'different', contrast: 'vowel_oU_O' },
-  { audio1: 'sounds/flip.mp3',   audio2: 'sounds/frip.mp3',   correct: 'different', contrast: 'l_r' },
-  { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'control' },
-  { audio1: 'sounds/batter.mp3', audio2: 'sounds/better.mp3', correct: 'different', contrast: 'vowel_ae_E' },
-  { audio1: 'sounds/flour.mp3',  audio2: 'sounds/flower.mp3', correct: 'same',      contrast: 'homophone' },
-  { audio1: 'sounds/stir.mp3',   audio2: 'sounds/star.mp3',   correct: 'different', contrast: 'vowel_3r_a' },
+  // Target-bearing pairs (one word in each pair is a v8.0 production target)
+  { audio1: 'sounds/slice.mp3',  audio2: 'sounds/sris.mp3',   correct: 'different', contrast: 'cluster_sl_sr',   target_word: 'slice'  },
+  { audio1: 'sounds/crack.mp3',  audio2: 'sounds/clack.mp3',  correct: 'different', contrast: 'cluster_kr_kl',   target_word: 'crack'  },
+  { audio1: 'sounds/flip.mp3',   audio2: 'sounds/frip.mp3',   correct: 'different', contrast: 'cluster_fl_fr',   target_word: 'flip'   },
+  { audio1: 'sounds/sizzle.mp3', audio2: 'sounds/siddle.mp3', correct: 'different', contrast: 'medial_z_d',      target_word: 'sizzle' },
+  { audio1: 'sounds/bowl.mp3',   audio2: 'sounds/vowl.mp3',   correct: 'different', contrast: 'onset_b_v',       target_word: 'bowl'   },
+  { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pun.mp3',    correct: 'different', contrast: 'vowel_ae_V',      target_word: 'pan'    },
+  { audio1: 'sounds/flour.mp3',  audio2: 'sounds/floor.mp3',  correct: 'different', contrast: 'vowel_aU@_O',     target_word: 'flour'  },
+  { audio1: 'sounds/butter.mp3', audio2: 'sounds/batter.mp3', correct: 'different', contrast: 'vowel_V_ae',      target_word: 'butter' },
+
+  // Filler-targeted pairs (cluster + r-coloured vowel covariates)
+  { audio1: 'sounds/spoon.mp3',  audio2: 'sounds/soon.mp3',   correct: 'different', contrast: 'cluster_sp_s',    target_word: 'spoon'  },
+  { audio1: 'sounds/stir.mp3',   audio2: 'sounds/star.mp3',   correct: 'different', contrast: 'vowel_3r_ar',     target_word: 'stir'   },
+
+  // Identity controls (attention check) — NOT randomized to be last; they
+  // intermix with the rest via randomize_order: true on the timeline node.
+  { audio1: 'sounds/crack.mp3',  audio2: 'sounds/crack.mp3',  correct: 'same',      contrast: 'identity',        target_word: 'crack'  },
+  { audio1: 'sounds/pan.mp3',    audio2: 'sounds/pan.mp3',    correct: 'same',      contrast: 'identity',        target_word: 'pan'    },
 ];
 
 // Foley — baseline iconicity sensitivity covariate. Trimmed from 7 to 4
@@ -672,6 +698,9 @@ function createPhonemeTrial() {
       task: 'phoneme_discrimination',
       correct_answer: jsPsych.timelineVariable('correct'),
       contrast_type: jsPsych.timelineVariable('contrast'),
+      target_word: jsPsych.timelineVariable('target_word'),
+      audio1: jsPsych.timelineVariable('audio1'),
+      audio2: jsPsych.timelineVariable('audio2'),
       phase: 'pre'
     }),
     on_load: function () {
