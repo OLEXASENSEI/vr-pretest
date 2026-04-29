@@ -16,36 +16,63 @@
 //   pre→post intelligibility gains in VR, with the iconicity gradient
 //   steepest in VR > 2D > Text.
 //
-// PRIMARY STATISTICAL CONTRAST: Condition × Iconicity × Time, on Group B
-//   targets (zero pretest contamination), replicated within-subject on
-//   Group A targets.
+// PRIMARY STATISTICAL CONTRAST: Condition × Iconicity × Time, on all 8
+//   trained production targets vs 4 untrained controls.
 //
 // ----------------------------------------------------------------------------
-// STIMULUS DESIGN (locked against Winter et al. 2024 iconicity ratings)
+// STIMULUS DESIGN (locked against Winter et al. 2024 + canonical training script)
 // ----------------------------------------------------------------------------
 //
-// PRIMARY ICONICITY CONTRAST — 8 production targets, all in the recipe,
-// all trained, balanced 4 iconic + 4 conventional:
-//   ICONIC TARGETS (mean rating 5.42):
-//     crack 5.40, sizzle 5.30, flip 5.70, slice 5.27
-//   CONVENTIONAL TARGETS (mean rating 3.24):
-//     bowl 3.00, pan 3.45, flour 3.00, butter 3.50
+// PRODUCTION TARGETS (8) — all pretested AND posttested for every participant:
+//   ICONIC (3, mean rating 5.46): crack 5.40, flip 5.70, slice 5.27
+//   MARGINAL ICONIC (1): stir 4.30 — included for form-selection analysis
+//     (does the gerund form `stirring` substitute for the bare imperative
+//     more often in VR > 2D > Text? See file comments at PRODUCTION_TARGETS.)
+//   CONVENTIONAL (4, mean rating 3.24): bowl 3.00, pan 3.45, flour 3.00, butter 3.50
 //
-// PARALLEL CONTROLS — 4 kitchen-domain words, never trained, pretested
+// PASSIVE/IMPLICIT ICONIC (NOT a production target):
+//   sizzle 5.30 — never produced during training (it's an SFX consequence of
+//   "butter the pan" / "heat the pan"). Tested in posttest multi-probe
+//   binding task only, NOT in pretest production.
+//
+// PARALLEL CONTROLS (4) — kitchen-domain words, never trained, pretested
 // AND posttested for every participant. Iconicity-balanced 2+2:
 //   ICONIC CONTROLS (mean 5.55): chopping 5.50, peeling 5.60
 //   CONVENTIONAL CONTROLS (mean 3.74): ladle 3.67, kettle 3.80
 //
-// COUNTERBALANCED SPLIT-HALF — per participant, derived from pid:
-//   pid hash mod 2 == 0 → List 1
-//     Group A (pre + post): sizzle, slice, bowl, butter
-//     Group B (post only):  crack, flip, pan, flour
-//   pid hash mod 2 == 1 → List 2
-//     Group A (pre + post): crack, flip, pan, flour
-//     Group B (post only):  sizzle, slice, bowl, butter
-//   Both lists: 2 iconic + 2 conventional in each group; iconicity-class
-//   means within ±0.3 across A and B. Counterbalance prevents item effects
-//   from confounding with split-half assignment.
+// NO SPLIT-HALF. v8.0's earlier draft used pid-hash counterbalance to assign
+// participants to Group A (pretested) vs Group B (held back) targets. That
+// was dropped because pretest production WITHOUT FEEDBACK is minimal
+// contamination: a 4-second recording with no model audio, no correct/wrong
+// indicator, no repetition. The parallel-control lane (chop, peel, ladle,
+// kettle) lets us estimate testing/familiarization effects directly via the
+// pre→post change on items the participant never trained on. Splitting the
+// targets gave us 3-vs-4 within-subject coverage at the cost of doubling
+// counterbalance complexity. Pretesting all 8 gives us 8-vs-8 coverage with
+// a clean within-subject pre→post comparison on every target. The
+// counterbalance hash function is retained but stamps trial data
+// informationally only.
+//
+// ----------------------------------------------------------------------------
+// FORM-SELECTION SECONDARY ANALYSIS (stir-driven, generalizes to all action verbs)
+// ----------------------------------------------------------------------------
+//
+// `stir` (rating 4.30 bare / 4.82 gerund) is included as a marginal-iconic
+// target for a specific reason: the gerund form `stirring` is more iconic
+// than the bare imperative because the /-ɪŋ/ ending phonologically lengthens
+// the action, mapping iconically onto stirring's continuous nature. For
+// Japanese L2 learners (whose L1 mimetic system is rich with durational
+// iconicity — gitaigo doubling like `guruguru` for stirring/swirling), the
+// gerund form may be preferred over the bare imperative for iconic action
+// verbs as a sound-meaning-driven form-selection error.
+//
+// All action verbs in v8.0 (crack, flip, slice, stir) carry `target_form: 'bare'`
+// in their trial data. Post-hoc Whisper transcription on the isolated-pass
+// audio scores whether the participant produced the bare form, the gerund,
+// or another variant. Form-selection analysis: gerund-substitution rate by
+// iconicity × condition. Predicted: higher gerund-substitution rate for
+// iconic verbs, amplified in VR > 2D > Text. Reported as a secondary
+// finding (exploratory, but theoretically grounded).
 //
 // ----------------------------------------------------------------------------
 // TWO-PASS PRODUCTION ELICITATION
@@ -65,7 +92,8 @@
 //     Same picture → "Say just the word." prompt
 //     Forces single-word production; primary measurement signal for
 //     phoneme-level intelligibility analysis (forced alignment, naïve-rater
-//     scoring, acoustic measures).
+//     scoring, acoustic measures). Also primary signal for form-selection
+//     analysis (bare vs gerund substitution).
 //
 // 2 reps per pass per item. Both passes are recorded as separate audio
 // files with explicit `pass` field in trial data for analysis.
@@ -92,17 +120,17 @@
 // ----------------------------------------------------------------------------
 //
 // Pictures (likely already in repo for training/posttest):
-//   img/cracking.jpeg, img/flipping.jpg, img/sizzling.jpg, img/slicing.jpg,
+//   img/cracking.jpeg, img/flipping.jpg, img/slicing.jpg, img/stirring.jpg,
 //   img/bowl.jpg, img/pan.jpg, img/flour.jpg, img/butter.jpg
 //
-// Pictures NEW for v8.0 control items (likely missing — please add):
-//   img/chopping.jpg     (existed in v7.3 as 4AFC distractor — reuse)
-//   img/peeling.jpg      ← NEW
-//   img/ladle.jpg        ← NEW
-//   img/kettle.jpg       ← NEW
+// Pictures NEW for v8.0 control items (please verify):
+//   img/chopping.jpg     — was in v7.3 as 4AFC distractor; reuse
+//   img/peeling.jpg      — NEW
+//   img/ladle.jpg        — NEW
+//   img/kettle.jpg       — NEW
 //
-// No audio files needed for production prompts (text only). Phoneme-
-// discrimination audio unchanged from v7.3.
+// Phoneme-discrimination audio: 11 new files recorded; 9 carried over from
+// v7.3. See phoneme_discrimination_stimuli array.
 //
 // ============================================================================
 
@@ -111,14 +139,7 @@ let jsPsych = null;
 let assignedCondition = null;
 let microphoneAvailable = false;
 let currentPID_value = 'unknown';
-let counterbalanceList = 0;  // 0 or 1, set during participant info
-
-// v8.0: dynamic Group A target list — populated during participant info
-// on_finish based on pid hash mod 2. Mutated in place so the production
-// timeline (which holds a reference to this array) sees the right items
-// when the trial executes. Empty until participant info completes; the
-// production block trial node reads it at execution time, not at build.
-let GROUP_A_PRODUCTION_ITEMS = [];
+let counterbalanceList = 0;  // 0 or 1, set during participant info (informational only in v8.0; retained for posttest split-half compatibility)
 
 // v7.1: track every asset URL that fails its HEAD check at startup, so the
 // launch-check screen can list them and every saved trial record can carry
@@ -321,34 +342,49 @@ const foley_stimuli = [
   { audio: 'sounds/sizzle.mp3',      options: ['oil heating in pan', 'flour falling into bowl'],       correct: 0, mapping_type: 'process_sound', iconicity_rating: 5.30 },
 ];
 
-// Production targets — used by the production block. The actual subset
-// shown to a given participant is determined at runtime by counterbalance
-// (see GROUP_A_PRODUCTION_ITEMS, populated during participant info).
-const PRODUCTION_TARGETS_LIST_1 = [
-  // Group A for participants with counterbalance == 0
-  { word: 'sizzle', display: 'sizzling', image: 'img/sizzling.jpg', prompt_type: 'action', iconic: true,  rating: 5.30 },
-  { word: 'slice',  display: 'slicing',  image: 'img/slicing.jpg',  prompt_type: 'action', iconic: true,  rating: 5.27 },
-  { word: 'bowl',   display: 'bowl',     image: 'img/bowl.jpg',     prompt_type: 'object', iconic: false, rating: 3.00 },
-  { word: 'butter', display: 'butter',   image: 'img/butter.jpg',   prompt_type: 'object', iconic: false, rating: 3.50 },
+// Production targets — all 7 trained targets pretested AND posttested for
+// every participant. No counterbalance split-half: pretest production with
+// no feedback is minimal contamination, and the parallel-control lane
+// (chop, peel, ladle, kettle) lets us estimate testing effects directly.
+//
+// `sizzle` is NOT a production target. Participants never produce `sizzle`
+// during training — it's an SFX consequence of saying "butter the pan" or
+// "heat the pan." It's tested as an implicit/passive iconic word in the
+// posttest multi-probe binding task only.
+//
+// `stir` is a MARGINAL iconic target (rating 4.30 bare / 4.82 gerund).
+// Included in the production block but coded `iconicity_marginal: true`
+// so it's analyzed separately. It's also the test case for the
+// form-selection secondary analysis: do learners substitute the gerund
+// `stirring` for the bare `stir` more often in iconic contexts and more
+// often in VR than 2D > Text? Same `target_form: 'bare'` field is set on
+// all action verbs (crack, flip, slice, stir) so post-hoc Whisper
+// transcription can score gerund-substitution rate uniformly.
+const PRODUCTION_TARGETS = [
+  // ICONIC (3) — all rated >5.2, defensible phonosemantic stories
+  { word: 'crack', display: 'cracking', image: 'img/cracking.jpeg', prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.40 },
+  { word: 'flip',  display: 'flipping', image: 'img/flipping.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.70 },
+  { word: 'slice', display: 'slicing',  image: 'img/slicing.jpg',   prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.27 },
+
+  // MARGINAL ICONIC (1) — for form-selection secondary analysis
+  { word: 'stir',  display: 'stirring', image: 'img/stirring.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: true,  target_form: 'bare', rating: 4.30 },
+
+  // CONVENTIONAL (4) — all rated <3.6, defensibly arbitrary
+  { word: 'bowl',   display: 'bowl',   image: 'img/bowl.jpg',   prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.00 },
+  { word: 'pan',    display: 'pan',    image: 'img/pan.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.45 },
+  { word: 'flour',  display: 'flour',  image: 'img/flour.jpg',  prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.00 },
+  { word: 'butter', display: 'butter', image: 'img/butter.jpg', prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.50 },
 ];
 
-const PRODUCTION_TARGETS_LIST_2 = [
-  // Group A for participants with counterbalance == 1
-  { word: 'crack',  display: 'cracking', image: 'img/cracking.jpeg', prompt_type: 'action', iconic: true,  rating: 5.40 },
-  { word: 'flip',   display: 'flipping', image: 'img/flipping.jpg',  prompt_type: 'action', iconic: true,  rating: 5.70 },
-  { word: 'pan',    display: 'pan',      image: 'img/pan.jpg',       prompt_type: 'object', iconic: false, rating: 3.45 },
-  { word: 'flour',  display: 'flour',    image: 'img/flour.jpg',     prompt_type: 'object', iconic: false, rating: 3.00 },
-];
-
-// Parallel control items — production-tested for everyone, never trained.
-// Iconicity-balanced to match targets; pretest-vs-posttest change on these
-// estimates pure testing/familiarization effect (no training). Targets'
-// pretest-vs-posttest change minus controls' change isolates training.
+// Parallel control items — production-tested at pre AND post for every
+// participant. Iconicity-balanced (2 iconic + 2 conventional). Never trained.
+// Pre→post change on these estimates pure testing/familiarization effect.
+// Targets' change minus controls' change isolates training.
 const PRODUCTION_CONTROLS = [
-  { word: 'chop',   display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  rating: 5.50 },
-  { word: 'peel',   display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  rating: 5.60 },
-  { word: 'ladle',  display: 'ladle',    image: 'img/ladle.jpg',    prompt_type: 'object', iconic: false, rating: 3.67 },
-  { word: 'kettle', display: 'kettle',   image: 'img/kettle.jpg',   prompt_type: 'object', iconic: false, rating: 3.80 },
+  { word: 'chop',   display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.50 },
+  { word: 'peel',   display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.60 },
+  { word: 'ladle',  display: 'ladle',    image: 'img/ladle.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.67 },
+  { word: 'kettle', display: 'kettle',   image: 'img/kettle.jpg',   prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.80 },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -380,7 +416,7 @@ function checkImageExists(url) {
 
 let PRELOAD_AUDIO = [];
 let PRELOAD_IMAGES = [];
-let FILTERED_STIMULI = { phoneme: [], foley: [], targetsList1: [], targetsList2: [], controls: [] };
+let FILTERED_STIMULI = { phoneme: [], foley: [], targets: [], controls: [] };
 
 async function filterExistingStimuli() {
   console.log('[Validation] Starting asset validation…');
@@ -390,8 +426,7 @@ async function filterExistingStimuli() {
   FILTERED_STIMULI = {
     phoneme: phoneme_discrimination_stimuli,
     foley: foley_stimuli,
-    targetsList1: PRODUCTION_TARGETS_LIST_1,
-    targetsList2: PRODUCTION_TARGETS_LIST_2,
+    targets: PRODUCTION_TARGETS,
     controls: PRODUCTION_CONTROLS,
   };
 
@@ -400,8 +435,7 @@ async function filterExistingStimuli() {
     const allImages = new Set();
     for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
     for (const s of foley_stimuli) { allAudio.add(s.audio); }
-    for (const s of PRODUCTION_TARGETS_LIST_1) { allImages.add(s.image); }
-    for (const s of PRODUCTION_TARGETS_LIST_2) { allImages.add(s.image); }
+    for (const s of PRODUCTION_TARGETS) { allImages.add(s.image); }
     for (const s of PRODUCTION_CONTROLS) { allImages.add(s.image); }
     allImages.add('img/park_scene.jpg');  // practice image
 
@@ -570,24 +604,19 @@ function createParticipantInfo() {
         currentPID_value = capturedResponses.participant_id;
       }
 
-      // v8.0: assign counterbalance and populate the Group A target list
-      // that the production block reads at trial-execution time.
+      // v8.0 (post script-reality update): split-half dropped. All 8 trained
+      // production targets and 4 controls are pretested for every participant.
+      // The counterbalance hash function is retained but informational only —
+      // it's stamped into trial data so a future re-introduction of split-half
+      // (e.g., for posttest-only Group B comparisons) doesn't require code
+      // re-architecture.
       counterbalanceList = pidToCounterbalance(currentPID_value);
-      const chosen = (counterbalanceList === 0)
-        ? PRODUCTION_TARGETS_LIST_1
-        : PRODUCTION_TARGETS_LIST_2;
-      GROUP_A_PRODUCTION_ITEMS.length = 0;
-      GROUP_A_PRODUCTION_ITEMS.push(...chosen);
-
       data.counterbalance_list = counterbalanceList;
-      data.group_a_words = chosen.map(s => s.word).join(',');
-
-      // Stamp counterbalance on every subsequent trial for analysis convenience.
       try {
         jsPsych.data.addProperties({ counterbalance_list: counterbalanceList });
       } catch {}
 
-      console.log(`[participant_info] pid=${currentPID_value}, counterbalance=${counterbalanceList}, Group A=[${data.group_a_words}]`);
+      console.log(`[participant_info] pid=${currentPID_value}, counterbalance_stamp=${counterbalanceList} (informational only; all 8 targets pretested)`);
     }
   };
 }
@@ -885,13 +914,8 @@ function buildMicSetupGate({ required = true } = {}) {
 //
 // Items are passed in via the timelineItems array. The function is called
 // twice from the main timeline:
-//   buildProductionBlock(FILTERED_STIMULI.controls, 'control')
-//   buildProductionBlock(GROUP_A_PRODUCTION_ITEMS, 'target')
-//
-// GROUP_A_PRODUCTION_ITEMS is mutated in place during participant info,
-// AFTER timeline construction but BEFORE the production block executes.
-// jsPsych reads timeline_variables at execution time, so the late
-// population is fine.
+//   buildProductionBlock(FILTERED_STIMULI.controls, 'control')   — 4 control items
+//   buildProductionBlock(FILTERED_STIMULI.targets, 'target')     — 8 trained targets
 
 function buildProductionBlock(timelineItems, itemRole) {
   const hasMicPlugins = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
@@ -947,6 +971,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       prompt_type: jsPsych.timelineVariable('prompt_type'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+      target_form: jsPsych.timelineVariable('target_form'),
       item_role: itemRole,
       pass: 'phrase',
       phase: 'pre',
@@ -979,6 +1005,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       prompt_type: jsPsych.timelineVariable('prompt_type'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+      target_form: jsPsych.timelineVariable('target_form'),
       item_role: itemRole,
       pass: 'phrase',
       phase: 'pre',
@@ -1008,6 +1036,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       prompt_type: jsPsych.timelineVariable('prompt_type'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+      target_form: jsPsych.timelineVariable('target_form'),
       item_role: itemRole,
       pass: 'isolated',
       phase: 'pre',
@@ -1039,6 +1069,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       prompt_type: jsPsych.timelineVariable('prompt_type'),
       iconic: jsPsych.timelineVariable('iconic'),
       iconicity_rating: jsPsych.timelineVariable('rating'),
+      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+      target_form: jsPsych.timelineVariable('target_form'),
       item_role: itemRole,
       pass: 'isolated',
       phase: 'pre',
@@ -1348,10 +1380,9 @@ async function initializeExperiment() {
     // Practice → controls → Group A targets
     timeline.push(...buildProductionPractice());
     timeline.push(...buildProductionBlock(FILTERED_STIMULI.controls, 'control'));
-    // GROUP_A_PRODUCTION_ITEMS is populated during participant_info on_finish.
-    // jsPsych reads timeline_variables at trial-execution time, so the late
-    // population works as long as the array reference is stable (it is).
-    timeline.push(...buildProductionBlock(GROUP_A_PRODUCTION_ITEMS, 'target'));
+    // v8.0 (post script-reality update): all 8 trained production targets
+    // pretested for every participant (no split-half).
+    timeline.push(...buildProductionBlock(FILTERED_STIMULI.targets, 'target'));
 
     // Done
     timeline.push({
