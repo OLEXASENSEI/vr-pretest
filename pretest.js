@@ -1033,21 +1033,36 @@ function buildProductionBlock(timelineItems, itemRole) {
   }
 
   // ---- PHRASE PASS ----
-  // Image variant is resolved once per trial. Both stimulus() and data()
-  // read from a per-trial state set by on_start. Without this single-
-  // resolution pattern, calling imagePath() in both spots could pick
-  // different variants for the same trial.
-  let _trialImgState = { path: null, variant: 0 };
+  // Image variant resolver — cached per (trial-index, base) pair so that
+  // stimulus() and data() both see the same path/variant within a single
+  // trial but variants re-randomize across trials. Uses jsPsych's global
+  // trial counter as the cache key.
+  //
+  // v8.0.1 PATCH: Replaces the previous closure-scoped `_trialImgState`
+  // pattern, which had a race: jsPsych can call stimulus() BEFORE on_start
+  // populates the state, so the first trial of each block saw the null
+  // initial value and rendered the placeholder image.
+  //
+  // The new pattern is idempotent — first call populates the cache, all
+  // subsequent calls within the same trial return the cached value.
+  // Safe to call from stimulus(), data(), preamble(), or anywhere else.
+  const _imgCache = new Map();
   const resolveTrialImage = () => {
-    _trialImgState = imagePath(jsPsych.timelineVariable('image'));
-    return _trialImgState;
+    const base = jsPsych.timelineVariable('image');
+    let trialIdx = 0;
+    try { trialIdx = jsPsych.getProgress().current_trial_global; } catch {}
+    const key = `${trialIdx}_${base}`;
+    if (!_imgCache.has(key)) {
+      _imgCache.set(key, imagePath(base));
+    }
+    return _imgCache.get(key);
   };
 
   const phraseAttemptAudio = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
-    on_start: () => { resolveTrialImage(); },
     stimulus: () => {
-      const img = imgSrc(_trialImgState.path);
+      const state = resolveTrialImage();
+      const img = imgSrc(state.path);
       const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
@@ -1058,23 +1073,26 @@ function buildProductionBlock(timelineItems, itemRole) {
         </div></div>`;
     },
     recording_duration: 4000, show_done_button: false, allow_playback: false,
-    data: () => ({
-      task: 'production_phrase',
-      target_word: jsPsych.timelineVariable('word'),
-      display_target: jsPsych.timelineVariable('display'),
-      prompt_type: jsPsych.timelineVariable('prompt_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
-      target_form: jsPsych.timelineVariable('target_form'),
-      image_path: _trialImgState.path,
-      image_variant: _trialImgState.variant,
-      item_role: itemRole,
-      pass: 'phrase',
-      phase: 'pre',
-      modality: 'audio',
-      counterbalance_list: counterbalanceList
-    }),
+    data: () => {
+      const state = resolveTrialImage();
+      return {
+        task: 'production_phrase',
+        target_word: jsPsych.timelineVariable('word'),
+        display_target: jsPsych.timelineVariable('display'),
+        prompt_type: jsPsych.timelineVariable('prompt_type'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+        target_form: jsPsych.timelineVariable('target_form'),
+        image_path: state.path,
+        image_variant: state.variant,
+        item_role: itemRole,
+        pass: 'phrase',
+        phase: 'pre',
+        modality: 'audio',
+        counterbalance_list: counterbalanceList
+      };
+    },
     on_finish: (d) => {
       const pid = currentPID();
       const tgt = (d.target_word || 'x').toLowerCase();
@@ -1085,9 +1103,9 @@ function buildProductionBlock(timelineItems, itemRole) {
 
   const phraseAttemptText = {
     type: T('jsPsychSurveyText'),
-    on_start: () => { resolveTrialImage(); },
     preamble: () => {
-      const img = imgSrc(_trialImgState.path);
+      const state = resolveTrialImage();
+      const img = imgSrc(state.path);
       const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
@@ -1096,31 +1114,34 @@ function buildProductionBlock(timelineItems, itemRole) {
         <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> Type your answer in English. / 英語で入力してください。</div></div>`;
     },
     questions: [{ prompt: '', name: 'response', rows: 1, required: false }],
-    data: () => ({
-      task: 'production_phrase',
-      target_word: jsPsych.timelineVariable('word'),
-      display_target: jsPsych.timelineVariable('display'),
-      prompt_type: jsPsych.timelineVariable('prompt_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
-      target_form: jsPsych.timelineVariable('target_form'),
-      image_path: _trialImgState.path,
-      image_variant: _trialImgState.variant,
-      item_role: itemRole,
-      pass: 'phrase',
-      phase: 'pre',
-      modality: 'text',
-      counterbalance_list: counterbalanceList
-    })
+    data: () => {
+      const state = resolveTrialImage();
+      return {
+        task: 'production_phrase',
+        target_word: jsPsych.timelineVariable('word'),
+        display_target: jsPsych.timelineVariable('display'),
+        prompt_type: jsPsych.timelineVariable('prompt_type'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+        target_form: jsPsych.timelineVariable('target_form'),
+        image_path: state.path,
+        image_variant: state.variant,
+        item_role: itemRole,
+        pass: 'phrase',
+        phase: 'pre',
+        modality: 'text',
+        counterbalance_list: counterbalanceList
+      };
+    }
   };
 
   // ---- ISOLATED PASS ----
   const isolatedAttemptAudio = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
-    on_start: () => { resolveTrialImage(); },
     stimulus: () => {
-      const img = imgSrc(_trialImgState.path);
+      const state = resolveTrialImage();
+      const img = imgSrc(state.path);
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
         <p style="margin-top:15px;font-size:18px;"><b>Say just the word.</b></p>
@@ -1130,23 +1151,26 @@ function buildProductionBlock(timelineItems, itemRole) {
         </div></div>`;
     },
     recording_duration: 3000, show_done_button: false, allow_playback: false,
-    data: () => ({
-      task: 'production_isolated',
-      target_word: jsPsych.timelineVariable('word'),
-      display_target: jsPsych.timelineVariable('display'),
-      prompt_type: jsPsych.timelineVariable('prompt_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
-      target_form: jsPsych.timelineVariable('target_form'),
-      image_path: _trialImgState.path,
-      image_variant: _trialImgState.variant,
-      item_role: itemRole,
-      pass: 'isolated',
-      phase: 'pre',
-      modality: 'audio',
-      counterbalance_list: counterbalanceList
-    }),
+    data: () => {
+      const state = resolveTrialImage();
+      return {
+        task: 'production_isolated',
+        target_word: jsPsych.timelineVariable('word'),
+        display_target: jsPsych.timelineVariable('display'),
+        prompt_type: jsPsych.timelineVariable('prompt_type'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+        target_form: jsPsych.timelineVariable('target_form'),
+        image_path: state.path,
+        image_variant: state.variant,
+        item_role: itemRole,
+        pass: 'isolated',
+        phase: 'pre',
+        modality: 'audio',
+        counterbalance_list: counterbalanceList
+      };
+    },
     on_finish: (d) => {
       const pid = currentPID();
       const tgt = (d.target_word || 'x').toLowerCase();
@@ -1157,9 +1181,9 @@ function buildProductionBlock(timelineItems, itemRole) {
 
   const isolatedAttemptText = {
     type: T('jsPsychSurveyText'),
-    on_start: () => { resolveTrialImage(); },
     preamble: () => {
-      const img = imgSrc(_trialImgState.path);
+      const state = resolveTrialImage();
+      const img = imgSrc(state.path);
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
         <p style="margin-top:15px;font-size:18px;"><b>Type just the word.</b></p>
@@ -1167,23 +1191,26 @@ function buildProductionBlock(timelineItems, itemRole) {
         <div class="mic-error-msg" style="margin-top:10px"><b>Note:</b> One word only. / 1単語のみ。</div></div>`;
     },
     questions: [{ prompt: '', name: 'response', rows: 1, required: false }],
-    data: () => ({
-      task: 'production_isolated',
-      target_word: jsPsych.timelineVariable('word'),
-      display_target: jsPsych.timelineVariable('display'),
-      prompt_type: jsPsych.timelineVariable('prompt_type'),
-      iconic: jsPsych.timelineVariable('iconic'),
-      iconicity_rating: jsPsych.timelineVariable('rating'),
-      iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
-      target_form: jsPsych.timelineVariable('target_form'),
-      image_path: _trialImgState.path,
-      image_variant: _trialImgState.variant,
-      item_role: itemRole,
-      pass: 'isolated',
-      phase: 'pre',
-      modality: 'text',
-      counterbalance_list: counterbalanceList
-    })
+    data: () => {
+      const state = resolveTrialImage();
+      return {
+        task: 'production_isolated',
+        target_word: jsPsych.timelineVariable('word'),
+        display_target: jsPsych.timelineVariable('display'),
+        prompt_type: jsPsych.timelineVariable('prompt_type'),
+        iconic: jsPsych.timelineVariable('iconic'),
+        iconicity_rating: jsPsych.timelineVariable('rating'),
+        iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
+        target_form: jsPsych.timelineVariable('target_form'),
+        image_path: state.path,
+        image_variant: state.variant,
+        item_role: itemRole,
+        pass: 'isolated',
+        phase: 'pre',
+        modality: 'text',
+        counterbalance_list: counterbalanceList
+      };
+    }
   };
 
   // PHRASE block (audio path) — 2 reps
