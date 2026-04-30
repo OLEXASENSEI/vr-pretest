@@ -205,6 +205,34 @@ function audioSrc(path) {
   return asset(path);
 }
 
+// Image variant picker — for production stimuli, prefer randomized
+// `{base}_01.{ext}` / `{base}_02.{ext}` when both variants exist in the
+// asset list, falling back to the single base image otherwise. Stamps
+// `image_variant` (1, 2, or 0 for single-take) into trial data so analysis
+// can check whether one variant is harder than the other.
+//
+// Resolution at trial-construction time so the on_load closure and the
+// data field both reference the same variant within a single trial.
+function imagePath(base) {
+  // base = "img/slicing.jpg" → check for "img/slicing_01.jpg" + "img/slicing_02.jpg"
+  const m = base.match(/^(.+?)\.(jpg|jpeg|png)$/i);
+  if (!m) return { path: base, variant: 0 };
+  const stem = m[1], ext = m[2];
+  const v01 = `${stem}_01.${ext}`;
+  const v02 = `${stem}_02.${ext}`;
+  // Both variants present in PRELOAD_IMAGES (added by validator) → randomize
+  if (PRELOAD_IMAGES.includes(v01) && PRELOAD_IMAGES.includes(v02)) {
+    const v = (Math.random() < 0.5) ? 1 : 2;
+    return { path: (v === 1) ? v01 : v02, variant: v };
+  }
+  // Only _01 present → use it (single-take case, e.g. slice)
+  if (PRELOAD_IMAGES.includes(v01)) {
+    return { path: v01, variant: 1 };
+  }
+  // Fallback to base
+  return { path: base, variant: 0 };
+}
+
 /* ======================== WORD CLASSIFICATION ======================== */
 // All ratings verified against Winter et al. 2024 iconicity ratings database
 // (n=14,776 words). Per-item SEs are large; class contrasts (mean of 4 iconic
@@ -446,11 +474,26 @@ async function filterExistingStimuli() {
 
   try {
     const allAudio = new Set();
-    const allImages = new Set();
+    const allImages = new Set();    // images REQUIRED to run — flag if missing
+    const optionalImages = new Set(); // image variants — silently registered if present, ignored if not
     for (const s of phoneme_discrimination_stimuli) { allAudio.add(s.audio1); allAudio.add(s.audio2); }
     for (const s of foley_stimuli) { allAudio.add(s.audio); }
-    for (const s of PRODUCTION_TARGETS) { allImages.add(s.image); }
-    for (const s of PRODUCTION_CONTROLS) { allImages.add(s.image); }
+    for (const s of PRODUCTION_TARGETS) {
+      allImages.add(s.image);
+      const m = s.image.match(/^(.+?)\.(jpg|jpeg|png)$/i);
+      if (m) {
+        optionalImages.add(`${m[1]}_01.${m[2]}`);
+        optionalImages.add(`${m[1]}_02.${m[2]}`);
+      }
+    }
+    for (const s of PRODUCTION_CONTROLS) {
+      allImages.add(s.image);
+      const m = s.image.match(/^(.+?)\.(jpg|jpeg|png)$/i);
+      if (m) {
+        optionalImages.add(`${m[1]}_01.${m[2]}`);
+        optionalImages.add(`${m[1]}_02.${m[2]}`);
+      }
+    }
     allImages.add('img/park_scene.jpg');  // practice image
 
     for (const url of allAudio) {
@@ -465,8 +508,20 @@ async function filterExistingStimuli() {
         else PRELOAD_IMAGES.push(url);
       } catch (e) { console.warn('[Validation] checkImage threw on', url, e); }
     }
+    // Silent probe for image variants. Variants are optional — if both _01
+    // and _02 exist for an item, imagePath() randomizes between them. If
+    // only _01 exists or neither exists, imagePath() falls back gracefully.
+    // We don't flag missing variants as errors because the base image
+    // covers the trial regardless.
+    for (const url of optionalImages) {
+      try {
+        const r = await fetch(asset(url), { method: 'HEAD' });
+        if (r.ok) PRELOAD_IMAGES.push(url);
+      } catch {} // missing variants are fine, ignore
+    }
 
-    console.log(`[Validation] Complete — missing: ${MISSING_ASSETS.images.length} images, ${MISSING_ASSETS.audio.length} audio.`);
+    const variantCount = [...optionalImages].filter(u => PRELOAD_IMAGES.includes(u)).length;
+    console.log(`[Validation] Complete — missing: ${MISSING_ASSETS.images.length} images, ${MISSING_ASSETS.audio.length} audio. Image variants registered: ${variantCount}/${optionalImages.size}.`);
     if (MISSING_ASSETS.images.length || MISSING_ASSETS.audio.length) {
       console.warn('[Validation] Missing images:', MISSING_ASSETS.images);
       console.warn('[Validation] Missing audio:', MISSING_ASSETS.audio);
@@ -978,10 +1033,21 @@ function buildProductionBlock(timelineItems, itemRole) {
   }
 
   // ---- PHRASE PASS ----
+  // Image variant is resolved once per trial. Both stimulus() and data()
+  // read from a per-trial state set by on_start. Without this single-
+  // resolution pattern, calling imagePath() in both spots could pick
+  // different variants for the same trial.
+  let _trialImgState = { path: null, variant: 0 };
+  const resolveTrialImage = () => {
+    _trialImgState = imagePath(jsPsych.timelineVariable('image'));
+    return _trialImgState;
+  };
+
   const phraseAttemptAudio = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
+    on_start: () => { resolveTrialImage(); },
     stimulus: () => {
-      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const img = imgSrc(_trialImgState.path);
       const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
@@ -1001,6 +1067,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       iconicity_rating: jsPsych.timelineVariable('rating'),
       iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
       target_form: jsPsych.timelineVariable('target_form'),
+      image_path: _trialImgState.path,
+      image_variant: _trialImgState.variant,
       item_role: itemRole,
       pass: 'phrase',
       phase: 'pre',
@@ -1017,8 +1085,9 @@ function buildProductionBlock(timelineItems, itemRole) {
 
   const phraseAttemptText = {
     type: T('jsPsychSurveyText'),
+    on_start: () => { resolveTrialImage(); },
     preamble: () => {
-      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const img = imgSrc(_trialImgState.path);
       const prompt = phrasePrompt(jsPsych.timelineVariable('prompt_type'));
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
@@ -1036,6 +1105,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       iconicity_rating: jsPsych.timelineVariable('rating'),
       iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
       target_form: jsPsych.timelineVariable('target_form'),
+      image_path: _trialImgState.path,
+      image_variant: _trialImgState.variant,
       item_role: itemRole,
       pass: 'phrase',
       phase: 'pre',
@@ -1047,8 +1118,9 @@ function buildProductionBlock(timelineItems, itemRole) {
   // ---- ISOLATED PASS ----
   const isolatedAttemptAudio = hasMicPlugins ? {
     type: T('jsPsychHtmlAudioResponse'),
+    on_start: () => { resolveTrialImage(); },
     stimulus: () => {
-      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const img = imgSrc(_trialImgState.path);
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
         <p style="margin-top:15px;font-size:18px;"><b>Say just the word.</b></p>
@@ -1067,6 +1139,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       iconicity_rating: jsPsych.timelineVariable('rating'),
       iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
       target_form: jsPsych.timelineVariable('target_form'),
+      image_path: _trialImgState.path,
+      image_variant: _trialImgState.variant,
       item_role: itemRole,
       pass: 'isolated',
       phase: 'pre',
@@ -1083,8 +1157,9 @@ function buildProductionBlock(timelineItems, itemRole) {
 
   const isolatedAttemptText = {
     type: T('jsPsychSurveyText'),
+    on_start: () => { resolveTrialImage(); },
     preamble: () => {
-      const img = imgSrc(jsPsych.timelineVariable('image'));
+      const img = imgSrc(_trialImgState.path);
       return `<div style="text-align:center;">
         <img src="${img}" style="width:300px;border-radius:8px;" ${IMG_ONERROR}/>
         <p style="margin-top:15px;font-size:18px;"><b>Type just the word.</b></p>
@@ -1101,6 +1176,8 @@ function buildProductionBlock(timelineItems, itemRole) {
       iconicity_rating: jsPsych.timelineVariable('rating'),
       iconicity_marginal: jsPsych.timelineVariable('iconicity_marginal'),
       target_form: jsPsych.timelineVariable('target_form'),
+      image_path: _trialImgState.path,
+      image_variant: _trialImgState.variant,
       item_role: itemRole,
       pass: 'isolated',
       phase: 'pre',
@@ -1216,6 +1293,181 @@ function buildProductionPractice() {
   return tl;
 }
 
+/* ======================== BOUBA / KIKI (cross-modal iconicity, 4 trials) ======================== */
+// v8.0 (post-pilot patch): cross-modal iconicity sensitivity. Foley measures
+// sound→meaning mapping (auditory only); bouba/kiki measures sound→shape
+// mapping (auditory+visual). These are theoretically distinct cognitive
+// operations — a participant could be high on one and low on the other —
+// and bouba/kiki specifically taps the multimodal binding that VR's
+// spatial-acoustic affordance is hypothesized to amplify.
+//
+// Canonical form (Köhler 1929 → Ramachandran & Hubbard 2001): show a
+// shape, ask "is this a [round-vowel-name] or a [obstruent-name]?"
+// 4 trials covering 2 shape×name pairs:
+//   round shape  + maluma/takete
+//   spiky shape  + maluma/takete
+//   round shape  + bouba/kiki
+//   spiky shape  + bouba/kiki
+// Score: how many of the 4 trials match the predicted iconic mapping
+// (round→sonorant, spiky→obstruent). Used as a participant-level
+// moderator for the iconicity-amplification analysis.
+const BOUBA_KIKI_SHAPES = {
+  rounded: `<svg viewBox="0 0 200 200" width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+    <path d="M100,30 C150,30 175,75 165,115 C155,155 130,175 100,170 C70,165 35,155 30,115 C25,75 50,30 100,30 Z" fill="#5B7BB8" stroke="#2c3e50" stroke-width="2"/>
+  </svg>`,
+  spiky: `<svg viewBox="0 0 200 200" width="180" height="180" xmlns="http://www.w3.org/2000/svg">
+    <polygon points="100,15 120,55 165,50 140,90 175,125 130,125 110,170 90,125 45,135 70,90 35,55 80,60" fill="#B85B5B" stroke="#5c1a1a" stroke-width="2"/>
+  </svg>`
+};
+
+// 4 trials: 2 shapes × 2 word-pairs. Each trial is a forced 2-AFC.
+const BOUBA_KIKI_STIMULI = [
+  { shape: 'rounded', wordA: 'maluma', wordB: 'takete', expected: 'maluma' },
+  { shape: 'spiky',   wordA: 'maluma', wordB: 'takete', expected: 'takete' },
+  { shape: 'rounded', wordA: 'bouba',  wordB: 'kiki',   expected: 'bouba'  },
+  { shape: 'spiky',   wordA: 'bouba',  wordB: 'kiki',   expected: 'kiki'   },
+];
+
+function createBoubaKikiTimeline() {
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `<h2>Shape and Sound / 形と音</h2>
+      <p>You will see a shape and two made-up words. Click the word that you feel matches the shape — there is no right answer, just go with your gut.</p>
+      <p>形と2つの作った単語が表示されます。直感で、その形に合うと感じる単語をクリックしてください。正解はありません。</p>
+      <p style="color:#666;">4 short trials. / 4回の短い試行。</p>`,
+    choices: ['Begin / 開始'],
+    data: { task: 'bouba_kiki_intro' }
+  };
+
+  const trial = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => {
+      const shape = jsPsych.timelineVariable('shape');
+      return `<div style="text-align:center;">
+        <div style="margin:20px 0;">${BOUBA_KIKI_SHAPES[shape]}</div>
+        <p style="color:#666;margin-top:10px;">Which word matches this shape? / どちらの単語が合いますか？</p>
+      </div>`;
+    },
+    // Randomize button order per trial so position doesn't bias responses
+    choices: () => {
+      const a = jsPsych.timelineVariable('wordA');
+      const b = jsPsych.timelineVariable('wordB');
+      const swap = Math.random() < 0.5;
+      window.__bk_left = swap ? b : a;
+      window.__bk_right = swap ? a : b;
+      return [window.__bk_left, window.__bk_right];
+    },
+    data: () => ({
+      task: 'bouba_kiki',
+      shape: jsPsych.timelineVariable('shape'),
+      wordA: jsPsych.timelineVariable('wordA'),
+      wordB: jsPsych.timelineVariable('wordB'),
+      expected: jsPsych.timelineVariable('expected'),
+      phase: 'pre'
+    }),
+    on_finish: (d) => {
+      const chosen = (d.response === 0) ? window.__bk_left : window.__bk_right;
+      d.word_chosen = chosen;
+      d.iconic_match = (chosen === d.expected);
+      window.__bk_left = null;
+      window.__bk_right = null;
+    }
+  };
+
+  return [intro, { timeline: [trial], timeline_variables: BOUBA_KIKI_STIMULI, randomize_order: true }];
+}
+
+/* ======================== RECEPTIVE VOCABULARY BREADTH (12 trials) ======================== */
+// v8.0 (post-pilot patch): quick covariate measuring kitchen-vocabulary
+// breadth. NOT trained targets — these items don't appear in any training
+// condition, so this block can't pre-teach training content. Used as a
+// covariate explaining "did the participant fail to produce because they
+// didn't know the word, or because they couldn't pronounce it?"
+//
+// Format: word shown, four pictures arranged in 2×2, click which picture
+// matches. Words span varied iconicity levels (4 high, 4 mid, 4 low) so
+// there's variance to explain in the iconicity-amplification analysis.
+//
+// IMPLEMENTATION NOTE: this block is a placeholder skeleton — running it
+// requires 12 picture sets (one correct + three distractors per word).
+// For Friday's pilot we use a SIMPLIFIED text-only version: word + 4
+// English glosses to choose from. This still measures vocabulary breadth
+// but skips the picture-acquisition cost. Upgrade to picture-version
+// post-defense.
+const RECEPTIVE_VOCAB_ITEMS = [
+  // High iconicity (untrained)
+  { word: 'splash',   correct: 'water hitting a surface',     distractors: ['cutting wood', 'gentle flame', 'steam rising'],          iconicity: 6.09 },
+  { word: 'glug',     correct: 'liquid pouring from a bottle', distractors: ['oil heating', 'butter melting', 'flour sifting'],       iconicity: 6.20 },
+  { word: 'drizzle',  correct: 'small slow stream of liquid',  distractors: ['boiling water', 'sharp knife cut', 'pan sizzling'],     iconicity: 6.00 },
+  { word: 'whisk',    correct: 'rapid mixing tool action',     distractors: ['slow oven heating', 'carrot peeling', 'salt sprinkling'], iconicity: 5.20 },
+  // Mid
+  { word: 'simmer',   correct: 'low gentle bubbling',          distractors: ['rolling boil', 'baking dry', 'roasting whole'],         iconicity: 4.30 },
+  { word: 'grate',    correct: 'rubbing food into shreds',      distractors: ['baking bread', 'mashing potato', 'pouring sauce'],      iconicity: 4.60 },
+  { word: 'roll',     correct: 'flattening dough with cylinder', distractors: ['cutting cheese', 'pouring milk', 'stirring soup'],     iconicity: 4.20 },
+  { word: 'fold',     correct: 'gentle combining motion',       distractors: ['rapid beating', 'cutting with knife', 'pressing flat'], iconicity: 4.00 },
+  // Low
+  { word: 'oven',     correct: 'enclosed heating box',          distractors: ['flat cooking surface', 'sharp tool', 'liquid container'], iconicity: 2.90 },
+  { word: 'recipe',   correct: 'list of cooking instructions',  distractors: ['tool for stirring', 'kitchen container', 'food ingredient'], iconicity: 2.10 },
+  { word: 'measure',  correct: 'determine quantity',            distractors: ['heat food', 'mix ingredients', 'serve a dish'],         iconicity: 2.50 },
+  { word: 'spice',    correct: 'flavoring ingredient',          distractors: ['cooking tool', 'liquid base', 'kitchen appliance'],     iconicity: 3.20 },
+];
+
+function createReceptiveVocabTimeline() {
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `<h2>Vocabulary Check / 語彙チェック</h2>
+      <p>You will see an English word and four short descriptions. Click the description that matches the word.</p>
+      <p>英単語と4つの短い説明が表示されます。単語に合う説明をクリックしてください。</p>
+      <p style="color:#666;">If you don't know a word, just guess — there's no penalty for wrong answers.</p>
+      <p style="color:#666;">分からない単語は推測で構いません。間違えてもペナルティはありません。</p>`,
+    choices: ['Begin / 開始'],
+    data: { task: 'receptive_vocab_intro' }
+  };
+
+  const trial = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: () => {
+      const word = jsPsych.timelineVariable('word');
+      return `<div style="text-align:center;">
+        <h2 style="font-size:42px;margin:20px 0;font-family:Georgia,serif;">${word}</h2>
+        <p style="color:#666;">What does this word mean? / この単語の意味は？</p>
+      </div>`;
+    },
+    // Build choices at trial-construction time so order is fixed across data + DOM
+    choices: () => {
+      const correct = jsPsych.timelineVariable('correct');
+      const distractors = jsPsych.timelineVariable('distractors');
+      const all = [correct, ...distractors];
+      // Shuffle
+      const shuffled = all.slice();
+      for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      }
+      window.__rv_shuffled = shuffled;
+      window.__rv_correct = correct;
+      return shuffled;
+    },
+    data: () => ({
+      task: 'receptive_vocab',
+      word: jsPsych.timelineVariable('word'),
+      iconicity_rating: jsPsych.timelineVariable('iconicity'),
+      correct_answer: jsPsych.timelineVariable('correct'),
+      phase: 'pre'
+    }),
+    on_finish: (d) => {
+      const shuffled = window.__rv_shuffled || [];
+      d.options_shown = shuffled;
+      d.response_text = shuffled[d.response];
+      d.correct = (d.response_text === window.__rv_correct);
+      window.__rv_shuffled = null;
+      window.__rv_correct = null;
+    }
+  };
+
+  return [intro, { timeline: [trial], timeline_variables: RECEPTIVE_VOCAB_ITEMS, randomize_order: true }];
+}
+
 /* ======================== FOLEY (4 items) ======================== */
 function createFoleyTimeline() {
   const intro = {
@@ -1318,6 +1570,65 @@ function createSpatialSpanTimeline() {
   return [instr, { timeline: innerTrials }];
 }
 
+/* ======================== TEACH-A-FRIEND BASELINE (60s audio) ======================== */
+// v8.0 (post-pilot patch): adds a parallel pretest baseline for the
+// posttest's teach-a-friend task. Without this, the posttest spontaneous-
+// production task has no within-subject pre→post baseline. The naturalistic
+// "teach a friend" prompt works at pretest because it doesn't reference
+// training content — pancake-making is general world knowledge, and the
+// production at pretest establishes baseline lexical density / iconic-word
+// use / SFX-mimicry rate against which posttest gains can be measured.
+//
+// Predicted: post − pre Δ in (a) iconic-word use rate, (b) SFX-mimicry
+// rate, (c) lexical density should be steepest in VR > 2D > Text. A
+// secondary descriptive analysis compares production patterns across
+// conditions controlling for pretest baseline.
+function buildTeachBaseline() {
+  const hasMic = have('jsPsychInitializeMicrophone') && have('jsPsychHtmlAudioResponse');
+  const canRecordAudio = () => hasMic && microphoneAvailable;
+
+  const intro = {
+    type: T('jsPsychHtmlButtonResponse'),
+    stimulus: `<h2>Teach a Friend / 友だちに教える</h2>
+      <p>Imagine your friend has never cooked. Teach them how to make a pancake — anything you know about it.</p>
+      <p>料理をしたことのない友だちを想像してください。パンケーキの作り方について知っていることを教えてあげてください。</p>
+      <p style="color:#666;">It's okay if you don't know everything — say what you can.</p>
+      <p style="color:#666;">全部分からなくても大丈夫です。知っていることを話してください。</p>
+      <p>You have up to <b>60 seconds</b>. Press "Done" when finished.<br>最大<b>60秒間</b>。終わったら「完了」を押してください。</p>`,
+    choices: ['Begin / 開始'],
+    data: { task: 'teach_baseline_intro', phase: 'pre' }
+  };
+
+  const audioTrial = hasMic ? {
+    type: T('jsPsychHtmlAudioResponse'),
+    stimulus: `<div style="max-width:600px;margin:0 auto;text-align:center;">
+      <div style="height:180px;display:flex;align-items:center;justify-content:center;border:1px dashed #ccc;border-radius:8px;background:#fff8f8;">
+        <div><p style="color:#333;font-size:16px;margin:0;">Teach a friend to make a pancake / 友だちに教える</p>
+        <p style="color:#888;font-size:14px;margin:8px 0 0 0;">Whatever you know — tools, ingredients, steps</p></div>
+      </div>
+      <p style="margin-top:12px;color:#d32f2f;font-weight:bold;font-size:18px;">🔴 Teaching… up to 60s / 説明中… 最大60秒</p></div>`,
+    recording_duration: 60000, show_done_button: true, done_button_label: 'Done / 完了', allow_playback: false,
+    data: { task: 'teach_someone', phase: 'pre', modality: 'audio', needs_audio_scoring: true },
+    on_finish: d => { d.audio_filename = `pre_${currentPID()}_teach.webm`; }
+  } : null;
+
+  const textTrial = {
+    type: T('jsPsychSurveyText'),
+    preamble: `<h3>Teach a Friend (Text)</h3>
+      <p>Teach a beginner how to make a pancake — whatever you know.<br>初心者にパンケーキの作り方を教えてください。知っていることを書いてください。</p>
+      <div class="mic-error-msg"><b>Note:</b> Mic unavailable; type your answer.</div>`,
+    questions: [{ prompt: '', name: 'teach', rows: 8, required: false }],
+    data: { task: 'teach_someone', phase: 'pre', modality: 'text' }
+  };
+
+  const tl = [intro];
+  if (hasMic) {
+    tl.push({ timeline: [audioTrial], conditional_function: canRecordAudio });
+  }
+  tl.push({ timeline: [textTrial], conditional_function: () => !canRecordAudio() });
+  return tl;
+}
+
 /* ======================== BOOTSTRAP ======================== */
 async function initializeExperiment() {
   window.addEventListener('error', (e) => {
@@ -1391,31 +1702,43 @@ async function initializeExperiment() {
       timeline.push({ timeline: [{ type: T('jsPsychInitializeMicrophone') }], conditional_function: () => microphoneAvailable });
     }
 
-    // Forward digit span 3-5 (covariate)
-    timeline.push(createDigitSpanInstructions());
-    timeline.push(generateDigitSpanTrials({ startLen: 3, endLen: 5 }));
-
     // Phoneme discrimination (covariate)
     if ((FILTERED_STIMULI.phoneme?.length || 0) > 0) {
       timeline.push(createPhonemeInstructions());
       timeline.push({ timeline: [createPhonemeTrial()], timeline_variables: FILTERED_STIMULI.phoneme, randomize_order: true });
     }
 
+    // Bouba/kiki cross-modal iconicity sensitivity (covariate, 4 items)
+    timeline.push(...createBoubaKikiTimeline());
+
     // Foley iconicity sensitivity (covariate, 4 items)
     if ((FILTERED_STIMULI.foley?.length || 0) > 0) {
       timeline.push(...createFoleyTimeline());
     }
 
-    // Spatial span (covariate)
-    timeline.push(...createSpatialSpanTimeline());
+    // Receptive vocabulary breadth (covariate, 12 untrained kitchen words)
+    timeline.push(...createReceptiveVocabTimeline());
+
+    // v1.6 (post-pilot lean cut): forward digit span and Corsi spatial span
+    // removed. They were generic WM covariates not specific to the iconicity
+    // hypothesis; the chapter argues VR amplifies *iconicity* effects, not
+    // WM-mediated learning generally. Phoneme discrimination + foley + bouba
+    // /kiki cover the perceptual/sensitivity covariates that ARE specific
+    // to the hypothesis. Function definitions retained for v8.1 if WM
+    // becomes relevant; recover via timeline.push() above.
 
     // ---- PRODUCTION (primary DV) ----
-    // Practice → controls → Group A targets
+    // Practice → controls → trained targets
     timeline.push(...buildProductionPractice());
     timeline.push(...buildProductionBlock(FILTERED_STIMULI.controls, 'control'));
     // v8.0 (post script-reality update): all 8 trained production targets
     // pretested for every participant (no split-half).
     timeline.push(...buildProductionBlock(FILTERED_STIMULI.targets, 'target'));
+
+    // Spontaneous-production baseline (parallels posttest teach-a-friend
+    // for pre→post change-score analysis on lexical density, iconic-word
+    // use, and SFX-mimicry rate).
+    timeline.push(...buildTeachBaseline());
 
     // Done
     timeline.push({
