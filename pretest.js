@@ -1,4 +1,24 @@
-// pretest.js — VR Pre-Test Battery (v8.0 — REDESIGNED)
+// pretest.js — VR Pre-Test Battery (v8.1 — patches over v8.0)
+//
+// ============================================================================
+// v8.1 PATCH NOTES (over v8.0)
+// ============================================================================
+//
+// 1. Phoneme discrimination: cap each play button at 2 plays per sound.
+//    Pre-v8.1 trials allowed unlimited replays, which let participants ceiling
+//    on what is supposed to be a perceptual covariate. Per-trial data now
+//    records `playA_count` and `playB_count` for sensitivity analysis. Set
+//    MAX_PLAYS = 1 inside on_load for stricter ABX, 2 for forgiving (current).
+//
+// 2. Receptive vocabulary: distractors rewritten so each shares the target's
+//    semantic frame. Pre-v8.1 distractors were semantically distant
+//    (e.g. drizzle vs "boiling water" / "sharp knife cut" / "pan sizzling"),
+//    letting participants succeed by category-elimination without knowing
+//    the target word. New distractors force genuine word-knowledge
+//    discrimination within the same frame. Same 12-item set, same iconicity
+//    ratings, same task structure.
+//
+// All other v8.0 design points unchanged.
 //
 // ============================================================================
 // v8.0 OVERVIEW (full redesign over v7.3)
@@ -773,7 +793,8 @@ function createPhonemeInstructions() {
     stimulus: () => `
       <h2>Sound Discrimination / 音の識別</h2>
       <p>You will hear two English words. Listen to both completely, then decide if they are the <b>SAME</b> word or <b>DIFFERENT</b> words.</p>
-      <p>2つの英単語が聞こえます。両方を完全に聞いてから、同じ単語か違う単語かを判断してください。</p>`,
+      <p>2つの英単語が聞こえます。両方を完全に聞いてから、同じ単語か違う単語かを判断してください。</p>
+      <p style="color:#666;">You can play each sound up to <b>2 times</b>. / 各音は最大<b>2回</b>まで再生できます。</p>`,
     choices: ['Begin / 開始'],
     data: { task: 'phoneme_discrimination_intro' }
   };
@@ -787,8 +808,8 @@ function createPhonemeTrial() {
       <div style="text-align:center;">
         <p id="status">Play both sounds, then choose your answer.</p>
         <div style="margin:20px 0;">
-          <button id="playA" class="jspsych-btn" style="margin:0 10px;">▶ Sound A</button>
-          <button id="playB" class="jspsych-btn" style="margin:0 10px;">▶ Sound B</button>
+          <button id="playA" class="jspsych-btn" style="margin:0 10px;min-width:180px;">▶ Sound A</button>
+          <button id="playB" class="jspsych-btn" style="margin:0 10px;min-width:180px;">▶ Sound B</button>
         </div>
         <div style="margin-top:30px;">
           <button id="btnSame" class="jspsych-btn" disabled style="opacity:.5;margin:0 10px;">Same Word</button>
@@ -805,12 +826,18 @@ function createPhonemeTrial() {
       phase: 'pre'
     }),
     on_load: function () {
+      // v8.1: cap each play button at MAX_PLAYS plays per sound. Set to 1
+      // for strict ABX, 2 for forgiving covariate (current). The play count
+      // per sound is logged to trial data as playA_count / playB_count for
+      // sensitivity analysis ("did accuracy depend on number of replays?").
+      const MAX_PLAYS = 2;
       const a = new Audio(audioSrc(jsPsych.timelineVariable('audio1')));
       const b = new Audio(audioSrc(jsPsych.timelineVariable('audio2')));
       a.loop = false;
       b.loop = false;
 
       let aEnded = false, bEnded = false;
+      let aPlays = 0, bPlays = 0;
       const btnSame = document.getElementById('btnSame');
       const btnDiff = document.getElementById('btnDiff');
       const status  = document.getElementById('status');
@@ -837,28 +864,51 @@ function createPhonemeTrial() {
         }
       }
 
-      a.addEventListener('ended', () => { aEnded = true; maybeEnable(); }, { once: true });
-      b.addEventListener('ended', () => { bEnded = true; maybeEnable(); }, { once: true });
+      function updatePlayLabels() {
+        const aLeft = MAX_PLAYS - aPlays;
+        const bLeft = MAX_PLAYS - bPlays;
+        playA.textContent = aLeft > 0 ? `▶ Sound A (${aLeft} left)` : '✓ Sound A (done)';
+        playB.textContent = bLeft > 0 ? `▶ Sound B (${bLeft} left)` : '✓ Sound B (done)';
+        if (aPlays >= MAX_PLAYS) { playA.disabled = true; playA.style.opacity = '.5'; }
+        if (bPlays >= MAX_PLAYS) { playB.disabled = true; playB.style.opacity = '.5'; }
+      }
+
+      // NOTE: ended/error listeners NOT once-only — with MAX_PLAYS > 1 we
+      // need them to fire every play. aEnded/bEnded are sticky flags that
+      // only need to flip true once for the answer-button unlock.
+      a.addEventListener('ended', () => { aEnded = true; maybeEnable(); });
+      b.addEventListener('ended', () => { bEnded = true; maybeEnable(); });
       a.addEventListener('error', () => { aEnded = true; maybeEnable(); }, { once: true });
       b.addEventListener('error', () => { bEnded = true; maybeEnable(); }, { once: true });
 
       playA.addEventListener('click', () => {
+        if (aPlays >= MAX_PLAYS) return;
+        aPlays++;
         status.textContent = 'Playing Sound A…';
         a.currentTime = 0;
         a.play().catch(() => {});
+        updatePlayLabels();
       });
       playB.addEventListener('click', () => {
+        if (bPlays >= MAX_PLAYS) return;
+        bPlays++;
         status.textContent = 'Playing Sound B…';
         b.currentTime = 0;
         b.play().catch(() => {});
+        updatePlayLabels();
       });
 
       setLock(true);
+      updatePlayLabels();
 
       const finish = (label) => {
         a.pause(); a.currentTime = 0;
         b.pause(); b.currentTime = 0;
-        jsPsych.finishTrial({ response_label: label });
+        jsPsych.finishTrial({
+          response_label: label,
+          playA_count: aPlays,
+          playB_count: bPlays
+        });
       };
 
       btnSame.addEventListener('click', () => finish('same'));
@@ -1411,32 +1461,73 @@ function createBoubaKikiTimeline() {
 // covariate explaining "did the participant fail to produce because they
 // didn't know the word, or because they couldn't pronounce it?"
 //
-// Format: word shown, four pictures arranged in 2×2, click which picture
-// matches. Words span varied iconicity levels (4 high, 4 mid, 4 low) so
-// there's variance to explain in the iconicity-amplification analysis.
+// Format: word shown, four English glosses, click the gloss that matches.
+// Words span varied iconicity levels (4 high, 4 mid, 4 low) so there's
+// variance to explain in the iconicity-amplification analysis.
 //
-// IMPLEMENTATION NOTE: this block is a placeholder skeleton — running it
-// requires 12 picture sets (one correct + three distractors per word).
-// For Friday's pilot we use a SIMPLIFIED text-only version: word + 4
-// English glosses to choose from. This still measures vocabulary breadth
-// but skips the picture-acquisition cost. Upgrade to picture-version
-// post-defense.
+// v8.1 PATCH: distractors rewritten to share the target's semantic frame.
+// Pre-v8.1 distractors were semantically distant — e.g. drizzle's distractors
+// were "boiling water", "sharp knife cut", "pan sizzling", letting a learner
+// who only knows that drizzle is liquid-related succeed via category
+// elimination. New distractors keep all four options inside the same frame
+// (e.g. for drizzle: all liquid-flow descriptions varying in volume/speed/
+// pattern), forcing genuine word-knowledge discrimination. Sentence
+// structure of distractors is matched to correct so structural shape
+// can't be used as a cue.
 const RECEPTIVE_VOCAB_ITEMS = [
-  // High iconicity (untrained)
-  { word: 'splash',   correct: 'water hitting a surface',     distractors: ['cutting wood', 'gentle flame', 'steam rising'],          iconicity: 6.09 },
-  { word: 'glug',     correct: 'liquid pouring from a bottle', distractors: ['oil heating', 'butter melting', 'flour sifting'],       iconicity: 6.20 },
-  { word: 'drizzle',  correct: 'small slow stream of liquid',  distractors: ['boiling water', 'sharp knife cut', 'pan sizzling'],     iconicity: 6.00 },
-  { word: 'whisk',    correct: 'rapid mixing tool action',     distractors: ['slow oven heating', 'carrot peeling', 'salt sprinkling'], iconicity: 5.20 },
-  // Mid
-  { word: 'simmer',   correct: 'low gentle bubbling',          distractors: ['rolling boil', 'baking dry', 'roasting whole'],         iconicity: 4.30 },
-  { word: 'grate',    correct: 'rubbing food into shreds',      distractors: ['baking bread', 'mashing potato', 'pouring sauce'],      iconicity: 4.60 },
-  { word: 'roll',     correct: 'flattening dough with cylinder', distractors: ['cutting cheese', 'pouring milk', 'stirring soup'],     iconicity: 4.20 },
-  { word: 'fold',     correct: 'gentle combining motion',       distractors: ['rapid beating', 'cutting with knife', 'pressing flat'], iconicity: 4.00 },
-  // Low
-  { word: 'oven',     correct: 'enclosed heating box',          distractors: ['flat cooking surface', 'sharp tool', 'liquid container'], iconicity: 2.90 },
-  { word: 'recipe',   correct: 'list of cooking instructions',  distractors: ['tool for stirring', 'kitchen container', 'food ingredient'], iconicity: 2.10 },
-  { word: 'measure',  correct: 'determine quantity',            distractors: ['heat food', 'mix ingredients', 'serve a dish'],         iconicity: 2.50 },
-  { word: 'spice',    correct: 'flavoring ingredient',          distractors: ['cooking tool', 'liquid base', 'kitchen appliance'],     iconicity: 3.20 },
+  // High iconicity (untrained) — distractors are all liquid/water actions
+  { word: 'splash',
+    correct: 'water hitting a surface suddenly',
+    distractors: ['water flowing steadily downward', 'water spreading slowly outward', 'water rising gradually upward'],
+    iconicity: 6.09 },
+  { word: 'glug',
+    correct: 'liquid pouring with sudden bursts',
+    distractors: ['liquid pouring in a steady stream', 'liquid falling in single drops', 'liquid spraying as a fine mist'],
+    iconicity: 6.20 },
+  { word: 'drizzle',
+    correct: 'thin slow stream of liquid',
+    distractors: ['thick fast stream of liquid', 'single large drop of liquid', 'wide splashing burst of liquid'],
+    iconicity: 6.00 },
+  { word: 'whisk',
+    correct: 'rapid beating with a wire tool',
+    distractors: ['slow folding with a flat spoon', 'circular stirring with a long spoon', 'firm pressing with the hands'],
+    iconicity: 5.20 },
+
+  // Mid iconicity — distractors share the same cooking-process frame
+  { word: 'simmer',
+    correct: 'small slow bubbles at low heat',
+    distractors: ['large fast bubbles at high heat', 'no bubbles, just hot steam', 'violent bubbles overflowing the pot'],
+    iconicity: 4.30 },
+  { word: 'grate',
+    correct: 'rubbing food into small shreds',
+    distractors: ['cutting food into thin slices', 'chopping food into small cubes', 'crushing food into smooth paste'],
+    iconicity: 4.60 },
+  { word: 'roll',
+    correct: 'flattening dough with a cylinder',
+    distractors: ['pressing dough with the hands', 'stretching dough by pulling it', 'cutting dough into thin strips'],
+    iconicity: 4.20 },
+  { word: 'fold',
+    correct: 'gently turning ingredients over',
+    distractors: ['quickly beating ingredients in circles', 'pressing ingredients flat together', 'stirring ingredients in fast circles'],
+    iconicity: 4.00 },
+
+  // Low iconicity — distractors are all kitchen objects/concepts in the same category
+  { word: 'oven',
+    correct: 'enclosed box that bakes from all sides',
+    distractors: ['flat surface that cooks from below', 'open flame that burns from underneath', 'sealed pot that boils with pressure'],
+    iconicity: 2.90 },
+  { word: 'recipe',
+    correct: 'step-by-step cooking instructions',
+    distractors: ['list of needed ingredients only', 'chart of cooking temperatures', 'guide to kitchen tool names'],
+    iconicity: 2.10 },
+  { word: 'measure',
+    correct: 'find out how much there is',
+    distractors: ['find out how hot it is', 'find out how long it takes', 'find out how strong it tastes'],
+    iconicity: 2.50 },
+  { word: 'spice',
+    correct: 'dry flavor powder like pepper',
+    distractors: ['thick flavor sauce like ketchup', 'sweet white crystal like sugar', 'liquid cooking base like oil'],
+    iconicity: 3.20 },
 ];
 
 function createReceptiveVocabTimeline() {
