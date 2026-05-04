@@ -1,4 +1,24 @@
-// pretest.js — VR Pre-Test Battery (v8.1 — patches over v8.0)
+// pretest.js — VR Pre-Test Battery (v8.2 — patches over v8.1)
+//
+// ============================================================================
+// v8.2 PATCH NOTES (over v8.1)
+// ============================================================================
+//
+// 1. Image variant extension fix. Pre-v8.2, filterExistingStimuli() and
+//    imagePath() constructed variant paths using each base image's extension
+//    (e.g., cracking.jpeg → probes cracking_01.jpeg). Production assets
+//    were created with .jpg/.jpeg bases but .png variants by convention,
+//    so every variant probe 404'd and PRELOAD_IMAGES never captured any
+//    variant. Trial-time imagePath() always fell through to the base file.
+//
+//    Fix: hardcode `.png` as the variant extension regardless of base.
+//    This matches the convention used to produce the variant files and
+//    matches posttest v8.5's identical fix. Side benefit: eliminates
+//    24 console 404s on test launch.
+//
+//    If you ever want a non-PNG variant, change `_VARIANT_EXT` below.
+//
+// All other v8.1 design points unchanged.
 //
 // ============================================================================
 // v8.1 PATCH NOTES (over v8.0)
@@ -225,21 +245,27 @@ function audioSrc(path) {
   return asset(path);
 }
 
+// v8.2: variant files are PNG by convention, regardless of base image
+// extension. Hardcoding here keeps imagePath() and filterExistingStimuli()
+// in sync; change once if you ever switch the variant format.
+const _VARIANT_EXT = 'png';
+
 // Image variant picker — for production stimuli, prefer randomized
-// `{base}_01.{ext}` / `{base}_02.{ext}` when both variants exist in the
-// asset list, falling back to the single base image otherwise. Stamps
-// `image_variant` (1, 2, or 0 for single-take) into trial data so analysis
-// can check whether one variant is harder than the other.
+// `{base}_01.{_VARIANT_EXT}` / `{base}_02.{_VARIANT_EXT}` when both variants
+// exist in the asset list, falling back to the single base image otherwise.
+// Stamps `image_variant` (1, 2, or 0 for single-take) into trial data so
+// analysis can check whether one variant is harder than the other.
 //
 // Resolution at trial-construction time so the on_load closure and the
 // data field both reference the same variant within a single trial.
 function imagePath(base) {
-  // base = "img/slicing.jpg" → check for "img/slicing_01.jpg" + "img/slicing_02.jpg"
+  // base = "img/slicing.jpg" → check for "img/slicing_01.png" + "img/slicing_02.png"
+  // v8.2: variants are always _VARIANT_EXT (png), regardless of base ext.
   const m = base.match(/^(.+?)\.(jpg|jpeg|png)$/i);
   if (!m) return { path: base, variant: 0 };
-  const stem = m[1], ext = m[2];
-  const v01 = `${stem}_01.${ext}`;
-  const v02 = `${stem}_02.${ext}`;
+  const stem = m[1];
+  const v01 = `${stem}_01.${_VARIANT_EXT}`;
+  const v02 = `${stem}_02.${_VARIANT_EXT}`;
   // Both variants present in PRELOAD_IMAGES (added by validator) → randomize
   if (PRELOAD_IMAGES.includes(v01) && PRELOAD_IMAGES.includes(v02)) {
     const v = (Math.random() < 0.5) ? 1 : 2;
@@ -502,16 +528,17 @@ async function filterExistingStimuli() {
       allImages.add(s.image);
       const m = s.image.match(/^(.+?)\.(jpg|jpeg|png)$/i);
       if (m) {
-        optionalImages.add(`${m[1]}_01.${m[2]}`);
-        optionalImages.add(`${m[1]}_02.${m[2]}`);
+        // v8.2: probe variants in _VARIANT_EXT regardless of base extension.
+        optionalImages.add(`${m[1]}_01.${_VARIANT_EXT}`);
+        optionalImages.add(`${m[1]}_02.${_VARIANT_EXT}`);
       }
     }
     for (const s of PRODUCTION_CONTROLS) {
       allImages.add(s.image);
       const m = s.image.match(/^(.+?)\.(jpg|jpeg|png)$/i);
       if (m) {
-        optionalImages.add(`${m[1]}_01.${m[2]}`);
-        optionalImages.add(`${m[1]}_02.${m[2]}`);
+        optionalImages.add(`${m[1]}_01.${_VARIANT_EXT}`);
+        optionalImages.add(`${m[1]}_02.${_VARIANT_EXT}`);
       }
     }
     allImages.add('img/park_scene.jpg');  // practice image
