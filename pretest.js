@@ -1,24 +1,43 @@
-// pretest.js — VR Pre-Test Battery (v8.2 — patches over v8.1)
+// pretest.js — VR Pre-Test Battery (v8.3 — patches over v8.2)
+//
+// ============================================================================
+// v8.3 PATCH NOTES (over v8.2)
+// ============================================================================
+//
+// 1. PRODUCTION_CONTROLS rating correction: spoon 3.30 → 4.30,
+//    plate 3.00 → 4.08. Both corrected to Winter et al. source values.
+//    The earlier values (3.30/3.00) were a mis-read; the database places
+//    spoon and plate in the mid-range rather than the low-conventional range.
+//    These items therefore function as testing/familiarization-effect
+//    estimators rather than perfectly-matched low-iconicity comparators.
+//    The primary iconicity contrast (trained iconic targets vs conventional
+//    targets) is unaffected — that contrast rests on the target set
+//    (conventional-noun mean 3.24) vs the iconic-target set (mean 5.46).
+//
+// 2. WORD_CLASSIFICATION dedup: removed duplicate 'spoon' and 'plate' entries
+//    from the FILLER section. They previously overrode the CONVENTIONAL
+//    CONTROLS entries with different (now-correct) ratings, making the object
+//    keyed on whichever entry appeared last. Now each word appears once, in
+//    the CONVENTIONAL CONTROLS section, with the correct Winter rating and
+//    role: 'control'.
 //
 // ============================================================================
 // v8.2 PATCH NOTES (over v8.1)
 // ============================================================================
 //
-// 1. Image variant extension fix. Pre-v8.2, filterExistingStimuli() and
-//    imagePath() constructed variant paths using each base image's extension
-//    (e.g., cracking.jpeg → probes cracking_01.jpeg). Production assets
-//    were created with .jpg/.jpeg bases but .png variants by convention,
-//    so every variant probe 404'd and PRELOAD_IMAGES never captured any
-//    variant. Trial-time imagePath() always fell through to the base file.
+// 1. Image variant extension fix. Pre-v8.2, the variant-probing logic in
+//    validateAssets() and imagePath() constructed variant paths using the
+//    base image's extension (e.g., cracking.jpeg → probes cracking_01.jpeg).
+//    Production assets were created with .jpg/.jpeg bases but .png variants
+//    by convention, so every variant probe 404'd and PRELOAD_IMAGES never
+//    captured any variant. Trial-time imagePath() always fell through to
+//    the base file.
 //
-//    Fix: hardcode `.png` as the variant extension regardless of base.
-//    This matches the convention used to produce the variant files and
-//    matches posttest v8.5's identical fix. Side benefit: eliminates
-//    24 console 404s on test launch.
+//    Fix: hardcode `_VARIANT_EXT = 'png'` as the variant extension regardless
+//    of base. This matches the convention used to produce the variant files.
+//    Side benefit: eliminates 24 console 404s on test launch.
 //
 //    If you ever want a non-PNG variant, change `_VARIANT_EXT` below.
-//
-// All other v8.1 design points unchanged.
 //
 // ============================================================================
 // v8.1 PATCH NOTES (over v8.0)
@@ -78,7 +97,7 @@
 // PARALLEL CONTROLS (4) — kitchen-domain words, never trained, pretested
 // AND posttested for every participant. Iconicity-balanced 2+2:
 //   ICONIC CONTROLS (mean 5.55): chopping 5.50, peeling 5.60
-//   CONVENTIONAL CONTROLS (mean 3.15): spoon 3.30, plate 3.00
+//   MID-RANGE CONTROLS (spoon 4.30, plate 4.08 — testing/familiarization estimators)
 //
 // NO SPLIT-HALF. v8.0's earlier draft used pid-hash counterbalance to assign
 // participants to Group A (pretested) vs Group B (held back) targets. That
@@ -197,6 +216,10 @@ const T = (name) => window[name];
 const ASSET_BUST = Math.floor(Math.random() * 100000);
 const q = Object.fromEntries(new URLSearchParams(location.search));
 
+// v8.2: variants are always PNG by convention regardless of base extension.
+// Change this if your variants use a different format.
+const _VARIANT_EXT = 'png';
+
 function toast(msg, ms = 1600) {
   const t = document.createElement('div');
   t.className = 'toast';
@@ -245,22 +268,17 @@ function audioSrc(path) {
   return asset(path);
 }
 
-// v8.2: variant files are PNG by convention, regardless of base image
-// extension. Hardcoding here keeps imagePath() and filterExistingStimuli()
-// in sync; change once if you ever switch the variant format.
-const _VARIANT_EXT = 'png';
-
 // Image variant picker — for production stimuli, prefer randomized
-// `{base}_01.{_VARIANT_EXT}` / `{base}_02.{_VARIANT_EXT}` when both variants
-// exist in the asset list, falling back to the single base image otherwise.
-// Stamps `image_variant` (1, 2, or 0 for single-take) into trial data so
-// analysis can check whether one variant is harder than the other.
+// `{base}_01.{ext}` / `{base}_02.{ext}` when both variants exist in the
+// asset list, falling back to the single base image otherwise. Stamps
+// `image_variant` (1, 2, or 0 for single-take) into trial data so analysis
+// can check whether one variant is harder than the other.
 //
 // Resolution at trial-construction time so the on_load closure and the
 // data field both reference the same variant within a single trial.
 function imagePath(base) {
   // base = "img/slicing.jpg" → check for "img/slicing_01.png" + "img/slicing_02.png"
-  // v8.2: variants are always _VARIANT_EXT (png), regardless of base ext.
+  // v8.2: variants use _VARIANT_EXT (.png) regardless of base extension.
   const m = base.match(/^(.+?)\.(jpg|jpeg|png)$/i);
   if (!m) return { path: base, variant: 0 };
   const stem = m[1];
@@ -302,8 +320,12 @@ const WORD_CLASSIFICATION = {
   'peel':    { iconic: true,  rating: 5.60, category: 'action',     role: 'control' },
 
   // CONVENTIONAL CONTROLS — never trained; production-tested at pre AND post for all
-  'spoon':   { iconic: false, rating: 3.30, category: 'object',     role: 'control' },
-  'plate':   { iconic: false, rating: 3.00, category: 'object',     role: 'control' },
+  // v8.3: Winter et al. source values. Spoon and plate sit in the mid-range
+  // (4.30, 4.08), not the low-conventional range. They function as
+  // testing/familiarization-effect estimators; the primary iconicity contrast
+  // rests on the trained target set.
+  'spoon':   { iconic: false, rating: 4.30, category: 'object',     role: 'control' },
+  'plate':   { iconic: false, rating: 4.08, category: 'object',     role: 'control' },
 
   // FOILS — never trained, used as posttest recognition distractors only
   'glug':    { iconic: true,  rating: 6.20, category: 'action',     role: 'foil' },
@@ -315,8 +337,6 @@ const WORD_CLASSIFICATION = {
   'cup':     { iconic: false, rating: 3.83, category: 'object',     role: 'foil' },
 
   // FILLER — in recipe and trained, but not in primary production analysis
-  'spoon':   { iconic: false, rating: 4.30, category: 'object',     role: 'filler' },
-  'plate':   { iconic: false, rating: 4.08, category: 'object',     role: 'filler' },
   'spatula': { iconic: false, rating: 3.91, category: 'object',     role: 'filler' },
   'sugar':   { iconic: false, rating: 3.36, category: 'ingredient', role: 'filler' },
   'egg':     { iconic: false, rating: 4.20, category: 'ingredient', role: 'filler' },
@@ -471,8 +491,8 @@ const PRODUCTION_TARGETS = [
 const PRODUCTION_CONTROLS = [
   { word: 'chop',  display: 'chopping', image: 'img/chopping.jpg', prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.50 },
   { word: 'peel',  display: 'peeling',  image: 'img/peeling.jpg',  prompt_type: 'action', iconic: true,  iconicity_marginal: false, target_form: 'bare', rating: 5.60 },
-  { word: 'spoon', display: 'spoon',    image: 'img/spoon.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.30 },
-  { word: 'plate', display: 'plate',    image: 'img/plate.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 3.00 },
+  { word: 'spoon', display: 'spoon',    image: 'img/spoon.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 4.30 },
+  { word: 'plate', display: 'plate',    image: 'img/plate.jpg',    prompt_type: 'object', iconic: false, iconicity_marginal: false, target_form: 'bare', rating: 4.08 },
 ];
 
 /* ======================== ASSET VALIDATION ======================== */
@@ -528,7 +548,7 @@ async function filterExistingStimuli() {
       allImages.add(s.image);
       const m = s.image.match(/^(.+?)\.(jpg|jpeg|png)$/i);
       if (m) {
-        // v8.2: probe variants in _VARIANT_EXT regardless of base extension.
+        // v8.2: probe variants in _VARIANT_EXT (default 'png'), regardless of base extension.
         optionalImages.add(`${m[1]}_01.${_VARIANT_EXT}`);
         optionalImages.add(`${m[1]}_02.${_VARIANT_EXT}`);
       }
