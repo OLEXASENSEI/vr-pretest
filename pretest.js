@@ -1,4 +1,15 @@
-// pretest.js — VR Pre-Test Battery (v8.4 — patches over v8.3)
+// pretest.js — VR Pre-Test Battery (v8.5 — patches over v8.4)
+//
+// ============================================================================
+// v8.5 PATCH NOTES (over v8.4)
+// ============================================================================
+//
+// 1. Bouba/kiki field naming fix. Pre-v8.5, the bouba/kiki on_finish stored
+//    correctness as `iconic_match` while every other task used `correct`.
+//    Any analysis script checking t.correct would read 0/4 for bouba/kiki
+//    for every participant. Added d.correct = d.iconic_match as an alias.
+//    `iconic_match` is retained for backwards compatibility.
+//
 //
 // ============================================================================
 // v8.4 PATCH NOTES (over v8.3)
@@ -1526,6 +1537,7 @@ function createBoubaKikiTimeline() {
       const chosen = (d.response === 0) ? window.__bk_left : window.__bk_right;
       d.word_chosen = chosen;
       d.iconic_match = (chosen === d.expected);
+      d.correct = d.iconic_match;  // v8.5: alias so all tasks share the `correct` field
       window.__bk_left = null;
       window.__bk_right = null;
     }
