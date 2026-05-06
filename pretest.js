@@ -1,4 +1,26 @@
-// pretest.js — VR Pre-Test Battery (v8.3 — patches over v8.2)
+// pretest.js — VR Pre-Test Battery (v8.4 — patches over v8.3)
+//
+// ============================================================================
+// v8.4 PATCH NOTES (over v8.3)
+// ============================================================================
+//
+// 1. Mic gate stream teardown in on_finish.
+//    Pre-v8.4, the mic gate's getUserMedia stream (used only for the level-
+//    meter visualizer) was left open after the gate trial ended. When
+//    jsPsychInitializeMicrophone then opened its own stream and created a
+//    MediaRecorder, the still-open first stream's audio tracks caused a
+//    NotSupportedError on the first MediaRecorder.start() call. jsPsych
+//    advanced past the failed trial anyway (recording_duration timer fires
+//    regardless), leaving the recorder in a half-started state. All
+//    subsequent audio trials then threw InvalidStateError: already recording.
+//    The onstop handlers from those failed trials also fired asynchronously,
+//    trying to write to a stale display_element reference — producing the
+//    repeated "Cannot set properties of null (setting 'innerHTML')" errors.
+//
+//    Fix: in mic gate on_finish, call streamRef.getTracks().forEach(t=>t.stop())
+//    before jsPsychInitializeMicrophone fires. jsPsychInitializeMicrophone
+//    opens a clean stream with no conflicts.
+//
 //
 // ============================================================================
 // v8.3 PATCH NOTES (over v8.2)
@@ -1051,7 +1073,18 @@ function buildMicSetupGate({ required = true } = {}) {
       enableBtn.addEventListener('click', startStream);
       if (textBtn) textBtn.addEventListener('click', () => { window.__mic_ok = false; });
     },
-    on_finish: () => { microphoneAvailable = !!window.__mic_ok; }
+    on_finish: () => {
+      microphoneAvailable = !!window.__mic_ok;
+      // v8.4: stop the visualizer stream before jsPsychInitializeMicrophone
+      // opens its own. Leaving the gate stream open causes a NotSupportedError
+      // on the first MediaRecorder.start() — two concurrent getUserMedia streams
+      // conflict on the audio track — which then cascades into every subsequent
+      // trial throwing InvalidStateError: already recording.
+      if (streamRef) {
+        try { streamRef.getTracks().forEach(t => t.stop()); } catch {}
+        streamRef = null;
+      }
+    }
   };
 
   return {
